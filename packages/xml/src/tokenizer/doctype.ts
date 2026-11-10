@@ -1,6 +1,6 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { MORE, scanError, Terminator, scanSpan, scanTo } from '../scan/scanner.ts';
-import { Char, isPubidText } from '../util/chars.ts';
+import { ErrorCode } from '@/errors/codes';
+import { MORE, scanError, scanSpan, scanTo, Terminator } from '@/scan/scanner';
+import { Char, isPubidText } from '@/util/chars';
 import {
   bufferEnded,
   COMMENT_OPEN_LENGTH,

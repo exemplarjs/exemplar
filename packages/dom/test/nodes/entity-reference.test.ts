@@ -1,4 +1,4 @@
-import { build, children, domException, newDocument, serialize } from '@test/helpers/dom.ts';
+import { build, children, domException, newDocument, serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import {
   type Attr,
@@ -9,7 +9,7 @@ import {
   type Node,
   type ProcessingInstruction,
   Text,
-} from '@/index.ts';
+} from '@/index';
 
 const DTD = `<!DOCTYPE r PUBLIC "-//P//EN" "r.dtd" [
 <!ENTITY t "text">
@@ -38,9 +38,7 @@ describe('EntityReference (DOM Level 1)', () => {
   it('takes the base URI of its entity, or null with none', () => {
     const document = build(
       { systemId: 'http://example.com/d.xml', text: '<!DOCTYPE r [<!ENTITY t "x">]><r>&t;</r>' },
-      {
-        replaceEntityReferences: false,
-      }
+      { replaceEntityReferences: false }
     );
     expect(document.documentElement?.firstChild?.baseURI).toBe('http://example.com/d.xml');
     expect(newDocument().createEntityReference('none').baseURI).toBeNull();

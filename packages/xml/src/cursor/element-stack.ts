@@ -1,5 +1,5 @@
-import { holdsAt, sameSpan } from '../scan/scanner.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
+import { holdsAt, sameSpan } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
 
 /**
  * The elements open around the current event, outermost first. An element is pushed at its start
@@ -22,6 +22,10 @@ export class ElementStack {
   readonly names: (string | undefined)[] = [];
   /** Where the first colon is in each open element's name, counted from the name's start, or -1. */
   readonly nameFirstColons: number[] = [];
+  /** A number for each open element, from a count of the start tags read, which tells it from elements that ended. */
+  readonly serials: number[] = [];
+  /** How many start tags have been read. */
+  #startTags = 0;
   /** Whether the root element has ended, after which no element may start. */
   rootEnded = false;
   /** The depth before the last element was left, for a call that then fails to put it back. */
@@ -42,6 +46,7 @@ export class ElementStack {
       tokenizer.nameFirstColon < 0 ? -1 : tokenizer.nameFirstColon - tokenizer.nameStart;
     tokenizer.openElementNameOffset = tokenizer.bufferOffset + tokenizer.nameStart;
     tokenizer.openElementNameLength = tokenizer.nameEnd - tokenizer.nameStart;
+    this.serials[elementDepth] = ++this.#startTags;
     this.depth = elementDepth + 1;
     return elementDepth;
   }

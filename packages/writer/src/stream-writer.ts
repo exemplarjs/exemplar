@@ -1,21 +1,32 @@
 import { ErrorCode, type QName } from '@exemplarjs/xml';
 import {
-  XMLNS_NAMESPACE,
   canonicalEncoding,
+  declarationName,
+  ErrorFactory,
   isAllWhitespace,
   isXmlName,
   reservedBindingProblem,
+  XMLNS_NAMESPACE,
 } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
 import { ContextNode } from './context-node.ts';
+import { ElementLists } from './element-lists.ts';
 import type { Encoder } from './encoders.ts';
 import { WriterError } from './error.ts';
-import { type Escaper, cdataSections, cdataSectionsAround, checkLiteral, escaper, quotedLiteral } from './escape.ts';
+import {
+  CDATA_BRACKETS_LENGTH,
+  cdataSections,
+  cdataSectionsAround,
+  checkLiteral,
+  type Escaper,
+  escaper,
+  quotedLiteral,
+} from './escape.ts';
 import { isKnownNcName, qualifiedName } from './names.ts';
 import { NamespaceBindings } from './namespaces.ts';
 import { type WritableNode, writeNode } from './node.ts';
 import type { ResolvedOutputOptions } from './options.ts';
 import { Output } from './output.ts';
+import { type CopiedReader, copyReader, copyReaderAsync } from './reader-copy.ts';
 import type { ByteSink, Sink } from './sinks.ts';
 
 /** Where the writer is in the document. */
@@ -39,7 +50,8 @@ const PREDEFINED_ENTITY_NAMES = new Set(['amp', 'lt', 'gt', 'apos', 'quot']);
  * writer.writeAttribute('lang', 'en');
  * writer.writeCharacters('Hello & welcome');
  * writer.writeEndDocument();
- * // sink.toString(): <?xml version="1.0" encoding="UTF-8"?><greeting lang="en">Hello &amp; welcome</greeting>
+ * // sink.toString(): <?xml version="1.0" encoding="UTF-8"?>
+ * // <greeting lang="en">Hello &amp; welcome</greeting>
  * ```
  *
  * A start tag stays open after `writeStartElement` so that attributes and namespace declarations
@@ -51,8 +63,6 @@ export class StreamWriter {
   readonly #output: Output;
   readonly #options: ResolvedOutputOptions;
   readonly #encoder: Encoder;
-  /** Matches a character the output encoding cannot hold, unless it holds them all. */
-  readonly #unencodable: RegExp | undefined;
   readonly #checksWellFormedness: boolean;
   readonly #namespaceAware: boolean;
   /** Repairing mode, which only a namespace-aware writer has. */
@@ -72,11 +82,12 @@ export class StreamWriter {
   /** Whether a start tag is open for attributes, and whether it came from `writeEmptyElement`. */
   #isTagOpen = false;
   #isEmptyElement = false;
+  /** The CDATA and suppress-indentation lists, and which open elements write CDATA. */
+  readonly #elementLists: ElementLists;
 
-  // The open elements: qualified names, and whether each holds element children, or CDATA by option.
+  // The open elements: qualified names, and whether each holds element children.
   readonly #openNames: string[] = [];
   readonly #hasElementChildren: boolean[] = [];
-  readonly #writesCData: boolean[] = [];
   /** Depth of the outermost open element holding text (0: text outside all, -1: none); nothing inside it is indented. */
   #textDepth = -1;
 
@@ -88,22 +99,23 @@ export class StreamWriter {
     this.#output = new Output(sink, encoder);
     this.#options = options;
     this.#encoder = encoder;
-    this.#unencodable = encoder.unencodable;
     this.#checksWellFormedness = options.checkWellFormedness;
     this.#namespaceAware = options.namespaceAware;
     this.#isRepairing = options.repairNamespaces && this.#namespaceAware;
     this.#checksBindings = this.#checksWellFormedness && this.#namespaceAware && !this.#isRepairing;
     this.#escapesMinimally = options.escaping === 'minimal';
     this.#escaper = this.#escaperFor(options.version);
+    this.#elementLists = new ElementLists(options.cdataSectionElements, options.suppressIndentation);
   }
 
   /** The escaper for an XML version. */
   #escaperFor(version: string): Escaper {
     return escaper({
-      minimal: this.#options.escaping === 'minimal',
+      minimal: this.#escapesMinimally,
       version11: version === '1.1',
       unencodable: this.#encoder.unencodable,
       checkCharacters: this.#checksWellFormedness,
+      characterMap: this.#options.characterMap,
     });
   }
 
@@ -114,7 +126,7 @@ export class StreamWriter {
 
   // The document
 
-  /** Writes the XML declaration, unless the factory omits it; a byte sink must be in the encoding it declares. */
+  /** Writes the XML declaration on a line of its own, unless the factory omits it; a byte sink must be in the encoding it declares. */
   writeStartDocument(
     version: string = this.#options.version,
     encoding: string = this.#encoder.name,
@@ -163,8 +175,7 @@ export class StreamWriter {
   writeStartElement(namespaceURI: string, localName: string): void;
   writeStartElement(prefix: string, localName: string, namespaceURI: string): void;
   writeStartElement(first: string | QName, second?: string, third?: string): void {
-    if (typeof first === 'string') this.#startElement(first, second, third, 'with content');
-    else this.#startElement(first.prefix, first.localName, first.namespaceURI, 'with content');
+    this.#startElement(first, second, third, 'with content');
   }
 
   /** Writes an empty element, which takes attributes and namespaces until the next write. */
@@ -173,21 +184,28 @@ export class StreamWriter {
   writeEmptyElement(namespaceURI: string, localName: string): void;
   writeEmptyElement(prefix: string, localName: string, namespaceURI: string): void;
   writeEmptyElement(first: string | QName, second?: string, third?: string): void {
-    if (typeof first === 'string') this.#startElement(first, second, third, 'empty');
-    else this.#startElement(first.prefix, first.localName, first.namespaceURI, 'empty');
+    this.#startElement(first, second, third, 'empty');
   }
 
   /** Starts an element from the arguments of one of the overloads; a local name alone names no namespace. */
-  #startElement(first: string, second: string | undefined, third: string | undefined, kind: ElementKind): void {
+  #startElement(first: string | QName, second: string | undefined, third: string | undefined, kind: ElementKind): void {
     this.#beforeChild();
     if (this.#checksWellFormedness && this.#state === State.EPILOG) {
       this.#fail(ErrorCode.WRITE_STATE, 'A document has only one root element');
     }
-    if (second === undefined) this.#openElement('', first, undefined, kind);
-    else if (!this.#namespaceAware) {
-      this.#openElement('', qualifiedName(third === undefined ? '' : first, second), undefined, kind);
-    } else if (third === undefined) this.#openElement(this.#prefixFor(first, 'element'), second, first, kind);
-    else this.#openElement(first, second, third, kind);
+    if (typeof first !== 'string') {
+      this.#openElement(first.prefix, first.localName, first.namespaceURI, kind); // (name)
+    } else if (second === undefined) {
+      this.#openElement('', first, undefined, kind); // (localName)
+    } else if (!this.#namespaceAware) {
+      // Without namespaces, only the three-argument form gives a prefix, kept in the name.
+      const prefix = third === undefined ? '' : first;
+      this.#openElement('', qualifiedName(prefix, second), undefined, kind); // either namespaced form
+    } else if (third === undefined) {
+      this.#openElement(this.#prefixFor(first, 'element'), second, first, kind); // (namespaceURI, localName)
+    } else {
+      this.#openElement(first, second, third, kind); // (prefix, localName, namespaceURI)
+    }
   }
 
   /** Writes a start tag and opens its element; with no URI, the element takes the default namespace its tag ends with. */
@@ -202,20 +220,26 @@ export class StreamWriter {
     this.#hasWritten = true;
     this.#openNames.push(name);
     this.#hasElementChildren.push(false);
-    this.#writesCData.push(this.#options.cdataSectionElements.has(name));
     this.#bindings.enter();
     this.#isTagOpen = true;
     this.#isEmptyElement = kind === 'empty';
     this.#contextNode.open(prefix, uri);
+    this.#elementLists.open(prefix, localName, uri);
     if (this.#isRepairing && uri !== undefined) this.#repair(prefix, uri);
   }
 
-  /** Ends the innermost open element. */
-  writeEndElement(): void {
+  /**
+   * Ends the innermost open element. Given the qualified name an end tag has, as a SAX event or an
+   * event object gives one, it checks that the open element has that name, unless namespaces are
+   * repaired, which can change the prefix written.
+   */
+  writeEndElement(endTagName?: string): void {
     if (this.#isTagOpen && this.#isEmptyElement) this.#beforeContent();
     const depth = this.#openNames.length;
     if (depth === 0) this.#fail(ErrorCode.WRITE_STATE, 'No element is open');
     const name = this.#openNames[depth - 1] as string;
+    if (endTagName !== undefined && endTagName !== name && this.#checksWellFormedness && !this.#isRepairing)
+      this.#fail(ErrorCode.WRITE_STATE, `The end tag ${endTagName} does not match the open element ${name}`);
     if (this.#isTagOpen) {
       this.#closeTag('ends element');
     } else {
@@ -229,7 +253,7 @@ export class StreamWriter {
   #popElement(): void {
     this.#openNames.pop();
     this.#hasElementChildren.pop();
-    this.#writesCData.pop();
+    this.#elementLists.close();
     this.#bindings.leave();
     const depth = this.#openNames.length;
     if (this.#textDepth > depth) this.#textDepth = -1;
@@ -238,16 +262,16 @@ export class StreamWriter {
 
   // Attributes and namespaces
 
-  /** Writes an attribute of the open start tag: by QName, local name, URI and local name, or prefix, URI and local name. */
+  /** Writes an attribute of the open start tag: by QName, local name, URI and local name, or prefix, local name and URI. */
   writeAttribute(name: QName, value: string): void;
   writeAttribute(localName: string, value: string): void;
   writeAttribute(namespaceURI: string, localName: string, value: string): void;
-  writeAttribute(prefix: string, namespaceURI: string, localName: string, value: string): void;
+  writeAttribute(prefix: string, localName: string, namespaceURI: string, value: string): void;
   writeAttribute(first: string | QName, second: string, third?: string, fourth?: string): void {
     if (typeof first !== 'string') this.#attribute(first.prefix, first.namespaceURI, first.localName, second);
     else if (third === undefined) this.#attribute('', '', first, second);
     else if (fourth === undefined) this.#attribute('', first, second, third);
-    else this.#attribute(first, second, third, fourth);
+    else this.#attribute(first, third, second, fourth);
   }
 
   /** Writes an attribute, finding a prefix for its URI when none is given; one naming a declaration declares it. */
@@ -283,7 +307,7 @@ export class StreamWriter {
   #writeAsDeclaration(prefix: string, uri: string, localName: string, value: string): boolean {
     const inXmlns = uri === XMLNS_NAMESPACE;
     if (localName === 'xmlns' && prefix === '' && (uri === '' || inXmlns)) {
-      this.writeDefaultNamespace(value);
+      this.#declarePrefix('', value);
       return true;
     }
     // The xmlns prefix with its namespace or none, or that namespace with no prefix.
@@ -334,8 +358,7 @@ export class StreamWriter {
 
   /** Throws when the output encoding cannot hold markup that cannot be written as references, such as a name. */
   #checkEncodable(text: string, what: string): void {
-    if (this.#unencodable !== undefined && this.#unencodable.test(text))
-      checkLiteral(text, this.#escaper.options, what);
+    if (this.#encoder.unencodable?.test(text) === true) checkLiteral(text, this.#escaper.options, what);
   }
 
   /** Throws when the open start tag already has an attribute of this expanded name. */
@@ -347,40 +370,30 @@ export class StreamWriter {
 
   /** Declares a namespace on the open start tag; the empty prefix declares the default namespace. */
   writeNamespace(prefix: string, namespaceURI: string): void {
-    if (prefix === '' || prefix === 'xmlns') {
-      this.writeDefaultNamespace(namespaceURI);
-      return;
-    }
-    this.#declarePrefix(prefix, namespaceURI);
+    this.#declarePrefix(prefix === 'xmlns' ? '' : prefix, namespaceURI);
   }
 
-  /** Declares a prefix on the open start tag; a writer that is not namespace-aware writes it as an attribute. */
+  /** Declares the default namespace on the open start tag. */
+  writeDefaultNamespace(namespaceURI: string): void {
+    this.#declarePrefix('', namespaceURI);
+  }
+
+  /** Declares a prefix, or the default namespace, on the open start tag; a writer that is not namespace-aware writes it as an attribute. */
   #declarePrefix(prefix: string, uri: string): void {
     this.#requireOpenTag('Namespace declarations');
     if (!this.#namespaceAware) {
-      this.#namedAttribute(`xmlns:${prefix}`, uri);
+      this.#namedAttribute(declarationName(prefix), uri);
       return;
     }
     if (this.#checksWellFormedness) this.#checkDeclaration(prefix, uri);
     this.#declareOnTag(prefix, uri);
   }
 
-  /** Declares the default namespace on the open start tag. */
-  writeDefaultNamespace(namespaceURI: string): void {
-    this.#requireOpenTag('Namespace declarations');
-    if (!this.#namespaceAware) {
-      this.#namedAttribute('xmlns', namespaceURI);
-      return;
-    }
-    if (this.#checksWellFormedness) this.#checkBinding('', namespaceURI);
-    this.#declareOnTag('', namespaceURI);
-  }
-
   /** Throws unless a prefix may be declared for a URI: it is a prefix, binds nothing reserved, and is undeclared only in XML 1.1. */
   #checkDeclaration(prefix: string, uri: string): void {
-    if (!isKnownNcName(prefix)) this.#fail(ErrorCode.WRITE_NAME, `${prefix} is not a prefix`);
+    if (prefix !== '' && !isKnownNcName(prefix)) this.#fail(ErrorCode.WRITE_NAME, `${prefix} is not a prefix`);
     this.#checkBinding(prefix, uri);
-    if (uri === '' && !this.#escaper.options.version11) {
+    if (prefix !== '' && uri === '' && !this.#escaper.options.version11) {
       this.#fail(ErrorCode.WRITE_NAME, 'A prefix can be undeclared only in XML 1.1');
     }
   }
@@ -393,19 +406,14 @@ export class StreamWriter {
       this.#fail(ErrorCode.WRITE_DUPLICATE_ATTRIBUTE, `The prefix ${prefix} is declared twice on one element`);
     }
     if (prefix !== 'xml') this.#bindings.declare(prefix, uri);
-    this.#writeAttributeText(prefix === '' ? 'xmlns' : `xmlns:${prefix}`, uri);
-  }
-
-  /** The default namespace's URI, declared or set; no namespace when none is bound. */
-  #defaultURI(): string {
-    return this.#bindings.uriOf('') ?? '';
+    this.#writeAttributeText(declarationName(prefix), uri);
   }
 
   /** The prefix to write for a URI: one already bound to it, or in repairing mode one to declare. */
   #prefixFor(uri: string, nameOf: 'element' | 'attribute'): string {
     if (uri === '') return '';
     const isElement = nameOf === 'element';
-    if (isElement && this.#defaultURI() === uri) return '';
+    if (isElement && (this.#bindings.uriOf('') ?? '') === uri) return '';
     const found = this.#bindings.prefixOf(uri);
     if (found !== undefined && (found !== '' || isElement)) return found;
     if (this.#isRepairing) return isElement ? '' : this.#bindings.newPrefix();
@@ -431,26 +439,29 @@ export class StreamWriter {
   }
 
   /** The prefix bound to a URI, declared or set, or undefined. */
-  getPrefix(namespaceURI: string): string | undefined {
+  prefixOf(namespaceURI: string): string | undefined {
     return this.#bindings.prefixOf(namespaceURI);
   }
 
   /** The URI a prefix is bound to, declared or set, or undefined. */
-  getNamespaceURI(prefix: string): string | undefined {
+  namespaceOf(prefix: string): string | undefined {
     return this.#bindings.uriOf(prefix);
   }
 
-  /** Closes the open start tag: checks its prefixes, then writes `>`, or `/>` when the element ends there. */
+  /** Closes the open start tag: checks its prefixes, writes `>` or `/>`, then matches it against the element lists. */
   #closeTag(next: 'ends element' | 'content follows'): void {
     this.#isTagOpen = false;
-    if (this.#checksBindings) this.#checkPrefixes();
-    this.#output.write(next === 'ends element' || this.#isEmptyElement ? '/>' : '>');
-  }
-
-  /** Throws unless the output binds each prefix the start tag uses to its URI. */
-  #checkPrefixes(): void {
-    const problem = this.#contextNode.unboundPrefixProblem(this.#bindings);
+    // Each prefix the start tag uses must be bound to its URI.
+    const problem = this.#checksBindings ? this.#contextNode.unboundPrefixProblem(this.#bindings) : undefined;
     if (problem !== undefined) this.#fail(ErrorCode.WRITE_UNBOUND_PREFIX, problem);
+    const endsHere = next === 'ends element' || this.#isEmptyElement;
+    this.#output.write(endsHere ? '/>' : '>');
+    const lists = this.#elementLists;
+    if (lists.isEmpty) return;
+    const depth = this.#openNames.length;
+    const name = this.#openNames[depth - 1] as string;
+    lists.noteCData(name, this.#bindings);
+    if (lists.suppressesIndentation(name, this.#bindings)) this.#noteText(depth);
   }
 
   /** Finishes an open start tag before content, and ends an empty element, before something is written inside it. */
@@ -502,7 +513,7 @@ export class StreamWriter {
     }
     if (text === '') return;
     this.#noteText(depth);
-    if (this.#writesCData[depth - 1] === true) this.#cdataSection(text, 'split ]]>');
+    if (this.#elementLists.writesCData) this.#cdataSection(text, 'split ]]>');
     else if (this.#escapesMinimally) this.#writeTextMinimally(text);
     else this.#output.write(this.#escaper.text(text));
   }
@@ -511,15 +522,15 @@ export class StreamWriter {
   #writeTextMinimally(text: string): void {
     const output = this.#output;
     const before = output.writtenLength === this.#textTailEnd ? this.#textTail : '';
-    const close = (before + text.slice(0, 2)).indexOf(']]>');
+    const close = (before + text.slice(0, CDATA_BRACKETS_LENGTH)).indexOf(']]>');
     if (close === -1 || close >= before.length) {
       output.write(this.#escaper.text(text));
     } else {
-      const greaterThan = close + 2 - before.length;
+      const greaterThan = close + CDATA_BRACKETS_LENGTH - before.length;
       const escape = this.#escaper;
       output.write(`${escape.text(text.slice(0, greaterThan))}&gt;${escape.text(text.slice(greaterThan + 1))}`);
     }
-    this.#textTail = (before + text).slice(-2);
+    this.#textTail = (before + text).slice(-CDATA_BRACKETS_LENGTH);
     this.#textTailEnd = output.writtenLength;
   }
 
@@ -577,7 +588,8 @@ export class StreamWriter {
       if (data?.includes('?>') === true) this.#fail(ErrorCode.WRITE_PI, 'A processing instruction cannot hold ?>');
     }
     checkLiteral(target + (data ?? ''), this.#escaper.options, 'a processing instruction');
-    this.#writeMarkup(data === undefined || data === '' ? `<?${target}?>` : `<?${target} ${data}?>`);
+    const hasData = data !== undefined && data !== '';
+    this.#writeMarkup(hasData ? `<?${target} ${data}?>` : `<?${target}?>`);
   }
 
   /** Writes markup that is not an element, on its own line when indenting. */
@@ -615,6 +627,20 @@ export class StreamWriter {
   flush(): void {
     this.#beforeContent();
     this.#output.flush();
+  }
+
+  /**
+   * Writes what a reader reads, from where it stands: from the start of a document, the whole
+   * document; from a start tag, that element, which can go inside a document being written. The
+   * reader can be a cursor or a delegate, so what filters and delegates change is what is written.
+   */
+  copy(reader: CopiedReader): void {
+    copyReader(this, reader);
+  }
+
+  /** Like `copy()`, waiting for an asynchronous reader's input and, before each wait, for the destination to have room. */
+  copyAsync(reader: CopiedReader): Promise<void> {
+    return copyReaderAsync(this, reader);
   }
 
   /** Resolves when the destination has room for more, so that a long run of writes can wait for a slow stream. */

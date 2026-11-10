@@ -1,5 +1,5 @@
-import type { Limits } from '../config/options.ts';
-import { ErrorCode } from '../errors/codes.ts';
+import type { Limits } from '@/config/options';
+import { ErrorCode } from '@/errors/codes';
 
 /** A limit an expansion went over: the error's code and message. */
 export interface ExceededLimit {

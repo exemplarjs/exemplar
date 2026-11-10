@@ -1,6 +1,6 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { protocolOf } from '../util/uri.ts';
+import { ErrorCode } from '@/errors/codes';
+import { ErrorFactory } from '@/util/errors';
+import { protocolOf } from '@/util/uri';
 
 /** What a resolver is asked for, as SAX's `EntityResolver2.resolveEntity` is. */
 export interface ResolveRequest {
@@ -42,6 +42,7 @@ export type Resolution = ResolvedSource | undefined | Promise<ResolvedSource | u
 export interface EntityResolver {
   /** Supplies the entity or DTD a request names; undefined to let the next resolver, or the catalog, answer. */
   resolveEntity(request: ResolveRequest): Resolution;
+
   /** Supplies an external subset to a document whose DOCTYPE names none. */
   getExternalSubset?(request: { readonly name: string; readonly baseURI?: string }): Resolution;
 }
@@ -89,6 +90,15 @@ export function accessRefusedError(uri: string): ResolutionError {
     ResolutionError,
     ErrorCode.ACCESS_REFUSED,
     `Reading ${uri} is not allowed: the access list does not name '${protocolOf(uri)}'`
+  );
+}
+
+/** The error for a read that is allowed when there is nothing to do it. */
+export function resolverMissingError(uri: string): ResolutionError {
+  return ErrorFactory.create(
+    ResolutionError,
+    ErrorCode.RESOLVER_MISSING,
+    `Reading ${uri} is allowed but there is no resolver to read it: set entityResolver or a catalog`
   );
 }
 

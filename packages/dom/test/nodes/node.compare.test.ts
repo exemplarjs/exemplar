@@ -1,4 +1,4 @@
-import { build, newDocument } from '@test/helpers/dom.ts';
+import { build, newDocument } from '@test/helpers/dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type Attr,
@@ -8,7 +8,7 @@ import {
   type Element,
   Entity,
   type Node,
-} from '@/index.ts';
+} from '@/index';
 
 const { DOCUMENT_POSITION_DISCONNECTED: DISCONNECTED, DOCUMENT_POSITION_PRECEDING: PRECEDING } = DocumentPosition;
 

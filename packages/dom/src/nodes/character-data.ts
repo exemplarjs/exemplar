@@ -1,6 +1,6 @@
-import { fail } from '../names.ts';
+import { fail } from '@/names';
 import type { Document } from './document.ts';
-import { Node, holdsNoChildren } from './node.ts';
+import { holdsNoChildren, Node } from './node.ts';
 
 /** Text, comments and CDATA, following DOM's CharacterData. */
 export abstract class CharacterData extends Node {

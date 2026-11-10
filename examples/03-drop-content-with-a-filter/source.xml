@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Prices checked on 3 March. -->
+<catalog>
+  <book id="b1">
+    <title>The Lighthouse Keeper</title>
+    <price>8.99</price>
+    <internal>
+      <supplier>Northwind Books</supplier>
+      <note>Reorder at five</note>
+    </internal>
+  </book>
+  <book id="b2">
+    <title>Small Worlds</title>
+    <price>14.50</price>
+    <internal>
+      <supplier>Harbour Press</supplier>
+    </internal>
+  </book>
+</catalog>

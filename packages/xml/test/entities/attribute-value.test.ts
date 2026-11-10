@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LIMITS, type Limits } from '@/config/options.ts';
-import type { EntityDeclaration } from '@/dtd/declarations.ts';
-import { DeclarationStore } from '@/dtd/store.ts';
+import { DEFAULT_LIMITS, type Limits } from '@/config/options';
+import type { EntityDeclaration } from '@/dtd/declarations';
+import { DeclarationStore } from '@/dtd/store';
 import {
-  type ExpansionContext,
   expandAttributeValue,
+  type ExpansionContext,
   lookupGeneral,
   normalizeTokens,
-} from '@/entities/attribute-value.ts';
-import { EntityCounter } from '@/entities/limits.ts';
+} from '@/entities/attribute-value';
+import { EntityCounter } from '@/entities/limits';
 
 /** A store holding the given general entities, as if read from a DOCTYPE with only an internal subset. */
 function storeOf(...entities: EntityDeclaration[]): DeclarationStore {

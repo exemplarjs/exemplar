@@ -1,7 +1,7 @@
-import { XI, eventsAsync, events, memoryResolver } from '@test/helpers/xinclude.ts';
+import { events, eventsAsync, memoryResolver, XI } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { XINCLUDE_NAMESPACE, xincludeProcessor } from '@/index.ts';
+import { XINCLUDE_NAMESPACE, xincludeProcessor } from '@/index';
 
 const FILES = { 'file:///doc/part.xml': '<part/>', 'file:///base/part.xml': '<based/>' };
 

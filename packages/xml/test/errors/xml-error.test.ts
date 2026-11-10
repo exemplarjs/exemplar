@@ -1,7 +1,7 @@
-import { utf8 } from '@test/helpers/lexical.ts';
-import { errorOf, reader } from '@test/helpers/parse.ts';
+import { utf8 } from '@test/helpers/lexical';
+import { errorOf, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { ErrorCode, XMLError } from '@/index.ts';
+import { ErrorCode, XMLError } from '@/index';
 
 describe('XMLError', () => {
   it('carries a code, a location and the entity chain', () => {
@@ -17,14 +17,14 @@ describe('XMLError', () => {
     expect(error.location).toEqual({ line: 1, column: 1, offset: 0 });
   });
 
-  it('keeps its message and the entity references it is given, outermost first', () => {
+  it('keeps its description apart from its message, and the entity references it is given, outermost first', () => {
     const error = new XMLError(ErrorCode.WF_ENTITY_CONTENT, 'Unbalanced', { line: 1, column: 1, offset: 0 }, [
       'e',
       'f',
     ]);
-    expect(error.message).toBe('Unbalanced');
+    expect([error.description, error.message]).toEqual(['Unbalanced', 'WF_ENTITY_CONTENT: Unbalanced (1:1)']);
     expect(error.entities).toEqual(['e', 'f']);
-    expect(String(error)).toBe('XMLError: Unbalanced');
+    expect(String(error)).toBe('XMLError: WF_ENTITY_CONTENT: Unbalanced (1:1)');
   });
 
   it('gives a new location object each time, which changing does not change the error', () => {

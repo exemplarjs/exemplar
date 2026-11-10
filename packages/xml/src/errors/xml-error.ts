@@ -25,10 +25,15 @@ export class XMLError extends Error {
   declare readonly systemId?: string;
   /** The entity references that led to the error, outermost first. */
   readonly entities: readonly string[];
+  /** What went wrong, without the code and the position the message adds. */
+  readonly description: string;
 
-  constructor(code: ErrorCode, message: string, location: Location, entities: readonly string[] = []) {
-    super(message);
+  /** An error whose message is `CODE: description (systemId line:column)`. */
+  constructor(code: ErrorCode, description: string, location: Location, entities: readonly string[] = []) {
+    const place = location.systemId === undefined ? '' : `${location.systemId} `;
+    super(`${code}: ${description} (${place}${location.line}:${location.column})`);
     this.name = 'XMLError';
+    this.description = description;
     this.code = code;
     this.line = location.line;
     this.column = location.column;
@@ -51,6 +56,8 @@ export class XMLError extends Error {
 /** Receives warnings and errors; a fatal error reaches `fatalError` before it is thrown. */
 export interface ErrorHandler {
   warning?(error: XMLError): void;
+
   error?(error: XMLError): void;
+
   fatalError?(error: XMLError): void;
 }

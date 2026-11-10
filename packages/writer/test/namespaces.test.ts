@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NamespaceBindings } from '@/namespaces.ts';
+import { NamespaceBindings } from '@/namespaces';
 
 describe('NamespaceBindings', () => {
   it('starts with xml and xmlns declared, and the empty prefix bound to no namespace in the output', () => {

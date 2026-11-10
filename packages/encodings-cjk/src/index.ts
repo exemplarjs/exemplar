@@ -21,8 +21,10 @@ interface Layout {
 /** The 94 × 94 sets as EUC writes them, from 0xA1 for both bytes. */
 const EUC_LAYOUT: Layout = { leadFirst: Euc.FIRST, trailRanges: [Euc.FIRST, Euc.LAST] };
 /** GBK: leads from 0x81, trail bytes 0x40–0x7E and 0x80–0xFE. */
+// eslint-disable-next-line no-magic-numbers -- encoding data: the table's byte layout
 const GBK_LAYOUT: Layout = { leadFirst: 0x81, trailRanges: [0x40, 0x7e, 0x80, 0xfe] };
 /** Big5: leads from 0x81, trail bytes 0x40–0x7E and 0xA1–0xFE. */
+// eslint-disable-next-line no-magic-numbers -- encoding data: the table's byte layout
 const BIG5_LAYOUT: Layout = { leadFirst: 0x81, trailRanges: [0x40, 0x7e, 0xa1, 0xfe] };
 
 /** A shared table, decoded from base64 the first time a decoder needs it. */

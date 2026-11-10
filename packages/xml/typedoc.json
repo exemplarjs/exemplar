@@ -1,0 +1,5 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts", "src/filters/index.ts", "src/resolvers/index.ts", "src/resolvers/file.ts"],
+  "intentionallyNotExported": ["Validator"]
+}

@@ -1,5 +1,5 @@
-import { fail, orNull } from '../names.ts';
-import { NodeType } from '../node-type.ts';
+import { fail, orNull } from '@/names';
+import { NodeType } from '@/node-type';
 import type { Attr } from './attr.ts';
 import type { Element } from './element.ts';
 import type { Node } from './node.ts';
@@ -27,17 +27,28 @@ class ListIterator<T> implements IterableIterator<T> {
   }
 }
 
+/** Gives a list a field that is not one of its enumerable properties, so that its keys are its nodes alone. */
+function hide(list: object, field: string, value: unknown): void {
+  Object.defineProperty(list, field, { value, writable: true });
+}
+
 /** A live list of nodes, holding them as its index properties so that `list[i]` reads as fast as an array. */
 export class NodeList<T extends Node = Node> implements Iterable<T> {
   [index: number]: T;
-  /** @internal */ _length = 0;
+
+  /** @internal */ declare _length: number;
+
+  constructor() {
+    hide(this, '_length', 0);
+  }
 
   get length(): number {
     return this._length;
   }
 
   item(index: number): T | null {
-    return Number.isInteger(index) && index >= 0 && index < this.length ? (this[index] as T) : null;
+    const inRange = Number.isInteger(index) && index >= 0 && index < this.length;
+    return inRange ? (this[index] as T) : null;
   }
 
   forEach(callback: (node: T, index: number, list: NodeList<T>) => void): void {
@@ -78,14 +89,16 @@ export class NodeList<T extends Node = Node> implements Iterable<T> {
  * list is next read, so a run of changes copies the children once.
  */
 export class ChildList extends NodeList {
-  /** @internal */ readonly _node: Node;
-  /** Whether the index properties hold the children. @internal */ _current = true;
-  /** The prototype that copies the children back at the next read, once made. @internal */ _stale: object | null =
-    null;
+  /** @internal */ declare readonly _node: Node;
+  /** Whether the index properties hold the children. @internal */ declare _current: boolean;
+  /** The prototype that copies the children back at the next read, once made. @internal */
+  declare _stale: object | null;
 
   constructor(node: Node) {
     super();
-    this._node = node;
+    hide(this, '_node', node);
+    hide(this, '_current', true);
+    hide(this, '_stale', null);
     this._fill(node.firstChild);
   }
 
@@ -124,14 +137,16 @@ function staleBase(list: ChildList): object {
  */
 export class NamedNodeMap implements Iterable<Node> {
   [index: number]: Node;
+
   /** The element whose attributes it holds; undefined for a document type's read-only maps. @internal */
-  readonly _owner: Element | undefined;
-  /** The nodes, shared with the owner. @internal */ readonly _nodes: Node[];
-  /** How many index properties the map holds. @internal */ _indexed = 0;
+  declare readonly _owner: Element | undefined;
+  /** The nodes, shared with the owner. @internal */ declare readonly _nodes: Node[];
+  /** How many index properties the map holds. @internal */ declare _indexed: number;
 
   constructor(owner: Element | undefined, nodes: Node[]) {
-    this._owner = owner;
-    this._nodes = nodes;
+    hide(this, '_owner', owner);
+    hide(this, '_nodes', nodes);
+    hide(this, '_indexed', 0);
     this._sync();
   }
 
@@ -140,7 +155,8 @@ export class NamedNodeMap implements Iterable<Node> {
   }
 
   item(index: number): Node | null {
-    return Number.isInteger(index) && index >= 0 ? (this._nodes[index] ?? null) : null;
+    if (!Number.isInteger(index) || index < 0) return null;
+    return this._nodes[index] ?? null;
   }
 
   getNamedItem(name: string): Node | null {

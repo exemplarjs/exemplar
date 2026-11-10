@@ -1,6 +1,6 @@
-import { domException } from '@test/helpers/dom.ts';
+import { domException } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { DTD_TYPES, checkName, checkPrefix, checkQName, checkQualifiedName, fail, orNull } from '@/names.ts';
+import { checkName, checkPrefix, checkQName, checkQualifiedName, DTD_TYPES, fail, orNull } from '@/names';
 
 /** Whether the engine builds a DOMException without stack frames while the limit is 0; Firefox keeps them. */
 const STACKLESS_DOM_EXCEPTIONS = ((): boolean => {

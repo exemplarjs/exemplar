@@ -1,6 +1,6 @@
-import { build, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { ProcessingInstruction } from '@/index.ts';
+import { ProcessingInstruction } from '@/index';
 
 describe('ProcessingInstruction', () => {
   it('gives its target as nodeName and its data as nodeValue and textContent (DOM Level 1)', () => {

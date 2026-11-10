@@ -1,7 +1,7 @@
-import { serialize } from '@test/helpers/dom.ts';
+import { serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { DocumentBuilder } from '@/index.ts';
+import { DocumentBuilder } from '@/index';
 
 /** A document with nested entities holding text and markup. */
 const NESTED = '<!DOCTYPE a [<!ENTITY i "<i>in</i>"><!ENTITY o "x&i;y"><!ENTITY t "text">]><a>&t;|&o;</a>';

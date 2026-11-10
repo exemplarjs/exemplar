@@ -1,7 +1,7 @@
-import { canonical } from '@test/helpers/canonical.ts';
+import { canonical } from '@test/helpers/canonical';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, XMLInputFactory, type XMLEvent } from '@exemplarjs/xml';
-import { EventWriter, type OutputOptions, StringSink, WriterError, XMLOutputFactory } from '@/index.ts';
+import { EventType, type InputOptions, XMLEventFactory, type XMLEvent, XMLInputFactory } from '@exemplarjs/xml';
+import { EventWriter, type OutputOptions, StringSink, WriterError, XMLOutputFactory } from '@/index';
 
 /** Copies a document through an event reader and an event writer; returns the output. */
 function copied(xml: string, input: InputOptions = {}, output: OutputOptions = {}): string {
@@ -115,13 +115,54 @@ describe('EventWriter (XMLEventWriter)', () => {
     const chunks: string[] = [];
     const writer = new XMLOutputFactory(NO_DECLARATION).createEventWriter({
       write: (chunk) => void chunks.push(chunk),
-      ready: async () => void waits++,
+      drain: async () => void waits++,
     });
     await writer.addAsync(new XMLInputFactory().createAsyncEventReader(stream()));
     await writer.drain();
     writer.flush();
     expect(chunks.join('')).toBe('<a x="1"><b>text</b><!--c--></a>');
     expect(waits).toBeGreaterThan(1);
+  });
+
+  it('writes the events a generator or any other iterable gives', () => {
+    const events = new XMLEventFactory();
+    function* upper(input: Iterable<XMLEvent>): Generator<XMLEvent> {
+      for (const event of input)
+        yield event.type === EventType.CHARACTERS ? events.createCharacters(event.text.toUpperCase()) : event;
+    }
+    const sink = new StringSink();
+    const writer = new XMLOutputFactory(NO_DECLARATION).createEventWriter(sink);
+    writer.add(upper(new XMLInputFactory().createEventReader('<a>x<b>y</b></a>')));
+    writer.add([events.createComment('after')]);
+    writer.flush();
+    expect(sink.toString()).toBe('<a>X<b>Y</b></a><!--after-->');
+  });
+
+  it('refuses an end tag that does not match the open element', () => {
+    const events = new XMLEventFactory();
+    const writer = new XMLOutputFactory(NO_DECLARATION).createEventWriter(new StringSink());
+    writer.add(events.createStartElement('p', 'urn:p', 'a'));
+    expect(() => writer.add(events.createEndElement('p', 'urn:p', 'b'))).toThrow(
+      expect.objectContaining({ code: 'WRITE_STATE', message: 'The end tag p:b does not match the open element p:a' })
+    );
+  });
+
+  it('writes the events any async iterable gives, waiting for room every so many', async () => {
+    const events = new XMLEventFactory();
+    async function* many(): AsyncGenerator<XMLEvent> {
+      yield events.createStartElement('', '', 'a');
+      for (let i = 0; i < 2048; i++) yield events.createCharacters('x');
+      yield events.createEndElement('', '', 'a');
+    }
+    let waits = 0;
+    const chunks: string[] = [];
+    const writer = new XMLOutputFactory(NO_DECLARATION).createEventWriter({
+      write: (chunk) => void chunks.push(chunk),
+      drain: async () => void waits++,
+    });
+    await writer.addAsync(many());
+    writer.flush();
+    expect([chunks.join('').length, waits]).toEqual(['<a></a>'.length + 2048, 2]);
   });
 
   it('flushes and closes the sink', async () => {

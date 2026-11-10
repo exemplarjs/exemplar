@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ADD_FILTER,
+  ANCESTOR_XML_ATTRIBUTES,
+  copyString,
   CREATE_READER,
   DTD_COMPLETE,
   DTD_ITEMS,
@@ -8,12 +10,13 @@ import {
   EVENT_POSITION,
   INCLUDED_DECLARATIONS,
   INPUT_ENCODING,
-  LISTEN_ENTITIES,
-  XML_ENCODING,
-  copyString,
   isIndex,
+  LISTEN_ENTITIES,
+  NAMESPACES_IN_SCOPE,
   outOfRange,
-} from '@/cursor/internal.ts';
+  READER_OPTIONS,
+  XML_ENCODING,
+} from '@/cursor/internal';
 
 describe('copyString', () => {
   it('returns a short string as it is, since V8 copies short slices itself', () => {
@@ -46,6 +49,7 @@ describe('the cursor hooks', () => {
   it('are distinct symbols', () => {
     const hooks = [
       ADD_FILTER,
+      ANCESTOR_XML_ATTRIBUTES,
       CREATE_READER,
       DTD_COMPLETE,
       DTD_ITEMS,
@@ -54,6 +58,8 @@ describe('the cursor hooks', () => {
       INCLUDED_DECLARATIONS,
       INPUT_ENCODING,
       LISTEN_ENTITIES,
+      NAMESPACES_IN_SCOPE,
+      READER_OPTIONS,
       XML_ENCODING,
     ];
     for (const hook of hooks) expect(typeof hook).toBe('symbol');

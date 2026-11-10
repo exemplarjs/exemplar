@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { grown } from '@/util/arrays.ts';
+import { grown } from '@/util/arrays';
 
 describe('grown', () => {
   it('at least doubles an array, keeping its elements and its kind', () => {

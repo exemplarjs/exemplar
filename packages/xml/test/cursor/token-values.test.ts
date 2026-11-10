@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EventType, XMLInputFactory } from '@/index.ts';
+import { EventType, XMLInputFactory } from '@/index';
 
 /** The text of each character-data, CDATA and comment event in a document, in order. */
 function texts(xml: string): string[] {

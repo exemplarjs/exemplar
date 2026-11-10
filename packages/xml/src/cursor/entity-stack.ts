@@ -1,7 +1,7 @@
-import { ErrorCode } from '../errors/codes.ts';
-import type { Location } from '../errors/xml-error.ts';
-import { scanError } from '../scan/scanner.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
+import { ErrorCode } from '@/errors/codes';
+import type { Location } from '@/errors/xml-error';
+import { scanError } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
 
 /** The location of the document's first character. */
 const DOCUMENT_START: Location = { line: 1, column: 1, offset: 0 };
@@ -121,7 +121,8 @@ export class EntityStack {
   /** A location with the document's system id added, when it has none of its own. */
   withDocumentSystemId(location: Location): Location {
     const systemId = this.#systemId;
-    return systemId === undefined || location.systemId !== undefined ? location : { ...location, systemId };
+    if (systemId === undefined || location.systemId !== undefined) return location;
+    return { ...location, systemId };
   }
 
   /** The location of the document's first character. */

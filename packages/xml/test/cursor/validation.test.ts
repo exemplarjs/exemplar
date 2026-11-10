@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ValidationContext, Validator } from '@/cursor/validation.ts';
-import { ErrorCode, EventType, type InputOptions, type XMLError, XMLInputFactory } from '@/index.ts';
+import type { ValidationContext, Validator } from '@/cursor/validation';
+import { ErrorCode, EventType, type InputOptions, type XMLError, XMLInputFactory } from '@/index';
 
 /** A validator that records what the cursor shows it, and reports whitespace in `<s>` as element content. */
 function recorder(): { validator: Validator; calls: string[]; context: () => ValidationContext } {
@@ -35,6 +35,20 @@ function read(xml: string, options: InputOptions): EventType[] {
 }
 
 describe('the validator interface', () => {
+  it('shows the validator nothing when a fed reader needs more input', () => {
+    const { validator, calls } = recorder();
+    const reader = new XMLInputFactory({ validator }).createAsyncStreamReader();
+    reader.feed(new TextEncoder().encode('<a><!--c-->'));
+    const seen: EventType[] = [];
+    for (let e = reader.next(); e !== EventType.NEED_INPUT; e = reader.next()) seen.push(e);
+    expect(calls).toEqual(['start a', `markup ${EventType.COMMENT}`]);
+    reader.feed(new TextEncoder().encode('</a>'));
+    reader.endOfInput();
+    for (let e = reader.next(); e !== EventType.END_DOCUMENT; e = reader.next()) seen.push(e);
+    expect(seen).toEqual([EventType.START_DOCUMENT, EventType.START_ELEMENT, EventType.COMMENT, EventType.END_ELEMENT]);
+    expect(calls).toEqual(['start a', `markup ${EventType.COMMENT}`, 'end a', 'endDocument']);
+  });
+
   it('makes one document validator per cursor', () => {
     let created = 0;
     const validator: Validator = {

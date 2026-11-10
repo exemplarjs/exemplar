@@ -1,4 +1,4 @@
-import { newDocument } from '@test/helpers/dom.ts';
+import { newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 
 describe('DocumentFragment (DOM Level 1)', () => {

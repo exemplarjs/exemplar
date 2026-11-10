@@ -1,6 +1,6 @@
-import { build, children, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, children, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { CDATASection, type Document, type Element, type Node, Text } from '@/index.ts';
+import { CDATASection, type Document, type Element, type Node, Text } from '@/index';
 
 /** A text node `hello` in an element. */
 function hello(): Text {

@@ -1,9 +1,9 @@
-import type { StreamReader } from '../cursor/stream-reader.ts';
-import type { Validator } from '../cursor/validation.ts';
-import type { ErrorHandler } from '../errors/xml-error.ts';
-import type { DecoderFactory, DecoderRegistry } from '../input/decoders.ts';
-import type { AsyncOpenedSource, OpenedSource, Source } from '../input/source.ts';
-import type { AccessList, EntityResolver, ResolvedSource, URIResolver } from '../resolvers/resolver.ts';
+import type { StreamReader } from '@/cursor/stream-reader';
+import type { Validator } from '@/cursor/validation';
+import type { ErrorHandler } from '@/errors/xml-error';
+import type { DecoderFactory, DecoderRegistry } from '@/input/decoders';
+import type { AsyncOpenedSource, OpenedSource, Source } from '@/input/source';
+import type { AccessList, EntityResolver, ResolvedSource, URIResolver } from '@/resolvers/resolver';
 
 /** The processing limits, defaulted as the JDK 24 `jdk.xml.*` limits are. */
 export interface Limits {
@@ -56,10 +56,13 @@ export type CatalogResolution = 'strict' | 'continue' | 'ignore';
 export interface CatalogProcessor {
   /** What happens when nothing in the catalog matches a reference. */
   readonly resolution: CatalogResolution;
+
   /** The URI an external identifier maps to, or undefined. */
   matchEntity(publicId: string | undefined, systemId: string | undefined, baseURI?: string): string | undefined;
+
   /** The URI a URI reference maps to, or undefined. */
   matchURI(uri: string, baseURI?: string): string | undefined;
+
   /** Reads a resource the catalog maps to, when no resolver supplies it. */
   read(uri: string): ResolvedSource | undefined;
 }

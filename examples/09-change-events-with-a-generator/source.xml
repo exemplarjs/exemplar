@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+  <product sku="B-101">
+    <name>The Lighthouse Keeper</name>
+    <price>899</price>
+  </product>
+  <product sku="B-205">
+    <name>Small Worlds</name>
+    <price>1450</price>
+  </product>
+</products>

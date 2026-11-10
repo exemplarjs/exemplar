@@ -1,7 +1,7 @@
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, type StreamReader, XMLError } from '@/index.ts';
-import { accessRefusedError } from '@/internal.ts';
+import { EventType, type InputOptions, type StreamReader, XMLError } from '@/index';
+import { accessRefusedError } from '@/internal';
 
 describe('the document (§2.1)', () => {
   it('needs a root element', () => {
@@ -151,7 +151,7 @@ describe('after a fatal error (§1.2)', () => {
     [
       'an entity in an attribute that an unread entity may declare',
       '<!DOCTYPE r [<!ENTITY % p SYSTEM "p.ent">%p;]><r a="&u;">t</r>',
-      {},
+      { entityResolver: { resolveEntity: () => undefined } },
       'UNREAD_ENTITY_IN_ATTRIBUTE',
     ],
   ] as const)('ends the document at %s, a recoverable error thrown for want of a handler', (_, xml, options, code) => {

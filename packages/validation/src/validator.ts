@@ -1,12 +1,12 @@
 import { type AttributeDeclaration, ErrorCode, EventType, type Location } from '@exemplarjs/xml';
 import {
   type DocumentValidator,
-  type ValidationContext,
-  type Validator,
   isNmtoken,
   isXmlName,
+  type ValidationContext,
+  type Validator,
 } from '@exemplarjs/xml/internal';
-import { type Automaton, type ContentModel, compileContentModel } from './content-model.ts';
+import { type Automaton, compileContentModel, type ContentModel } from './content-model.ts';
 
 // Module-level constants, so V8 can inline them; imported bindings are read again on every use.
 const { CHARACTERS, ENTITY_REFERENCE } = EventType;

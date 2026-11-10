@@ -1,6 +1,6 @@
-import { bytes } from '@test/helpers/lexical.ts';
+import { bytes } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
-import { BYTE_ORDER_MARK, NO_BYTES, concatBytes, isAscii, startsWithBytes } from '@/util/bytes.ts';
+import { BYTE_ORDER_MARK, concatBytes, isAscii, NO_BYTES, startsWithBytes } from '@/util/bytes';
 
 describe('byte helpers', () => {
   it('has an empty array for no bytes', () => {

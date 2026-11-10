@@ -1,24 +1,25 @@
-import { canonicalOfAsync } from '@test/helpers/canonical.ts';
-import { bytes, framed, join, split, utf16, utf8, verdict } from '@test/helpers/lexical.ts';
-import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { canonicalOfAsync } from '@test/helpers/canonical';
+import { bytes, framed, join, split, utf16, utf8, verdict } from '@test/helpers/lexical';
+import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { DecodeError } from '@/encodings/decoders.ts';
-import { XMLInputFactory } from '@/index.ts';
-import { type Decoder, DecoderRegistry } from '@/input/decoders.ts';
+import { DecodeError } from '@/encodings/decoders';
+import { InvalidArgumentError } from '@/index';
+import { XMLInputFactory } from '@/index';
+import { type Decoder, DecoderRegistry } from '@/input/decoders';
+import type { Source } from '@/input/source';
 import {
   type Chunk,
   ChunkQueue,
   CountedSource,
   DecodingFailureError,
-  PENDING,
-  type TextSource,
-  UnsupportedEncodingError,
   openAsyncSource,
   openSource,
+  PENDING,
   readStream,
   stringSource,
-} from '@/input/source.ts';
-import type { Source } from '@/input/source.ts';
+  type TextSource,
+  UnsupportedEncodingError,
+} from '@/input/source';
 
 const registry = new DecoderRegistry();
 const BOM = bytes(0xef, 0xbb, 0xbf);
@@ -123,7 +124,7 @@ describe('opening a source', () => {
     expect(() => openSource(streamOf(), registry)).toThrow(TypeError);
     expect(() => openSource(webStream(), registry)).toThrow(TypeError);
     expect(() => openSource({ stream: webStream() }, registry)).toThrow(TypeError);
-    expect(() => openSource({ systemId: 'a.xml' }, registry)).toThrow(TypeError);
+    expect(() => openSource({ systemId: 'a.xml' }, registry)).toThrow(InvalidArgumentError);
   });
 });
 
@@ -310,6 +311,12 @@ describe('streams', () => {
     expect(out.filter((chunk) => chunk === null)).toHaveLength(3);
   });
 
+  it('refuses a source object that gives its content more than once', () => {
+    const several = 'A source object has one of text, bytes, chunks or a stream, not several';
+    expect(() => openSource({ text: '<a/>', bytes: new Uint8Array() }, registry)).toThrow(several);
+    expect(() => openAsyncSource({ stream: streamOf(), text: '<a/>' }, registry)).toThrow(several);
+  });
+
   it('opens a source object with a stream, with where it came from and its encoding', async () => {
     const stream = streamOf(framed('<a>', [0xe9], '</a>'));
     const { opened, queue, pump } = openAsyncSource({ stream, systemId: 'a.xml', encoding: 'latin1' }, registry);
@@ -404,7 +411,7 @@ describe('sources through the readers', () => {
   it('refuses an asynchronous source in the synchronous reader', () => {
     expect(() => reader(streamOf(utf8('<a/>')))).toThrow(TypeError);
     expect(() => reader({ stream: webStream() })).toThrow(TypeError);
-    expect(() => reader({ systemId: 'a.xml' })).toThrow(TypeError);
+    expect(() => reader({ systemId: 'a.xml' })).toThrow(InvalidArgumentError);
   });
 
   it('reads a web stream, an async iterable and a source object with a stream asynchronously', async () => {

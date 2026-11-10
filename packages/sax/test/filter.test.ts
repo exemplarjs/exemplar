@@ -1,7 +1,7 @@
-import { HANDLER_METHODS, recorder } from '@test/helpers/recorder.ts';
+import { HANDLER_METHODS, recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
 import { XMLError } from '@exemplarjs/xml';
-import { type Attributes, SAXParser, type SAXHandler, XMLFilterImpl } from '@/index.ts';
+import { type Attributes, type SAXHandler, SAXParser, XMLFilterImpl } from '@/index';
 
 /** An error to pass through the error methods. */
 const ERROR = new XMLError('WF_TAG', 'test', { line: 1, column: 1, offset: 0 });
@@ -101,6 +101,7 @@ describe('XMLFilterImpl (SAX2 XMLFilterImpl)', () => {
         super.startElement(uri, localName === 'para' ? 'p' : localName, qName, attributes);
       }
     }
+
     const { handler, calls } = recorder();
     new SAXParser().parse('<para>x</para>', new RenamePara(handler));
     expect(calls).toEqual([
@@ -118,11 +119,13 @@ describe('XMLFilterImpl (SAX2 XMLFilterImpl)', () => {
         super.characters(text.toUpperCase());
       }
     }
+
     class Bracket extends XMLFilterImpl {
       override characters(text: string) {
         super.characters(`[${text}]`);
       }
     }
+
     const { handler, calls } = recorder(['characters']);
     new SAXParser().parse('<a>x</a>', new Upper(new Bracket(handler)));
     expect(calls).toEqual(['characters([X])']);
@@ -132,6 +135,7 @@ describe('XMLFilterImpl (SAX2 XMLFilterImpl)', () => {
     class NoComments extends XMLFilterImpl {
       override comment() {}
     }
+
     const { handler, calls } = recorder(['comment', 'characters']);
     new SAXParser().parse('<a><!--c-->t</a>', new NoComments(handler));
     expect(calls).toEqual(['characters(t)']);

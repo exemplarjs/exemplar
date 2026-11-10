@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BytesSink, encoderFor } from '@/index.ts';
-import { Output } from '@/output.ts';
+import { BytesSink, encoderFor } from '@/index';
+import { Output } from '@/output';
 
 describe('Output', () => {
   it('hands text to a sink once about 64 K characters gather, and the rest when flushed', () => {

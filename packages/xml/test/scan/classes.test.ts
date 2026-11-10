@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   CharClass,
-  NAME_CLASSES,
-  NameClass,
-  TABLES_XML_10,
-  TABLES_XML_11,
-  TABLES_REPLACEMENT_TEXT,
   isNameCharBmp,
   isNameStartCharBmp,
-} from '@/scan/classes.ts';
+  NAME_CLASSES,
+  NameClass,
+  TABLES_REPLACEMENT_TEXT,
+  TABLES_XML_10,
+  TABLES_XML_11,
+} from '@/scan/classes';
 
 const hex = (c: number): string => `U+${c.toString(16).toUpperCase().padStart(4, '0')}`;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorCode } from '@/errors/codes.ts';
+import { ErrorCode } from '@/errors/codes';
 
 describe('ErrorCode', () => {
   it('gives every code its own name as its value, so codes are stable strings', () => {

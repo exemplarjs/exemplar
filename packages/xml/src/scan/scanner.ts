@@ -1,18 +1,18 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { Char, Unicode, codePointLabel, codePointOf, isRestrictedChar } from '../util/chars.ts';
-import { ErrorFactory } from '../util/errors.ts';
+import { ErrorCode } from '@/errors/codes';
 import {
   CharClass,
   type ClassTables,
+  isNameCharBmp,
+  isNameStartCharBmp,
   NAME_CLASSES,
   NAME_LAST,
   NameClass,
   TABLES_REPLACEMENT_TEXT,
   TABLES_XML_10,
   TABLES_XML_11,
-  isNameCharBmp,
-  isNameStartCharBmp,
-} from './classes.ts';
+} from '@/scan/classes';
+import { Char, codePointLabel, codePointOf, isRestrictedChar, SURROGATE_PAIR_LENGTH, Unicode } from '@/util/chars';
+import { ErrorFactory } from '@/util/errors';
 
 // Module-level constants, so V8 can inline them; imported and exported bindings are read again on every use.
 const NAMES = NAME_CLASSES;
@@ -26,6 +26,9 @@ const { NONE: NOT_IN_NAMES, NAME_START_CHAR, COLON: NAME_COLON } = NameClass;
 const { SPACE, TAB, LINE_FEED, LESS_THAN, AMPERSAND, HYPHEN, QUESTION, GREATER_THAN, RIGHT_BRACKET, NON_ASCII } = Char;
 const { NEXT_LINE, LINE_SEPARATOR, NONCHARACTER_FFFE, NONCHARACTER_FFFF } = Char;
 const { HIGH_SURROGATE_FIRST, HIGH_SURROGATE_LAST, LOW_SURROGATE_FIRST, LOW_SURROGATE_LAST } = Unicode;
+const SURROGATE_PAIR_WIDTH = SURROGATE_PAIR_LENGTH;
+/** How far the `>` of `]]>` lies past its first `]`. */
+const CDATA_CLOSE_LAST_OFFSET = ']]>'.length - 1;
 
 /**
  * For one kind of loop, 0 where every table set classes an ASCII code unit as ordinary and 1
@@ -172,9 +175,12 @@ function checkNonAscii(state: ScanState, pos: number, char: number): number {
 function checkRightBracket(state: ScanState, pos: number): number {
   const text = state.buffer;
   // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
-  if (text.charCodeAt(pos + 1) !== RIGHT_BRACKET) return pos + 1 === text.length && !state.final ? NEED_MORE : pos;
+  if (text.charCodeAt(pos + 1) !== RIGHT_BRACKET) {
+    if (pos + 1 === text.length && !state.final) return NEED_MORE;
+    return pos;
+  }
   // eslint-disable-next-line prefer-code-point -- NaN past the end marks the end
-  const third = text.charCodeAt(pos + 2);
+  const third = text.charCodeAt(pos + CDATA_CLOSE_LAST_OFFSET);
   if (Number.isNaN(third) && !state.final) return NEED_MORE;
   if (third === GREATER_THAN) {
     throw scanError(ErrorCode.WF_CDATA_END_IN_TEXT, pos, ']]> is not allowed in character data');
@@ -286,7 +292,8 @@ function nonAsciiNameCharWidth(state: ScanState, pos: number, char: number, firs
   const low = state.buffer.charCodeAt(pos + 1);
   if (Number.isNaN(low)) return state.final ? 0 : NEED_MORE;
   const paired = low >= LOW_SURROGATE_FIRST && low <= LOW_SURROGATE_LAST;
-  return paired && codePointOf(char, low) <= NAME_LAST ? 2 : 0;
+  if (!paired) return 0;
+  return codePointOf(char, low) <= NAME_LAST ? SURROGATE_PAIR_WIDTH : 0;
 }
 
 /** Records a colon at `pos` in the name being scanned. */
@@ -361,7 +368,7 @@ function terminatorStartsAt(text: string, pos: number, terminator: TerminatorKin
   if (terminator === Terminator.PI) return second === GREATER_THAN ? pos : NOT_HERE;
   if (second !== RIGHT_BRACKET) return NOT_HERE;
   // eslint-disable-next-line prefer-code-point -- NaN past the end marks the end
-  const third = text.charCodeAt(pos + 2);
+  const third = text.charCodeAt(pos + CDATA_CLOSE_LAST_OFFSET);
   if (Number.isNaN(third)) return NEED_MORE;
   return third === GREATER_THAN ? pos : NOT_HERE;
 }

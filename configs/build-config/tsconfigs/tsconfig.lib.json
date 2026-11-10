@@ -6,9 +6,6 @@
     "lib": ["esnext", "dom"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "paths": {
-      "@/*": ["${configDir}/src/*"],
-      "@test/*": ["${configDir}/test/*"]
-    }
+    "paths": { "@/*": ["${configDir}/src/*"], "@test/*": ["${configDir}/test/*"] }
   }
 }

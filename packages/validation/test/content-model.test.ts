@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Automaton, type ContentModel, compileContentModel } from '@/content-model.ts';
+import { type Automaton, compileContentModel, type ContentModel } from '@/content-model';
 
 /** The automaton of an element-content model. */
 function automaton(content: string): Automaton {

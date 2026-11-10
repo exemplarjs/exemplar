@@ -1,7 +1,7 @@
-import { errorOf, parseEveryWay } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EntityCounter } from '@/entities/limits.ts';
-import { DEFAULT_LIMITS } from '@/index.ts';
+import { EntityCounter } from '@/entities/limits';
+import { DEFAULT_LIMITS } from '@/index';
 
 describe('limits', () => {
   it('defaults to the JDK 24 values', () => {

@@ -1,6 +1,7 @@
 import { encoderFor } from './encoders.ts';
 import { EventWriter } from './event-writer.ts';
 import { type OutputOptions, type ResolvedOutputOptions, resolveOutputOptions } from './options.ts';
+import { WritingHandler } from './sax-handler.ts';
 import { type ByteSink, type Sink, WritableStreamSink } from './sinks.ts';
 import { StreamWriter } from './stream-writer.ts';
 
@@ -25,5 +26,10 @@ export class XMLOutputFactory {
   /** Creates an event writer. */
   createEventWriter(destination: Destination, options: { readonly encoding?: string } = {}): EventWriter {
     return new EventWriter(this.createStreamWriter(destination, options));
+  }
+
+  /** Creates a SAX handler that writes the events it is given, such as those a chain of SAX filters passes on. */
+  createSAXHandler(destination: Destination, options: { readonly encoding?: string } = {}): WritingHandler {
+    return new WritingHandler(this.createStreamWriter(destination, options));
   }
 }

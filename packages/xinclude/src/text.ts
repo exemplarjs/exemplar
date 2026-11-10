@@ -1,13 +1,13 @@
 import type { ResolvedSource } from '@exemplarjs/xml';
 import {
   BYTE_ORDER_MARK,
-  type DecoderRegistry,
   canonicalEncoding,
+  type DecoderRegistry,
   detect,
+  ErrorFactory,
   holdsNonChar,
   startsWithBytes,
 } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
 
 /** Why a text inclusion failed: a resource error, which a fallback may replace, or a fatal one. */
 export class TextInclusionError extends Error {
@@ -29,15 +29,16 @@ const { UTF16BE, UTF16LE } = BYTE_ORDER_MARK;
 function encodingByXmlRules(bytes: Uint8Array): string | undefined {
   const detection = detect(bytes, true);
   if (detection === undefined || detection.byteOrderMark !== undefined) return undefined;
-  return detection.family !== 'ascii' || startsWithBytes(bytes, XML_DECLARATION_START)
-    ? detection.decoderName
-    : undefined;
+  // An ASCII-compatible encoding is detected only for text that starts with an XML declaration.
+  const startsAsXml = detection.family !== 'ascii' || startsWithBytes(bytes, XML_DECLARATION_START);
+  return startsAsXml ? detection.decoderName : undefined;
 }
 
 /** The encoding of text nothing names: UTF-16 when it starts with the first byte of either UTF-16 BOM, else UTF-8. */
 function defaultEncoding(bytes: Uint8Array): string {
   const first = bytes[0];
-  return first === UTF16BE[0] || first === UTF16LE[0] ? 'UTF-16' : 'UTF-8';
+  const startsAsUtf16 = first === UTF16BE[0] || first === UTF16LE[0];
+  return startsAsUtf16 ? 'UTF-16' : 'UTF-8';
 }
 
 /** The encoding of included text: one supplied from outside, then XML's rules for XML, then the `encoding` attribute, else UTF-8. */

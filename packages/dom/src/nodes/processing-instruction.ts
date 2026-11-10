@@ -1,6 +1,6 @@
-import { NodeType } from '../node-type.ts';
+import { NodeType } from '@/node-type';
 import type { Document } from './document.ts';
-import { Node, holdsNoChildren } from './node.ts';
+import { holdsNoChildren, Node } from './node.ts';
 
 // Module-level constants, so V8 can inline them.
 const { PROCESSING_INSTRUCTION_NODE } = NodeType;

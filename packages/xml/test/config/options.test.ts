@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LIMITS, resolveOptions } from '@/config/options.ts';
-import type { Validator } from '@/cursor/validation.ts';
-import type { EntityResolver } from '@/index.ts';
+import { DEFAULT_LIMITS, resolveOptions } from '@/config/options';
+import type { Validator } from '@/cursor/validation';
+import type { EntityResolver } from '@/index';
 
 describe('DEFAULT_LIMITS (the JDK 24 jdk.xml.* defaults)', () => {
   it('has the documented value for every limit', () => {
@@ -99,9 +99,6 @@ describe('resolveOptions', () => {
   });
 
   it('merges the limits given over the defaults', () => {
-    expect(resolveOptions({ limits: { elementDepth: 5 } }).limits).toEqual({
-      ...DEFAULT_LIMITS,
-      elementDepth: 5,
-    });
+    expect(resolveOptions({ limits: { elementDepth: 5 } }).limits).toEqual({ ...DEFAULT_LIMITS, elementDepth: 5 });
   });
 });

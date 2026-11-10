@@ -1,8 +1,8 @@
-import { build, domException, newDocument, serialize } from '@test/helpers/dom.ts';
-import { resolver } from '@test/helpers/stubs.ts';
+import { build, domException, newDocument, serialize } from '@test/helpers/dom';
+import { resolver } from '@test/helpers/stubs';
 import { describe, expect, it } from 'vitest';
-import { XMLInputFactory } from '@exemplarjs/xml';
-import { type Document, DOMParser, type Element, PARSER_ERROR_NAMESPACE, XMLSerializer } from '@/index.ts';
+import { InvalidArgumentError, XMLInputFactory } from '@exemplarjs/xml';
+import { type Document, DOMParser, type Element, PARSER_ERROR_NAMESPACE, XMLSerializer } from '@/index';
 
 /** Parses a string as application/xml. */
 function parse(text: string, parser = new DOMParser()): Document {
@@ -33,8 +33,8 @@ describe('DOMParser.parseFromString', () => {
     expect(() => new DOMParser().parseFromString('<a/>', 'text/html')).toThrow(domException('NotSupportedError'));
   });
 
-  it.each(['text/plain', 'application/json', ''])('raises a TypeError for the type %j', (type) => {
-    expect(() => new DOMParser().parseFromString('<a/>', type)).toThrow(TypeError);
+  it.each(['text/plain', 'application/json', ''])('raises an InvalidArgumentError for the type %j', (type) => {
+    expect(() => new DOMParser().parseFromString('<a/>', type)).toThrow(InvalidArgumentError);
   });
 
   it('reads its argument as a string', () => {

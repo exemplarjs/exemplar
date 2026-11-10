@@ -1,7 +1,7 @@
-import { canonicalOfAsync } from '@test/helpers/canonical.ts';
+import { canonicalOfAsync } from '@test/helpers/canonical';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { XMLInputFactory } from '@/index.ts';
-import { fetchResolver } from '@/resolvers/fetch.ts';
+import { XMLInputFactory } from '@/index';
+import { fetchResolver } from '@/resolvers/fetch';
 
 /** A stub fetch that records its calls and answers with a response made from what `respond` gives. */
 function stubFetch(
@@ -128,5 +128,14 @@ describe('fetchResolver', () => {
       systemId: 'http://example.org/doc.xml',
     });
     expect(await canonicalOfAsync(reader)).toBe('<a><b>fetched</b></a>');
+  });
+
+  it('resolves URIs too, sending the accept headers a request carries', async () => {
+    const { calls, fetch } = stubFetch(() => ({ body: '<b/>' }));
+    const resolver = fetchResolver({ fetch });
+    const resolved = await resolver.resolve('b.xml', 'https://example.org/d/doc.xml', { accept: 'text/xml' });
+    expect(calls).toEqual([{ url: 'https://example.org/d/b.xml', init: { headers: { Accept: 'text/xml' } } }]);
+    expect(resolved).toEqual({ systemId: 'https://example.org/d/b.xml', bytes: new TextEncoder().encode('<b/>') });
+    expect(await resolver.resolve('file:///b.xml', undefined)).toBeUndefined();
   });
 });

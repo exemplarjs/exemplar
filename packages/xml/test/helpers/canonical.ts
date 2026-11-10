@@ -1,4 +1,4 @@
-import { type AsyncStreamReader, EventType, type StreamReader, type XMLEvent } from '@/index.ts';
+import { type AsyncStreamReader, EventType, type StreamReader, type XMLEvent } from '@/index';
 
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -60,6 +60,7 @@ export function canonicalOf(reader: StreamReader): string {
 export async function canonicalOfAsync(reader: AsyncStreamReader): Promise<string> {
   let out = '';
   for (let event = reader.next(); event !== EventType.END_DOCUMENT; event = reader.next()) {
+    // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
     if (event === EventType.NEED_INPUT) await reader.fill();
     else out += write(reader, event);
   }

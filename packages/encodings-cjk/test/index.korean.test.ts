@@ -1,4 +1,4 @@
-import { outcome } from '@test/helpers/bytes.ts';
+import { outcome } from '@test/helpers/bytes';
 import { describe, expect, it } from 'vitest';
 
 // Each case is the bytes in hex and what the JDK decodes them to, or null for an error.

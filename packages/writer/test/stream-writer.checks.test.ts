@@ -1,12 +1,27 @@
-import { codeOf, inRoot, written } from '@test/helpers/write.ts';
+import { codeOf, inRoot, written } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
-import { type StreamWriter, StringSink, XMLOutputFactory } from '@/index.ts';
+import { type OutputOptions, type StreamWriter, StringSink, XMLOutputFactory } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
 
 /** A table row: what the write does wrong, the writes, and the code it throws. */
 type Refusal = [string, (w: StreamWriter) => void, string];
+
+describe('writeEndElement with a name', () => {
+  it('checks the name against the open element, unless checks are off', () => {
+    const named = (options: OutputOptions = {}): string => {
+      const sink = new StringSink();
+      const w = new XMLOutputFactory({ omitXMLDeclaration: true, ...options }).createStreamWriter(sink);
+      w.writeStartElement('a');
+      w.writeEndElement('b');
+      w.flush();
+      return sink.toString();
+    };
+    expect(() => named()).toThrow('The end tag b does not match the open element a');
+    expect(named({ checkWellFormedness: false })).toBe('<a/>');
+  });
+});
 
 describe('StreamWriter checks: names (§2.3, Namespaces §3)', () => {
   it.each<Refusal>([
@@ -18,7 +33,7 @@ describe('StreamWriter checks: names (§2.3, Namespaces §3)', () => {
     ['an empty element name by writeEmptyElement', (w) => w.writeEmptyElement(''), 'WRITE_NAME'],
     ['an attribute name starting with a digit', inRoot((w) => w.writeAttribute('1a', 'v')), 'WRITE_NAME'],
     ['an attribute name with a colon', inRoot((w) => w.writeAttribute('a:b', 'v')), 'WRITE_NAME'],
-    ['an attribute prefix that is not a name', inRoot((w) => w.writeAttribute('1p', 'urn:p', 'a', 'v')), 'WRITE_NAME'],
+    ['an attribute prefix that is not a name', inRoot((w) => w.writeAttribute('1p', 'a', 'urn:p', 'v')), 'WRITE_NAME'],
     ['a namespace prefix that is not a name', inRoot((w) => w.writeNamespace('1p', 'urn:p')), 'WRITE_NAME'],
     ['a namespace prefix with a colon', inRoot((w) => w.writeNamespace('a:b', 'urn:p')), 'WRITE_NAME'],
     ['an entity name with a space', inRoot((w) => w.writeEntityRef('a b')), 'WRITE_NAME'],
@@ -32,12 +47,12 @@ describe('StreamWriter checks: names (§2.3, Namespaces §3)', () => {
     ['an entity name with a colon (Namespaces §7)', inRoot((w) => w.writeEntityRef('a:b')), 'WRITE_NAME'],
     [
       'the xml prefix on an attribute in another namespace',
-      inRoot((w) => w.writeAttribute('xml', 'urn:wrong', 'lang', 'en')),
+      inRoot((w) => w.writeAttribute('xml', 'lang', 'urn:wrong', 'en')),
       'WRITE_NAME',
     ],
     [
       'another prefix on an attribute in the XML namespace',
-      inRoot((w) => w.writeAttribute('p', XML, 'a', 'v')),
+      inRoot((w) => w.writeAttribute('p', 'a', XML, 'v')),
       'WRITE_NAME',
     ],
     [
@@ -60,7 +75,7 @@ describe('StreamWriter checks: names (§2.3, Namespaces §3)', () => {
   it('refuses the xml prefix in another namespace in repairing mode too, rather than declare it', () => {
     expect(
       codeOf(
-        inRoot((w) => w.writeAttribute('xml', 'urn:wrong', 'lang', 'en')),
+        inRoot((w) => w.writeAttribute('xml', 'lang', 'urn:wrong', 'en')),
         { repairNamespaces: true }
       )
     ).toBe('WRITE_NAME');
@@ -234,8 +249,8 @@ describe('StreamWriter checks: attributes and prefixes (§3.1, Namespaces §5)',
       inRoot((w) => {
         w.writeNamespace('p', 'u');
         w.writeNamespace('q', 'u');
-        w.writeAttribute('p', 'u', 'id', '1');
-        w.writeAttribute('q', 'u', 'id', '2');
+        w.writeAttribute('p', 'id', 'u', '1');
+        w.writeAttribute('q', 'id', 'u', '2');
       }),
       'WRITE_DUPLICATE_ATTRIBUTE',
     ],
@@ -267,7 +282,7 @@ describe('StreamWriter checks: attributes and prefixes (§3.1, Namespaces §5)',
     ],
     [
       'an attribute prefix that is never declared',
-      inRoot((w) => (w.writeAttribute('p', 'urn:p', 'x', '1'), w.writeEndElement())),
+      inRoot((w) => (w.writeAttribute('p', 'x', 'urn:p', '1'), w.writeEndElement())),
       'WRITE_UNBOUND_PREFIX',
     ],
     [
@@ -310,8 +325,8 @@ describe('StreamWriter checks: attributes and prefixes (§3.1, Namespaces §5)',
         w.writeNamespace('p', 'u1');
         w.writeNamespace('q', 'u2');
         w.writeAttribute('id', '0');
-        w.writeAttribute('p', 'u1', 'id', '1');
-        w.writeAttribute('q', 'u2', 'id', '2');
+        w.writeAttribute('p', 'id', 'u1', '1');
+        w.writeAttribute('q', 'id', 'u2', '2');
       })
     );
     expect(out).toBe('<r xmlns:p="u1" xmlns:q="u2" id="0" p:id="1" q:id="2">');
@@ -374,12 +389,12 @@ describe('StreamWriter with the checks off', () => {
     ['an unbound prefix', (w) => (w.writeStartElement('p', 'a', 'urn:p'), w.writeEndElement()), '<p:a/>'],
     [
       'an attribute with the xmlns prefix in another namespace',
-      inRoot((w) => w.writeAttribute('xmlns', 'urn:x', 'p', 'u')),
+      inRoot((w) => w.writeAttribute('xmlns', 'p', 'urn:x', 'u')),
       '<r xmlns:p="u">',
     ],
     [
       'an attribute in the xmlns namespace with another prefix',
-      inRoot((w) => w.writeAttribute('q', XMLNS, 'p', 'u')),
+      inRoot((w) => w.writeAttribute('q', 'p', XMLNS, 'u')),
       '<r q:p="u">',
     ],
     [
@@ -411,7 +426,7 @@ describe('StreamWriter with the checks off', () => {
   it('still refuses a prefix in repairing mode that the element already binds to another URI', () => {
     expect(
       codeOf(
-        inRoot((w) => (w.writeNamespace('p', 'urn:1'), w.writeAttribute('p', 'urn:2', 'x', '1'))),
+        inRoot((w) => (w.writeNamespace('p', 'urn:1'), w.writeAttribute('p', 'x', 'urn:2', '1'))),
         { ...off, repairNamespaces: true }
       )
     ).toBe('WRITE_UNBOUND_PREFIX');

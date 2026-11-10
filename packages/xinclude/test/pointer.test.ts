@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventType, XMLInputFactory } from '@exemplarjs/xml';
-import { PointerMatcher, type PointerPart, Selection, parsePointer } from '@/pointer.ts';
+import { parsePointer, PointerMatcher, type PointerPart, Selection } from '@/pointer';
 
 /** An element() part, or a shorthand pointer when it has no steps. */
 function element(id: string | undefined, ...steps: number[]): PointerPart {

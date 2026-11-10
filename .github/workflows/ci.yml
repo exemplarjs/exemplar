@@ -63,8 +63,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.organization=io-timeout
-            -Dsonar.projectKey=io-timeout_exemplar
+            -Dsonar.organization=io-timeout -Dsonar.projectKey=io-timeout_exemplar
 
   # The W3C suites and consistency checks, from exemplar-tests, on this change's build.
   conformance:

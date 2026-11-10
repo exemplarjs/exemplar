@@ -1,15 +1,15 @@
-import type { ResolvedOptions } from '../config/options.ts';
-import type { EntityDeclaration } from '../dtd/declarations.ts';
-import type { DtdContext, ExternalText, Frame } from '../dtd/input.ts';
-import { DtdParser } from '../dtd/parser.ts';
-import type { DeclarationStore } from '../dtd/store.ts';
-import { type ExternalReader, ResolutionPendingError, entityRequest, resolveRequest } from '../entities/external.ts';
-import type { EntityCounter } from '../entities/limits.ts';
-import type { ErrorCode } from '../errors/codes.ts';
-import type { Location } from '../errors/xml-error.ts';
-import type { OpenedSource } from '../input/source.ts';
-import type { ResolvedSource } from '../resolvers/resolver.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
+import type { ResolvedOptions } from '@/config/options';
+import type { EntityDeclaration } from '@/dtd/declarations';
+import type { DtdContext, ExternalText, Frame } from '@/dtd/input';
+import { DtdParser } from '@/dtd/parser';
+import type { DeclarationStore } from '@/dtd/store';
+import { entityRequest, type ExternalReader, ResolutionPendingError, resolveRequest } from '@/entities/external';
+import type { EntityCounter } from '@/entities/limits';
+import type { ErrorCode } from '@/errors/codes';
+import type { Location } from '@/errors/xml-error';
+import type { OpenedSource } from '@/input/source';
+import type { ResolvedSource } from '@/resolvers/resolver';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
 import type { EntityStack } from './entity-stack.ts';
 import type { ErrorReporter } from './error-reporter.ts';
 
@@ -150,6 +150,7 @@ export class DtdLoader {
       namespaceAware: this.#options.namespaceAware,
       fail: (code, message, location, entities) => errors.fatal(code, message, location, entities),
       error,
+      warn: (code, message, location) => errors.warn(code, message, location),
       readParameterEntity: (entity) => this.#readParameterEntity(external, entity),
       ...(this.#validating && { invalid: error }),
     };

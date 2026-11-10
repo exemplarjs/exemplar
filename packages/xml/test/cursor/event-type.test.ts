@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { EventType, isCharacterData } from '@/cursor/event-type.ts';
+import { EventType, isCharacterData } from '@/cursor/event-type';
 
 it('numbers the events as StAX XMLStreamConstants does', () => {
   expect(EventType).toMatchObject({

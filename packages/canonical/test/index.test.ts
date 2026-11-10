@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import * as canonical from '@/index.ts';
+import * as canonical from '@/index';
 
 describe('@exemplarjs/canonical', () => {
-  it('exports canonicalize, and nothing else at run time', () => {
-    expect(Object.keys(canonical)).toEqual(['canonicalize']);
+  it('exports canonicalize, canonicalizeAsync and the error for a bad argument, and nothing else at run time', () => {
+    expect(Object.keys(canonical).toSorted()).toEqual(['InvalidArgumentError', 'canonicalize', 'canonicalizeAsync']);
   });
 
   it('accepts every method its type names', () => {

@@ -56,20 +56,20 @@ export class DeclarationStore {
     return !this.hasDoctype || this.isStandalone || (!this.hasExternalSubset && !this.hasParameterReferences);
   }
 
-  /** Adds an entity declaration unless one of that name was already read. */
-  declareEntity(entity: EntityDeclaration): void {
+  /** Adds an entity declaration unless one of that name was already read; returns whether it was new. */
+  declareEntity(entity: EntityDeclaration): boolean {
     const map = entity.isParameterEntity ? this.parameterEntities : this.generalEntities;
-    this.#addIfNew(map, entity.name, entity, { kind: 'entity', declaration: entity });
+    return this.#addIfNew(map, entity.name, entity, { kind: 'entity', declaration: entity });
   }
 
-  /** Adds an attribute declaration unless the element already declares that attribute. */
-  declareAttribute(attribute: AttributeDeclaration): void {
+  /** Adds an attribute declaration unless the element already declares that attribute; returns whether it was new. */
+  declareAttribute(attribute: AttributeDeclaration): boolean {
     let list = this.attributes.get(attribute.element);
     if (!list) {
       list = new Map();
       this.attributes.set(attribute.element, list);
     }
-    this.#addIfNew(list, attribute.name, attribute, { kind: 'attribute', declaration: attribute });
+    return this.#addIfNew(list, attribute.name, attribute, { kind: 'attribute', declaration: attribute });
   }
 
   /** Adds an element declaration unless one of that name was already read; returns whether it was new. */
@@ -99,6 +99,8 @@ export class DeclarationStore {
   /** A general entity as the reference at hand may use it: under `standalone="yes"`, external declarations do not count. */
   generalEntity(name: string): EntityDeclaration | undefined {
     const entity = this.generalEntities.get(name);
-    return entity?.declaredExternally === true && this.isStandalone ? undefined : entity;
+    // A standalone document may not use an entity declared in the external subset.
+    if (entity?.declaredExternally === true && this.isStandalone) return undefined;
+    return entity;
   }
 }

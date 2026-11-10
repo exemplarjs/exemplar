@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { RESIDENT_READERS } from '@/config/factory.ts';
-import type { XIncludeProcessor } from '@/config/options.ts';
-import { AsyncEventReader, EventReader, EventType, type XMLEvent, XMLInputFactory } from '@/index.ts';
-import { CREATE_READER, StreamReader } from '@/internal.ts';
+import { RESIDENT_READERS } from '@/config/factory';
+import type { XIncludeProcessor } from '@/config/options';
+import { StreamReaderDelegate } from '@/filters/index';
+import { AsyncEventReader, EventReader, EventType, type XMLEvent, XMLInputFactory } from '@/index';
+import { CREATE_READER, StreamReader } from '@/internal';
 
 const encoder = new TextEncoder();
 
@@ -76,6 +77,18 @@ describe('XMLInputFactory (JAXP XMLInputFactory)', () => {
     expect(cursor.eventType()).toBe(EventType.END_DOCUMENT);
   });
 
+  it('createEventReader reads a delegate it is given, through the delegate', () => {
+    class Upper extends StreamReaderDelegate {
+      override text(): string {
+        return super.text().toUpperCase();
+      }
+    }
+
+    const factory = new XMLInputFactory();
+    const events = [...factory.createEventReader(new Upper(factory.createStreamReader('<a>x</a>')))];
+    expect(events[2]?.type === EventType.CHARACTERS && events[2].text).toBe('X');
+  });
+
   it('createAsyncEventReader reads a source or an asynchronous cursor', async () => {
     const factory = new XMLInputFactory();
     /** The types of the events an async event reader yields. */
@@ -126,6 +139,28 @@ describe('XMLInputFactory internals', () => {
     const reader = factory[CREATE_READER]('<a>x<![CDATA[y]]></a>', { coalescing: true }, false);
     reader.next();
     expect([reader.next(), reader.text()]).toEqual([EventType.CHARACTERS, 'xy']);
+  });
+
+  it('CREATE_READER applies the same overrides again to each cursor, and others apart', () => {
+    const factory = new XMLInputFactory();
+    const overrides = { coalescing: true };
+    const texts = [overrides, overrides, { coalescing: false }].map((given) => {
+      const reader = factory[CREATE_READER]('<a>x<![CDATA[y]]></a>', given, false);
+      reader.next();
+      reader.next();
+      return reader.text();
+    });
+    expect(texts).toEqual(['xy', 'xy', 'x']);
+  });
+
+  it('CREATE_READER reports to a per-call error handler over the cached overrides', () => {
+    const factory = new XMLInputFactory();
+    const overrides = { checkNormalization: true };
+    const warnings: string[] = [];
+    const errorHandler = { warning: (e: { code: string }) => warnings.push(e.code) };
+    const reader = factory[CREATE_READER]('<?xml version="1.1"?><a>e\u0301</a>', overrides, false, errorHandler);
+    while (reader.next() !== EventType.END_DOCUMENT);
+    expect(warnings).toEqual(['NOT_FULLY_NORMALIZED']);
   });
 
   it('CREATE_READER makes an asynchronous cursor when asked', async () => {

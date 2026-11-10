@@ -1,5 +1,5 @@
-import type { AsyncOpenedSource, ChunkQueue } from '../input/source.ts';
-import { ErrorFactory } from '../util/errors.ts';
+import type { AsyncOpenedSource, ChunkQueue } from '@/input/source';
+import { ErrorFactory, IllegalStateError } from '@/util/errors';
 import { EventType } from './event-type.ts';
 
 /**
@@ -43,7 +43,7 @@ export class AsyncInput {
   #fedQueue(): ChunkQueue {
     const input = this.#asyncSource;
     if (input?.queue === undefined || input.pump !== undefined) {
-      throw ErrorFactory.create(TypeError, 'Only an asynchronous reader created without a source can be fed');
+      throw ErrorFactory.create(IllegalStateError, 'Only an asynchronous reader created without a source can be fed');
     }
     return input.queue;
   }
@@ -52,7 +52,7 @@ export class AsyncInput {
   needInput(): EventType {
     if (this.#starved) {
       throw ErrorFactory.create(
-        Error,
+        IllegalStateError,
         'The reader needs more input: await fill(), or feed it, before calling next() again'
       );
     }

@@ -1,12 +1,17 @@
+/** How many bits a byte holds, and how many values it takes. */
+export const BYTE_BITS = 8;
+export const BYTE_VALUES = 256;
+/** The mask that keeps the lowest byte of a number. */
+export const BYTE_MASK = 0xff;
+/** How many hexadecimal digits write a byte. */
+export const HEX_DIGITS_PER_BYTE = 2;
+
 /** An empty byte array, shared so that nothing allocates one. */
 export const NO_BYTES = new Uint8Array(0);
 
 /** U+FEFF, the byte order mark, as UTF-8, UTF-16BE and UTF-16LE write it. */
-export const BYTE_ORDER_MARK = {
-  UTF8: [0xef, 0xbb, 0xbf],
-  UTF16BE: [0xfe, 0xff],
-  UTF16LE: [0xff, 0xfe],
-} as const;
+// eslint-disable-next-line no-magic-numbers -- the byte order mark's bytes in each encoding
+export const BYTE_ORDER_MARK = { UTF8: [0xef, 0xbb, 0xbf], UTF16BE: [0xfe, 0xff], UTF16LE: [0xff, 0xfe] } as const;
 
 /** Joins two byte arrays into a new one. */
 export function concatBytes(first: Uint8Array, second: Uint8Array): Uint8Array {
@@ -18,8 +23,9 @@ export function concatBytes(first: Uint8Array, second: Uint8Array): Uint8Array {
 
 /** The high bit of each byte in a 32-bit word, which is set only in non-ASCII bytes. */
 const HIGH_BITS = 0x80_80_80_80;
-/** How many bytes a 32-bit word holds. */
+/** How many bytes a 32-bit word holds, and the right shift that divides a byte count by it. */
 const BYTES_PER_WORD = 4;
+const BYTES_PER_WORD_SHIFT = 2;
 
 /**
  * Whether every byte is ASCII. It ORs all the bytes together and checks the high bit once, reading
@@ -27,7 +33,7 @@ const BYTES_PER_WORD = 4;
  */
 export function isAscii(bytes: Uint8Array): boolean {
   const unalignedHead = Math.min(-bytes.byteOffset & (BYTES_PER_WORD - 1), bytes.length);
-  const wordCount = (bytes.length - unalignedHead) >>> 2;
+  const wordCount = (bytes.length - unalignedHead) >>> BYTES_PER_WORD_SHIFT;
   let allBits = 0;
   for (let i = 0; i < unalignedHead; i++) allBits |= bytes[i] as number;
   if (wordCount > 0) {

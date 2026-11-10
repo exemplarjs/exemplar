@@ -13,10 +13,7 @@
       "inputs": ["$TURBO_DEFAULT$", "!README.md"],
       "outputs": ["dist/**"]
     },
-    "test": {
-      "dependsOn": ["^compile"],
-      "env": ["EXEMPLAR_FUZZ_SCALE", "EXEMPLAR_FUZZ_SEED", "EXEMPLAR_FUZZ_PATH"]
-    },
+    "test": { "dependsOn": ["^compile"], "env": ["EXEMPLAR_FUZZ_SCALE", "EXEMPLAR_FUZZ_SEED", "EXEMPLAR_FUZZ_PATH"] },
     "test:coverage": {
       "dependsOn": ["^compile"],
       "outputs": ["coverage/**"],

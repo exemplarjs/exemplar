@@ -1,4 +1,4 @@
-import { DocumentPosition, NodeType } from '../node-type.ts';
+import { DocumentPosition, NodeType } from '@/node-type';
 import type { Attr } from './attr.ts';
 import type { DocumentType } from './document-type.ts';
 import type { Element } from './element.ts';
@@ -28,7 +28,9 @@ function container(node: Node): Node | null {
   if (node.nodeType === ATTRIBUTE_NODE) return (node as Attr)._ownerElement;
   if (!isDeclaration(node)) return node._parent;
   const doctype = node._owner?.doctype ?? null;
-  return doctype !== null && [...doctype._entities, ...doctype._notations].includes(node) ? doctype : null;
+  if (doctype === null) return null;
+  const isDeclared = [...doctype._entities, ...doctype._notations].includes(node);
+  return isDeclared ? doctype : null;
 }
 
 /** A node and the nodes that hold it, outermost first. */

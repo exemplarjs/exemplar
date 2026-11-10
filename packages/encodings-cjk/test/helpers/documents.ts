@@ -1,4 +1,4 @@
-import { bytes, hex } from '@test/helpers/bytes.ts';
+import { bytes, hex } from '@test/helpers/bytes';
 import {
   type AsyncStreamReader,
   EventType,
@@ -7,13 +7,13 @@ import {
   XMLError,
   XMLInputFactory,
 } from '@exemplarjs/xml';
-import { cjkDecoders } from '@/index.ts';
+import { cjkDecoders } from '@/index';
 
 /** A factory with the CJK decoders registered. */
 export const cjkFactory = new XMLInputFactory({ decoders: cjkDecoders });
 
 /** A document's events as text: start tags with their attributes, text, and end tags. */
-export function eventsOf(reader: StreamReader): string[] {
+function eventsOf(reader: StreamReader): string[] {
   const out: string[] = [];
   for (let event = reader.next(); event !== EventType.END_DOCUMENT; event = reader.next()) {
     out.push(...eventsAt(reader, event));

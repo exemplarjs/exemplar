@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SINGLE_BYTE_TABLES } from '@/encodings/tables.ts';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
 
 const TABLES = Object.entries(SINGLE_BYTE_TABLES);
 const EBCDIC = TABLES.filter(([, table]) => table.length === 256);

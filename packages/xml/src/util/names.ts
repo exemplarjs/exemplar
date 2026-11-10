@@ -1,4 +1,4 @@
-import { NAME_CLASSES, NAME_LAST, NameClass, isNameCharBmp, isNameStartCharBmp } from '../scan/classes.ts';
+import { isNameCharBmp, isNameStartCharBmp, NAME_CLASSES, NAME_LAST, NameClass } from '@/scan/classes';
 import { Char, Unicode } from './chars.ts';
 
 // Module-level constants, so V8 can inline them.
@@ -49,13 +49,13 @@ function isAsciiNameOrToken(text: string, nameStartFirst: boolean): boolean {
 }
 
 /** Whether a code point is a NameStartChar (§2.3 [4]), which may start a name. */
-function isNameStartChar(codePoint: number): boolean {
+export function isNameStartChar(codePoint: number): boolean {
   if (codePoint < NON_ASCII) return (NAME_CLASSES[codePoint] as number) >= NameClass.NAME_START_CHAR;
   return codePoint >= SUPPLEMENTARY_FIRST ? codePoint <= NAME_LAST : isNameStartCharBmp(codePoint);
 }
 
 /** Whether a code point is a NameChar (§2.3 [4a]), which may appear in a name after its first character. */
-function isNameChar(codePoint: number): boolean {
+export function isNameChar(codePoint: number): boolean {
   if (codePoint < NON_ASCII) return (NAME_CLASSES[codePoint] as number) !== NameClass.NONE;
   return codePoint >= SUPPLEMENTARY_FIRST ? codePoint <= NAME_LAST : isNameCharBmp(codePoint);
 }
@@ -74,6 +74,15 @@ export function splitQName(name: string): [string, string] | undefined {
   if (colon === -1) return ['', name];
   if (colon === 0 || colon === name.length - 1 || name.includes(':', colon + 1)) return undefined;
   return [name.slice(0, colon), name.slice(colon + 1)];
+}
+
+/** A lexical QName's prefix (`''` for none) and local part, or undefined unless both are NCNames. */
+export function lexicalQNameParts(text: string): [string, string] | undefined {
+  const parts = splitQName(text);
+  if (parts === undefined) return undefined;
+  const [prefix, localName] = parts;
+  if (!isNcName(localName) || (prefix !== '' && !isNcName(prefix))) return undefined;
+  return parts;
 }
 
 /** A qualified name's prefix, `''` for none. */

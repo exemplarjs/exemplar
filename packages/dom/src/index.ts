@@ -1,5 +1,7 @@
 /** @exemplarjs/dom: the DOM Level 3 Core tree, its builder, and browser-style `DOMParser` and `XMLSerializer`. */
+export { IllegalStateError, InvalidArgumentError } from '@exemplarjs/xml';
 export { type BuilderOptions, DocumentBuilder } from './builder.ts';
+export type { MissingAttribute } from './nodes/index.ts';
 export { DOMConfiguration, DOMError, type DOMErrorHandler, DOMLocator, DOMStringList } from './config.ts';
 export {
   Attr,
@@ -27,3 +29,4 @@ export {
   UserDataOperation,
 } from './nodes/index.ts';
 export { DOMParser, PARSER_ERROR_NAMESPACE, XMLSerializer } from './parser.ts';
+export { DOMBuildingHandler } from './sax-handler.ts';

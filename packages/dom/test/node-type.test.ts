@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DocumentPosition, NodeType } from '@/node-type.ts';
-import { Node } from '@/nodes/index.ts';
+import { DocumentPosition, NodeType } from '@/node-type';
+import { Node } from '@/nodes/index';
 
 describe('NodeType', () => {
   it.each(Object.entries(NodeType))('numbers %s %i, as Node does', (name, value) => {

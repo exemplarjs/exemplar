@@ -1,6 +1,6 @@
-import { parseEveryWay } from '@test/helpers/parse.ts';
+import { parseEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { decodeReferences, normalizeAttributeValue, normalizeLineEnds, rawIndexMapper } from '@/util/normalize.ts';
+import { decodeReferences, normalizeAttributeValue, normalizeLineEnds, rawIndexMapper } from '@/util/normalize';
 
 describe('line ends (§2.11)', () => {
   it('normalizes CRLF and a lone CR to LF in character data', () => {

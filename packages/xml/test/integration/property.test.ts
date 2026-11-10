@@ -1,8 +1,8 @@
 import { fc, test } from '@fast-check/vitest';
-import { write } from '@test/helpers/canonical.ts';
-import { canonical, parseEveryWay } from '@test/helpers/parse.ts';
+import { write } from '@test/helpers/canonical';
+import { canonical, parseEveryWay } from '@test/helpers/parse';
 import { expect } from 'vitest';
-import { EventType, XMLInputFactory } from '@/index.ts';
+import { EventType, XMLInputFactory } from '@/index';
 
 // The nightly run scales the number of runs up.
 const SCALE = Number(globalThis.process?.env['EXEMPLAR_FUZZ_SCALE'] ?? 1);
@@ -32,10 +32,7 @@ const node: fc.Arbitrary<Node> = fc.letrec<{ node: Node; element: Node }>((tie) 
   element: fc.record({
     kind: fc.constant('element' as const),
     name,
-    attributes: fc.uniqueArray(fc.tuple(name, value), {
-      selector: ([n]) => n,
-      maxLength: 4,
-    }),
+    attributes: fc.uniqueArray(fc.tuple(name, value), { selector: ([n]) => n, maxLength: 4 }),
     children: fc.array(tie('node'), { maxLength: 4 }),
   }),
   node: fc.oneof(

@@ -27,13 +27,35 @@ export function isAllWhitespace(text: string): boolean {
   return isWhitespaceSpan(text, 0, text.length, false);
 }
 
-/**
- * Normalizes a public identifier (§4.2.2, XML Catalogs §6.2): each run of whitespace becomes one
- * space, and there is none at either end.
- */
+/** XML's whitespace characters (S, §2.3 [3]) as a regex character class, for building patterns. */
+export const WHITESPACE_CLASS = String.raw`[\t\n\r ]`;
+
+/** Runs of whitespace (S); `replaceAll` and `split` both ignore its `lastIndex`. */
+const WHITESPACE_RUN = new RegExp(`${WHITESPACE_CLASS}+`, 'g');
+
+/** Text with each run of whitespace (S) made one space, and none at either end. JavaScript's `trim()` takes more, such as U+00A0. */
+export function collapseWhitespace(text: string): string {
+  return text.replaceAll(WHITESPACE_RUN, ' ').replace(/^ /, '').replace(/ $/, '');
+}
+
+/** Text without whitespace (S) at either end. */
+export function trimWhitespace(text: string): string {
+  let start = 0;
+  let end = text.length;
+  // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
+  while (start < end && isWhitespaceChar(text.charCodeAt(start), false)) start++;
+  // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
+  while (end > start && isWhitespaceChar(text.charCodeAt(end - 1), false)) end--;
+  return text.slice(start, end);
+}
+
+/** The tokens of text separated by whitespace (S), without empty ones. */
+export function splitWhitespace(text: string): string[] {
+  const trimmed = trimWhitespace(text);
+  return trimmed === '' ? [] : trimmed.split(WHITESPACE_RUN);
+}
+
+/** Normalizes a public identifier (§4.2.2, XML Catalogs §6.2): whitespace collapsed. */
 export function normalizePublicId(id: string): string {
-  return id
-    .replaceAll(/[\t\n\r ]+/g, ' ')
-    .replace(/^ /, '')
-    .replace(/ $/, '');
+  return collapseWhitespace(id);
 }

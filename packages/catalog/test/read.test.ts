@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readLocalFile } from '@/read.ts';
+import { readLocalFile } from '@/read';
 
 describe('readLocalFile', () => {
   afterEach(() => {

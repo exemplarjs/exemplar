@@ -1,8 +1,8 @@
-import { DOCUMENTS } from '@test/helpers/documents.ts';
-import { build, buildAsync, serialize, streamOf, utf16, utf8 } from '@test/helpers/dom.ts';
+import { DOCUMENTS } from '@test/helpers/documents';
+import { build, buildAsync, serialize, streamOf, utf16, utf8 } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import type { Source } from '@exemplarjs/xml';
-import { type Document, DocumentBuilder } from '@/index.ts';
+import { type Document, DocumentBuilder } from '@/index';
 
 /** Splits bytes into chunks of one size. */
 function chunks(bytes: Uint8Array, size: number): Uint8Array[] {

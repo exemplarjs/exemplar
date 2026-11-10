@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { ScopeStack } from '@/scopes.ts';
+import { ScopeStack } from '@/scopes';
 
 describe('ScopeStack', () => {
   it('records the base URI, language and namespaces in scope at each open element', () => {

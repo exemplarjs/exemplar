@@ -1,18 +1,46 @@
-import type { EventType } from '../cursor/event-type.ts';
-import type { AsyncStreamReader, StreamReader } from '../cursor/readers.ts';
-import type { Doctype } from '../cursor/stream-reader.ts';
-import type { Location } from '../errors/xml-error.ts';
+import type { EventType } from '@/cursor/event-type';
+import * as navigation from '@/cursor/navigation';
+import type { AsyncStreamReader, StreamReader } from '@/cursor/readers';
+import type { StreamReader as Cursor, Doctype } from '@/cursor/stream-reader';
+import type { Location } from '@/errors/xml-error';
+import { ErrorFactory, IllegalStateError } from '@/util/errors';
+
+/** The parent of a delegate made without one: every use of it says the delegate needs a parent first. */
+const NO_PARENT = new Proxy(
+  {},
+  {
+    get(): never {
+      throw ErrorFactory.create(IllegalStateError, 'The delegate has no parent to read yet: set its parent first');
+    },
+  }
+) as StreamReader;
 
 /**
- * Forwards every call to a parent reader, as StAX's `StreamReaderDelegate` does. Each method calls
- * the parent's method of the same name, so `StreamReader` documents what each does; a subclass
- * overrides the ones it wants to change. To skip events, a filter (`createFilteredReader`) is faster.
+ * Forwards calls to a parent reader, as StAX's `StreamReaderDelegate` does. A method calls the
+ * parent's method of the same name, so `StreamReader` documents what each does; a subclass
+ * overrides the ones it wants to change:
+ *
+ * ```ts
+ * class Shouting extends StreamReaderDelegate {
+ *   override text(): string {
+ *     return super.text().toUpperCase();
+ *   }
+ * }
+ * const document = new XdmDocumentBuilder().parse(new Shouting(factory.createStreamReader(source)));
+ * ```
+ *
+ * `nextTag`, `elementText` and `forEachEvent` read through the delegate's own `next()`, so an
+ * override of `next()` applies to them too. Every API that takes a reader takes a delegate. To skip
+ * events, a filter (`createFilteredReader`) is faster.
+ *
+ * A delegate can be made without a parent and given one before it is read, by setting `parent` or
+ * with `createDelegatedReader`, which stacks several delegates on a reader.
  */
 export class StreamReaderDelegate {
-  /** The reader calls are forwarded to. */
-  parent: StreamReader | AsyncStreamReader;
+  /** The reader calls are forwarded to; set it before reading, not part way through a document. */
+  parent: StreamReader | AsyncStreamReader | StreamReaderDelegate;
 
-  constructor(parent: StreamReader | AsyncStreamReader) {
+  constructor(parent: StreamReader | AsyncStreamReader | StreamReaderDelegate = NO_PARENT) {
     this.parent = parent;
   }
 
@@ -96,12 +124,13 @@ export class StreamReaderDelegate {
     return this.parent.isAttributeSpecified(index);
   }
 
-  attributeValue(index: number): string;
-  attributeValue(namespaceURI: string, localName: string): string | undefined;
-  attributeValue(indexOrNamespace: number | string, localName?: string): string | undefined {
-    return typeof indexOrNamespace === 'number'
-      ? this.parent.attributeValue(indexOrNamespace)
-      : this.parent.attributeValue(indexOrNamespace, localName as string);
+  attributeValue(index: number): string {
+    return this.parent.attributeValue(index);
+  }
+
+  /** Finds the attribute through the delegate's own accessors, so it gives what an override of them gives. */
+  attribute(localName: string, namespaceURI = ''): string | undefined {
+    return navigation.attributeNamed(this, localName, namespaceURI);
   }
 
   text(): string {
@@ -132,6 +161,10 @@ export class StreamReaderDelegate {
     return this.parent.encoding();
   }
 
+  declaredEncoding(): string | undefined {
+    return this.parent.declaredEncoding();
+  }
+
   standalone(): boolean | undefined {
     return this.parent.standalone();
   }
@@ -141,22 +174,37 @@ export class StreamReaderDelegate {
   }
 
   nextTag(): EventType {
-    return this.parent.nextTag();
+    return navigation.nextTag(this);
   }
 
   elementText(): string {
-    return this.parent.elementText();
+    return navigation.elementText(this);
   }
 
   nextTagAsync(): Promise<EventType> {
-    return (this.parent as AsyncStreamReader).nextTagAsync();
+    return navigation.nextTagAsync(this);
   }
 
   elementTextAsync(): Promise<string> {
-    return (this.parent as AsyncStreamReader).elementTextAsync();
+    return navigation.elementTextAsync(this);
   }
 
-  forEachEvent(handle: Parameters<AsyncStreamReader['forEachEvent']>[0]): Promise<void> {
-    return (this.parent as AsyncStreamReader).forEachEvent(handle);
+  skipElement(): void {
+    navigation.skipElement(this);
   }
+
+  skipElementAsync(): Promise<void> {
+    return navigation.skipElementAsync(this);
+  }
+
+  forEachEvent(handle: (type: Exclude<EventType, typeof EventType.NEED_INPUT>, reader: this) => void): Promise<void> {
+    return navigation.forEachEvent(this, handle);
+  }
+}
+
+/** The cursor a reader reads with: the reader itself, or the one at the bottom of a chain of delegates. @internal */
+export function cursorOf(reader: Cursor | StreamReaderDelegate): Cursor {
+  let cursor = reader;
+  while (cursor instanceof StreamReaderDelegate) cursor = cursor.parent as Cursor | StreamReaderDelegate;
+  return cursor;
 }

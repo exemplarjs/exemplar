@@ -1,8 +1,9 @@
-import { EventType } from '../cursor/event-type.ts';
-import type { AsyncStreamReader, StreamReader as PublicStreamReader } from '../cursor/readers.ts';
-import type { StreamReader } from '../cursor/stream-reader.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { isAllWhitespace } from '../util/whitespace.ts';
+import { EventType } from '@/cursor/event-type';
+import type { AsyncStreamReader, StreamReader as PublicStreamReader } from '@/cursor/readers';
+import type { StreamReader } from '@/cursor/stream-reader';
+import { cursorOf } from '@/filters/delegate';
+import { ErrorFactory, IllegalStateError } from '@/util/errors';
+import { isAllWhitespace } from '@/util/whitespace';
 import { EventBuilder, type XMLEvent } from './events.ts';
 
 /** Decides whether a filtered event reader yields an event, as StAX's `EventFilter` does. */
@@ -37,6 +38,8 @@ class EventPump {
   readonly reader: StreamReader;
   readonly filters: EventFilter[] = [];
   readonly #builder = new EventBuilder();
+  /** The cursor the reader reads with, itself unless it is a delegate. */
+  readonly #cursor: StreamReader;
   /** Whether the cursor's first event has been read. */
   #readFirstEvent = false;
   /** Whether END_DOCUMENT has been read, after which there are no more events. */
@@ -44,6 +47,7 @@ class EventPump {
 
   constructor(reader: StreamReader) {
     this.reader = reader;
+    this.#cursor = cursorOf(reader);
   }
 
   /** The next event that passes the filters, if the input buffered so far holds one; undefined when the cursor needs input or has ended. */
@@ -59,7 +63,7 @@ class EventPump {
       }
       if (type === EventType.NEED_INPUT) return undefined;
       if (type === EventType.END_DOCUMENT) this.ended = true;
-      const event = this.#builder.build(reader, type);
+      const event = this.#builder.build(reader, this.#cursor, type);
       if (accepts(this.filters, event)) return event;
     }
     return undefined;
@@ -98,7 +102,7 @@ export class EventReader implements IterableIterator<XMLEvent> {
   /** The next event; throws after END_DOCUMENT. */
   nextEvent(): XMLEvent {
     const event = this.#take();
-    if (event === undefined) throw ErrorFactory.create(Error, 'There are no more events');
+    if (event === undefined) throw ErrorFactory.create(IllegalStateError, 'There are no more events');
     return event;
   }
 
@@ -113,7 +117,7 @@ export class EventReader implements IterableIterator<XMLEvent> {
     for (;;) {
       const event = this.nextEvent();
       if (event.type === EventType.START_ELEMENT || event.type === EventType.END_ELEMENT) return event;
-      if (!nextTagMaySkip(event)) throw ErrorFactory.create(Error, 'Expected a start or end tag');
+      if (!nextTagMaySkip(event)) throw ErrorFactory.create(IllegalStateError, 'Expected a start or end tag');
     }
   }
 
@@ -124,7 +128,7 @@ export class EventReader implements IterableIterator<XMLEvent> {
       const event = this.nextEvent();
       if (event.type === EventType.END_ELEMENT) return text;
       if (event.type === EventType.START_ELEMENT)
-        throw ErrorFactory.create(Error, 'elementText() found a child element');
+        throw ErrorFactory.create(IllegalStateError, 'elementText() found a child element');
       if (event.type === EventType.CHARACTERS || event.type === EventType.CDATA || event.type === EventType.SPACE) {
         text += event.text;
       }
@@ -148,7 +152,7 @@ export class EventReader implements IterableIterator<XMLEvent> {
   #readNext(): XMLEvent | undefined {
     const event = this.#pump.poll();
     if (event === undefined && !this.#pump.ended) {
-      throw ErrorFactory.create(Error, 'An asynchronous reader needs an asynchronous event reader');
+      throw ErrorFactory.create(IllegalStateError, 'An asynchronous reader needs an asynchronous event reader');
     }
     return event;
   }
@@ -187,6 +191,7 @@ export class AsyncEventReader implements AsyncIterableIterator<XMLEvent> {
       const event = pump.poll();
       if (event !== undefined) return { done: false, value: event };
       if (pump.ended) return { done: true, value: undefined };
+      // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
       await pump.reader.fill();
     }
   }
@@ -198,6 +203,7 @@ export class AsyncEventReader implements AsyncIterableIterator<XMLEvent> {
       const batch: XMLEvent[] = [];
       for (let event = pump.poll(); event !== undefined; event = pump.poll()) batch.push(event);
       if (batch.length > 0) yield batch;
+      // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
       if (!pump.ended) await pump.reader.fill();
     }
   }

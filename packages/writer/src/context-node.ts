@@ -50,8 +50,9 @@ export class ContextNode {
   unboundPrefixProblem(bindings: NamespaceBindings): string | undefined {
     const uri = this.#uri;
     if (uri !== undefined && bindings.declaredURIOf(this.#prefix) !== uri) {
-      const what = this.#prefix === '' ? 'The default namespace' : `The prefix ${this.#prefix}`;
-      return `${what} is not bound to ${uri || 'no namespace'}`;
+      if (this.#prefix !== '') return `The prefix ${this.#prefix} is not bound to ${uri}`;
+      if (uri !== '') return `The default namespace is not bound to ${uri}`;
+      return 'An element in no namespace needs xmlns="" here: call writeDefaultNamespace(\'\') or turn on repairNamespaces';
     }
     for (let i = 0; i < this.#attributePrefixes.length; i++) {
       const prefix = this.#attributePrefixes[i] as string;

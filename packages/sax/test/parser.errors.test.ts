@@ -1,7 +1,7 @@
-import { recorder } from '@test/helpers/recorder.ts';
+import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
 import { type ErrorHandler, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { SAXParser, type SAXHandler } from '@/index.ts';
+import { type SAXHandler, SAXParser } from '@/index';
 
 /** A document with a recoverable error: a parameter entity that is not declared (VC: Entity Declared). */
 const RECOVERABLE = '<!DOCTYPE a [%p;]><a/>';

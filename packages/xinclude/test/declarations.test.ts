@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventType, type StreamReader, XMLInputFactory } from '@exemplarjs/xml';
-import { Declarations } from '@/declarations.ts';
+import { Declarations } from '@/declarations';
 
 /** A DTD declaring a notation, an unparsed entity, and attributes naming them. */
 function dtd(logo: string, gif: string): string {

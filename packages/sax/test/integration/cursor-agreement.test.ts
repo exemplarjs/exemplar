@@ -1,8 +1,8 @@
-import { readEveryWay } from '@test/helpers/agreement.ts';
-import { canonicalHandler, canonicalOf } from '@test/helpers/canonical.ts';
+import { readEveryWay } from '@test/helpers/agreement';
+import { canonicalHandler, canonicalOf } from '@test/helpers/canonical';
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { SAXParser } from '@/index.ts';
+import { SAXParser } from '@/index';
 
 /** A table row: what the document shows, the document, and its first canonical form. */
 type Case = [string, string, string];

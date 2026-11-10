@@ -1,11 +1,4 @@
-import {
-  BytesSink,
-  type OutputOptions,
-  type StreamWriter,
-  StringSink,
-  WriterError,
-  XMLOutputFactory,
-} from '@/index.ts';
+import { BytesSink, type OutputOptions, type StreamWriter, StringSink, WriterError, XMLOutputFactory } from '@/index';
 
 /** Writes with a fresh string writer and returns the output. */
 export function written(write: (w: StreamWriter) => void, options: OutputOptions = {}): string {

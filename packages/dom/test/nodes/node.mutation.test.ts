@@ -1,6 +1,6 @@
-import { build, children, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, children, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { type Attr, DOMImplementation, type Document, type Element, type Node, type Text } from '@/index.ts';
+import { type Attr, type Document, DOMImplementation, type Element, type Node, type Text } from '@/index';
 
 /** A document `<r><a/><b/><c/></r>` and its nodes. */
 function tree(): { document: Document; r: Element; a: Element; b: Element; c: Element } {

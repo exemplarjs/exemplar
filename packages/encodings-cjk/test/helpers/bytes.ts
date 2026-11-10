@@ -1,5 +1,5 @@
 import type { Decoder, DecoderFactory } from '@exemplarjs/xml';
-import { cjkDecoders } from '@/index.ts';
+import { cjkDecoders } from '@/index';
 
 /** Bytes from hex pairs, such as `'82a0'`. */
 export function hex(text: string): Uint8Array {

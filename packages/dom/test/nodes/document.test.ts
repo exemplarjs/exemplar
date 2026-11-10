@@ -1,13 +1,13 @@
-import { build, children, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, children, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type Attr,
   CDATASection,
   Comment,
-  DOMImplementation,
   Document,
   DocumentFragment,
   type DocumentType,
+  DOMImplementation,
   type Element,
   Entity,
   EntityReference,
@@ -16,7 +16,7 @@ import {
   ProcessingInstruction,
   Text,
   UserDataOperation,
-} from '@/index.ts';
+} from '@/index';
 
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
 

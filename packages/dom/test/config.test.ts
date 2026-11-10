@@ -1,6 +1,6 @@
-import { domException, newDocument } from '@test/helpers/dom.ts';
+import { domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { DOMConfiguration, DOMError, DOMLocator, DOMStringList } from '@/config.ts';
+import { DOMConfiguration, DOMError, DOMLocator, DOMStringList } from '@/config';
 
 const BOOLEANS = [
   'canonical-form',

@@ -1,17 +1,17 @@
-import { isEbcdic } from '../encodings/decoders.ts';
-import { SINGLE_BYTE_TABLES } from '../encodings/tables.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import { couldStartDeclaration, DECLARATION_START_LENGTH, startsWithDeclaration } from '../tokenizer/declaration.ts';
-import { XML_DECLARATION_OPEN_LENGTH } from '../tokenizer/syntax.ts';
-import { BYTE_ORDER_MARK } from '../util/bytes.ts';
-import { Char } from '../util/chars.ts';
+import { isEbcdic } from '@/encodings/decoders';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
+import { ErrorCode } from '@/errors/codes';
+import { couldStartDeclaration, DECLARATION_START_LENGTH, startsWithDeclaration } from '@/tokenizer/declaration';
+import { XML_DECLARATION_OPEN_LENGTH } from '@/tokenizer/syntax';
+import { BYTE_ORDER_MARK } from '@/util/bytes';
+import { Char } from '@/util/chars';
 import { canonicalEncoding } from './decoders.ts';
 
 /** The four-byte encodings, by byte order. */
 type Utf32Encoding = 'utf-32be' | 'utf-32le' | 'x-ucs-4-2143' | 'x-ucs-4-3412';
 
 /** The byte order or ASCII-compatibility the first bytes show, or EBCDIC. */
-export type EncodingFamily = 'utf-16le' | 'utf-16be' | Utf32Encoding | 'ascii' | 'ebcdic';
+type EncodingFamily = 'utf-16le' | 'utf-16be' | Utf32Encoding | 'ascii' | 'ebcdic';
 
 /** What the first bytes of a document say about its encoding. */
 export interface Detection {
@@ -274,9 +274,8 @@ export function checkDeclaredEncoding(
   if (detection.family === 'ebcdic') return isEbcdic(declared) ? undefined : encodingMismatch('EBCDIC', declaration);
   // A four-byte encoding must be declared as UTF-32, in its byte order if named.
   if (isUtf32Family(detection.family)) {
-    return declared === 'utf-32' || declared === detection.family
-      ? undefined
-      : encodingMismatch(detection.family, declaration);
+    if (declared === 'utf-32' || declared === detection.family) return undefined;
+    return encodingMismatch(detection.family, declaration);
   }
   return detection.family === 'ascii'
     ? checkAscii(detection, declaration, declared)

@@ -1,5 +1,5 @@
-import { bytes, hex, splits } from '@test/helpers/bytes.ts';
-import { cjkFactory, documentIn, errorOf, read, readFed } from '@test/helpers/documents.ts';
+import { bytes, hex, splits } from '@test/helpers/bytes';
+import { cjkFactory, documentIn, errorOf, read, readFed } from '@test/helpers/documents';
 import { describe, expect, it } from 'vitest';
 import { ErrorCode, XMLInputFactory } from '@exemplarjs/xml';
 import { CREATE_READER, INPUT_ENCODING } from '@exemplarjs/xml/internal';

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { InvalidArgumentError } from '@exemplarjs/xml';
 import { ErrorCode } from '@exemplarjs/xml';
-import { encoderFor } from '@/encoders.ts';
-import { WriterError } from '@/error.ts';
-import { StringSink, XMLOutputFactory } from '@/index.ts';
+import { encoderFor } from '@/encoders';
+import { WriterError } from '@/error';
+import { StringSink, XMLOutputFactory } from '@/index';
 
 describe('WriterError', () => {
   it('is an Error with a name, a message and a stable code', () => {
@@ -30,7 +31,7 @@ describe('WriterError', () => {
       const writer = new XMLOutputFactory().createStreamWriter(new StringSink());
       const badName = thrown(() => writer.writeStartElement('1a'));
       const unknownEncoding = thrown(() => encoderFor('no-such-encoding'));
-      expect([badName instanceof WriterError, unknownEncoding instanceof RangeError]).toEqual([true, true]);
+      expect([badName instanceof WriterError, unknownEncoding instanceof InvalidArgumentError]).toEqual([true, true]);
       expect([noFrames(badName), noFrames(unknownEncoding)]).toEqual([true, true]);
     }
   );

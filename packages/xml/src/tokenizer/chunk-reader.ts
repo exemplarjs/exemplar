@@ -1,5 +1,5 @@
-import { type Chunk, DecodingFailureError, PENDING, type ChunkSource } from '../input/source.ts';
-import { Char } from '../util/chars.ts';
+import { type Chunk, type ChunkSource, DecodingFailureError, PENDING } from '@/input/source';
+import { Char } from '@/util/chars';
 import type { Tokenizer } from './tokenizer.ts';
 
 // A module-level constant, so V8 can inline it.

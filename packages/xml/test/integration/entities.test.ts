@@ -1,7 +1,7 @@
-import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { createFilteredReader } from '@/filters/index.ts';
-import { type AsyncStreamReader, EventType, type InputOptions, XMLInputFactory } from '@/index.ts';
+import { createFilteredReader } from '@/filters/index';
+import { type AsyncStreamReader, EventType, type InputOptions, XMLInputFactory } from '@/index';
 
 /** A DOCTYPE declaring the given internal entities. */
 function dtd(entities: Record<string, string>): string {

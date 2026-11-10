@@ -1,33 +1,40 @@
-import type { CatalogProcessor, ResolvedOptions } from '../config/options.ts';
-import type { EntityDeclaration } from '../dtd/declarations.ts';
-import type { ExternalText } from '../dtd/input.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import type { Location } from '../errors/xml-error.ts';
-import type { DecoderRegistry } from '../input/decoders.ts';
-import { checkDeclaredEncoding } from '../input/detect.ts';
-import { DecodingFailureError, type OpenedSource, PENDING, openSource, readStream } from '../input/source.ts';
+import type { CatalogProcessor, ResolvedOptions } from '@/config/options';
+import type { EntityDeclaration } from '@/dtd/declarations';
+import type { ExternalText } from '@/dtd/input';
+import { ErrorCode } from '@/errors/codes';
+import type { Location } from '@/errors/xml-error';
+import type { DecoderRegistry } from '@/input/decoders';
+import { checkDeclaredEncoding } from '@/input/detect';
+import { DecodingFailureError, type OpenedSource, openSource, PENDING, readStream } from '@/input/source';
 import {
-  type AccessList,
-  type ResolveRequest,
-  type Resolution,
-  type ResolvedSource,
-  ResolutionError,
   accessAllows,
-  orElse,
+  type AccessList,
   accessRefusedError,
-} from '../resolvers/resolver.ts';
-import { ScanError } from '../scan/scanner.ts';
-import { DeclarationParser, startsWithDeclaration } from '../tokenizer/declaration.ts';
-import { lastIndexAtOrBefore } from '../util/arrays.ts';
-import { Char, codePointLabel, isHighSurrogate, isLowSurrogate, isRestrictedChar } from '../util/chars.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { normalizeLineEnds, rawIndexMapper } from '../util/normalize.ts';
-import { resolveURI } from '../util/uri.ts';
+  resolverMissingError,
+  orElse,
+  type Resolution,
+  ResolutionError,
+  type ResolvedSource,
+  type ResolveRequest,
+} from '@/resolvers/resolver';
+import { ScanError } from '@/scan/scanner';
+import { DeclarationParser, startsWithDeclaration } from '@/tokenizer/declaration';
+import { lastIndexAtOrBefore } from '@/util/arrays';
+import {
+  Char,
+  codePointLabel,
+  isHighSurrogate,
+  isLowSurrogate,
+  isRestrictedChar,
+  SURROGATE_PAIR_LENGTH,
+} from '@/util/chars';
+import { AsyncReaderRequiredError, ErrorFactory, InvalidArgumentError } from '@/util/errors';
+import { normalizeLineEnds, rawIndexMapper } from '@/util/normalize';
+import { abandon } from '@/util/promises';
+import { resolveURI } from '@/util/uri';
 
 // Module-level constants, so V8 can inline them.
-const { DELETE } = Char;
-/** The last C1 control. */
-const C1_LAST = 0x9f;
+const { C1_LAST, DELETE } = Char;
 
 /** Fails at a location in an external entity. */
 export type ExternalFail = (code: ErrorCode, message: string, location: Location) => never;
@@ -121,8 +128,11 @@ export class ExternalReader {
   resolve(request: ResolveRequest, access: AccessList): { source: ResolvedSource; systemId?: string } | undefined {
     const resolver = this.#options.entityResolver;
     const catalog = this.#options.catalog;
-    if (resolver === undefined && catalog === undefined) return undefined;
     const absolute = resolveURI(request.systemId, request.baseURI);
+    if (resolver === undefined && catalog === undefined) {
+      if (accessAllows(access, absolute)) throw resolverMissingError(absolute ?? request.name);
+      return undefined;
+    }
     // The caller's resolver answers first, as in the JDK; the access list goes with the request for resolvers that read.
     const asked = { ...request, access };
     const key = JSON.stringify([request.name, request.publicId, request.systemId, request.baseURI]);
@@ -172,8 +182,9 @@ export class ExternalReader {
     if (answers === undefined) {
       const answer = ask();
       if (answer instanceof Promise) {
+        abandon(answer);
         throw ErrorFactory.create(
-          TypeError,
+          AsyncReaderRequiredError,
           'A synchronous reader needs a resolver that answers at once; use an asynchronous reader'
         );
       }
@@ -280,7 +291,10 @@ function readWholeText(
     }
     if (chunk === undefined) return text;
     if (chunk === PENDING)
-      throw ErrorFactory.create(TypeError, 'A synchronous reader needs a resolver that supplies text or bytes');
+      throw ErrorFactory.create(
+        InvalidArgumentError,
+        'A synchronous reader needs a resolver that supplies text or bytes'
+      );
     text += chunk;
   }
 }
@@ -307,7 +321,7 @@ function checkCharacters(
     // eslint-disable-next-line prefer-code-point -- reads one half of a surrogate pair
     const next = text.charCodeAt(pos + 1);
     if (isHighSurrogate(unit) && isLowSurrogate(next)) {
-      CONTROL_SURROGATE_OR_NONCHARACTER.lastIndex = pos + 2;
+      CONTROL_SURROGATE_OR_NONCHARACTER.lastIndex = pos + SURROGATE_PAIR_LENGTH;
       continue;
     }
     // XML 1.0 allows DEL and the C1 controls; XML 1.1 allows NEL, which line-end handling has already turned into LF.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveOutputOptions } from '@/options.ts';
+import { resolveOutputOptions } from '@/options';
 
 describe('resolveOutputOptions', () => {
   it('fills in the defaults of the JAXP output properties', () => {
@@ -13,6 +13,8 @@ describe('resolveOutputOptions', () => {
       doctypePublic: undefined,
       doctypeSystem: undefined,
       cdataSectionElements: new Set(),
+      suppressIndentation: new Set(),
+      characterMap: new Map(),
       encoding: 'UTF-8',
       namespaceAware: true,
     });
@@ -30,6 +32,8 @@ describe('resolveOutputOptions', () => {
         doctypePublic: '-//P',
         doctypeSystem: 's.dtd',
         cdataSectionElements: ['script', 'p:style'],
+        suppressIndentation: ['pre'],
+        characterMap: { $: '\u00A3' },
         encoding: 'ISO-8859-1',
         namespaceAware: false,
       })
@@ -43,6 +47,8 @@ describe('resolveOutputOptions', () => {
       doctypePublic: '-//P',
       doctypeSystem: 's.dtd',
       cdataSectionElements: new Set(['script', 'p:style']),
+      suppressIndentation: new Set(['pre']),
+      characterMap: new Map([['$', '\u00A3']]),
       encoding: 'ISO-8859-1',
       namespaceAware: false,
     });

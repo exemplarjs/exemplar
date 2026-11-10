@@ -10,6 +10,7 @@
     "directory": "packages/xml"
   },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "exemplar-source": "./src/index.ts",
@@ -52,7 +53,6 @@
   },
   "devDependencies": {
     "@exemplarjs/build-config": "workspace:*",
-    "@fast-check/vitest": "catalog:",
-    "fast-check": "catalog:"
+    "@fast-check/vitest": "catalog:"
   }
 }

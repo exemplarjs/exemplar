@@ -1,8 +1,8 @@
-import { reader } from '@test/helpers/parse.ts';
+import { reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import type { DtdItem } from '@/dtd/store.ts';
-import { EventType, type InputOptions, type Source } from '@/index.ts';
-import { DTD_ITEMS } from '@/internal.ts';
+import type { DtdItem } from '@/dtd/store';
+import { EventType, type InputOptions, type Source } from '@/index';
+import { DTD_ITEMS } from '@/internal';
 
 /** The declarations of a document's DTD, in order. */
 function declared(xml: Source, options: InputOptions = {}): unknown[] {

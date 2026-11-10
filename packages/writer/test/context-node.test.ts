@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ContextNode } from '@/context-node.ts';
-import { NamespaceBindings } from '@/namespaces.ts';
+import { ContextNode } from '@/context-node';
+import { NamespaceBindings } from '@/namespaces';
 
 describe('ContextNode', () => {
   it('finds an attribute written twice by its expanded name, until the next tag opens', () => {
@@ -36,7 +36,9 @@ describe('ContextNode', () => {
     expect(node.unboundPrefixProblem(bindings)).toBe('The default namespace is not bound to urn:d');
     bindings.declare('', 'urn:d');
     node.open('', '');
-    expect(node.unboundPrefixProblem(bindings)).toBe('The default namespace is not bound to no namespace');
+    expect(node.unboundPrefixProblem(bindings)).toBe(
+      'An element in no namespace needs xmlns="" here: call writeDefaultNamespace(\'\') or turn on repairNamespaces'
+    );
     node.open('', undefined);
     node.notePrefixedAttribute('xml', 'http://www.w3.org/XML/1998/namespace');
     expect(node.unboundPrefixProblem(bindings)).toBeUndefined();

@@ -54,8 +54,23 @@
     "default-case-last": "error",
     "no-new": "error",
     "no-warning-comments": ["error", { "terms": ["fixme"], "location": "anywhere" }],
-    // The other unicorn rules, except no-null (DOM Level 3 spells "absent" as null) and three that misfire: worker
-    // postMessage origins, the empty export a module needs, and CommonJS config files.
+    // Named constants in place of numbers; 0, 1 and -1 read plainly, and types, enums and indexes name themselves.
+    "no-magic-numbers": [
+      "error",
+      {
+        "ignore": [-1, 0, 1, "0n", "1n"],
+        "ignoreArrayIndexes": true,
+        "ignoreDefaultValues": true,
+        "ignoreEnums": true,
+        "ignoreNumericLiteralTypes": true,
+        "ignoreReadonlyClassProperties": true,
+        "ignoreTypeIndexes": true,
+        "enforceConst": true
+      }
+    ],
+    // The other unicorn rules, except no-null (DOM Level 3 spells "absent" as null), prefer-ternary (an if/else often
+    // reads better), and three that misfire: worker postMessage origins, the empty export a module needs, and CommonJS
+    // config files.
     "unicorn/catch-error-name": "error",
     "unicorn/consistent-assert": "error",
     "unicorn/consistent-date-clone": "error",
@@ -178,7 +193,6 @@
     "unicorn/prefer-string-slice": "error",
     "unicorn/prefer-string-trim-start-end": "error",
     "unicorn/prefer-structured-clone": "error",
-    "unicorn/prefer-ternary": "error",
     "unicorn/prefer-top-level-await": "error",
     "unicorn/prefer-type-error": "error",
     "unicorn/relative-url-style": "error",
@@ -441,17 +455,12 @@
       }
     },
     // The one runtime-specific subpath: @exemplarjs/xml/resolvers/file reads files with the Node API, which Deno and Bun share.
-    {
-      "files": ["packages/xml/src/resolvers/file.ts"],
-      "rules": { "no-restricted-imports": "off" }
-    },
+    { "files": ["packages/xml/src/resolvers/file.ts"], "rules": { "no-restricted-imports": "off" } },
     // Runtime environment variables are not turbo inputs.
     {
       "files": ["**/src/**", "**/test/**"],
       "jsPlugins": ["eslint-plugin-turbo"],
-      "rules": {
-        "turbo/no-undeclared-env-vars": "off"
-      }
+      "rules": { "turbo/no-undeclared-env-vars": "off" }
     },
     // Tests: vitest's rules, and relaxed rules for spies passed detached, deliberate assertions and fixtures
     // beside their cases.
@@ -474,6 +483,8 @@
         "vitest/valid-expect": ["error", { "maxArgs": 2 }],
         // It cannot see that a title computed per case is a string.
         "vitest/valid-title": "off",
+        // Expected values are the point of a test.
+        "no-magic-numbers": "off",
         "no-console": "off",
         "no-new": "off",
         "no-unused-vars": "off",
@@ -503,17 +514,9 @@
     {
       "files": ["**/*.{js,mjs,cjs}"],
       "env": { "node": true },
-      "rules": {
-        "no-redeclare": "error",
-        "no-undef": "error"
-      }
+      "rules": { "no-redeclare": "error", "no-undef": "error" }
     },
-    // Tool configs report to the terminal running them.
-    {
-      "files": ["**/*.config.{ts,mts,js,mjs,cjs}"],
-      "rules": {
-        "no-console": "off"
-      }
-    }
+    // Tool configs report to the terminal running them, and examples print their results.
+    { "files": ["**/*.config.{ts,mts,js,mjs,cjs}", "examples/*/example.ts"], "rules": { "no-console": "off" } }
   ]
 }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EventType, type InputOptions, XMLInputFactory } from '@exemplarjs/xml';
 import type { StreamReader } from '@exemplarjs/xml/internal';
-import { NoXmlnsURIAttributes, ReaderAttributes } from '@/attributes.ts';
-import { type Attributes, SAXParser } from '@/index.ts';
+import { NoXmlnsURIAttributes, ReaderAttributes } from '@/attributes';
+import { type Attributes, SAXParser } from '@/index';
 
 const XML_NS = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -94,6 +94,17 @@ describe('ReaderAttributes (SAX2 Attributes2)', () => {
     const names = Array.from({ length: a.length }, (_, i) => `${a.qName(i)}|${a.localName(i)}|${a.uri(i)}`);
     expect(names).toEqual(['xmlns:p||', 'p:z||', 'b||']);
     expect(a.index('p:z')).toBe(1);
+  });
+
+  it('finds an attribute by its whole name in no namespace, without namespace processing', () => {
+    const a = attributesOf('<r xmlns:p="urn:p" p:z="1" b="2"/>', { namespaceAware: false });
+    expect([a.index('', 'b'), a.index('', 'p:z'), a.value('', 'b')]).toEqual([2, 1, '2']);
+    expect([a.index('', ''), a.index('', 'z'), a.index('urn:p', 'z'), a.value('urn:p', 'z')]).toEqual([
+      -1,
+      -1,
+      -1,
+      undefined,
+    ]);
   });
 
   it('has no attributes for a tag without them', () => {

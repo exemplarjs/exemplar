@@ -1,4 +1,4 @@
-import { build, children, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, children, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type Attr,
@@ -11,7 +11,7 @@ import {
   NodeType,
   type Notation,
   UserDataOperation,
-} from '@/index.ts';
+} from '@/index';
 
 const DTD = `<!DOCTYPE r PUBLIC "-//P//EN" "r.dtd" [
 <!ENTITY t "text">
@@ -133,18 +133,37 @@ describe('Node defaults', () => {
   });
 });
 
+describe('the element shortcuts', () => {
+  const document = build('<r><!--c--><a/>t<b/><?p?></r>');
+  const r = document.documentElement as Element;
+
+  it('give the first and last children that are elements, and how many there are', () => {
+    expect([r.firstElementChild?.nodeName, r.lastElementChild?.nodeName, r.childElementCount]).toEqual(['a', 'b', 2]);
+    expect([document.firstElementChild, document.childElementCount]).toEqual([r, 1]);
+    const a = r.firstElementChild as Element;
+    expect([a.firstElementChild, a.lastElementChild, a.childElementCount]).toEqual([null, null, 0]);
+  });
+
+  it('give the siblings that are elements, from any node', () => {
+    const [a, b] = [r.firstElementChild as Element, r.lastElementChild as Element];
+    expect([a.nextElementSibling, b.previousElementSibling]).toEqual([b, a]);
+    expect([a.previousElementSibling, b.nextElementSibling]).toEqual([null, null]);
+    expect([r.firstChild?.nextElementSibling, r.lastChild?.previousElementSibling]).toEqual([a, b]);
+  });
+});
+
 describe('Node.cloneNode (DOM Level 3)', () => {
   it('copies an element and its attributes, without children unless deep', () => {
     const document = build('<r a="1"><c>t</c></r>');
     const r = document.documentElement as Element;
-    const shallow = r.cloneNode() as Element;
+    const shallow = r.cloneNode();
     expect([shallow.parentNode, shallow.ownerDocument, shallow.getAttribute('a'), shallow.hasChildNodes()]).toEqual([
       null,
       document,
       '1',
       false,
     ]);
-    const deep = r.cloneNode(true) as Element;
+    const deep = r.cloneNode(true);
     expect([deep.textContent, deep.firstChild === r.firstChild]).toEqual(['t', false]);
   });
 
@@ -179,7 +198,7 @@ describe('Node.cloneNode (DOM Level 3)', () => {
   it('makes a writable copy of a read-only subtree', () => {
     const document = withDtd();
     const b = document.documentElement?.lastChild?.firstChild as Element;
-    const clone = b.cloneNode(true) as Element;
+    const clone = b.cloneNode(true);
     clone.setAttribute('x', 'y');
     expect(clone.getAttribute('x')).toBe('y');
   });

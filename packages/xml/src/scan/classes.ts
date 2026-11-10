@@ -1,7 +1,8 @@
-import { Char } from '../util/chars.ts';
+import { Char, Unicode } from '@/util/chars';
 
 // Module-level constants, so V8 can inline them.
-const { NON_ASCII } = Char;
+const { NON_ASCII, NONCHARACTER_FFFE } = Char;
+const { LAST_BEFORE_SURROGATES } = Unicode;
 
 /** The last code point a name may hold (§2.3 [4]). */
 export const NAME_LAST = 0xe_ff_ff;
@@ -104,6 +105,7 @@ export const NAME_CLASSES = (() => {
   return table;
 })();
 
+/* eslint-disable no-magic-numbers -- the NameStartChar and NameChar ranges of XML 1.0 fifth edition §2.3 [4] and [4a] */
 /**
  * Whether a BMP code point above U+007F is a NameStartChar (fifth edition §2.3 [4], and XML 1.1 [4],
  * whose ranges these are).
@@ -118,9 +120,9 @@ export function isNameStartCharBmp(codePoint: number): boolean {
     (codePoint >= 0x20_0c && codePoint <= 0x20_0d) ||
     (codePoint >= 0x20_70 && codePoint <= 0x21_8f) ||
     (codePoint >= 0x2c_00 && codePoint <= 0x2f_ef) ||
-    (codePoint >= 0x30_01 && codePoint <= 0xd7_ff) ||
+    (codePoint >= 0x30_01 && codePoint <= LAST_BEFORE_SURROGATES) ||
     (codePoint >= 0xf9_00 && codePoint <= 0xfd_cf) ||
-    (codePoint >= 0xfd_f0 && codePoint <= 0xff_fd)
+    (codePoint >= 0xfd_f0 && codePoint < NONCHARACTER_FFFE)
   );
 }
 
@@ -133,3 +135,4 @@ export function isNameCharBmp(codePoint: number): boolean {
     (codePoint >= 0x20_3f && codePoint <= 0x20_40)
   );
 }
+/* eslint-enable no-magic-numbers */

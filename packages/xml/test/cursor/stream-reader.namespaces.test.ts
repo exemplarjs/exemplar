@@ -1,6 +1,6 @@
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, XMLInputFactory } from '@/index.ts';
+import { EventType, type InputOptions, XMLInputFactory } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';

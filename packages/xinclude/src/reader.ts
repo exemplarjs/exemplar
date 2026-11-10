@@ -1,7 +1,9 @@
 import {
+  AsyncReaderRequiredError,
   type DtdItem,
   ErrorCode,
   EventType,
+  InvalidArgumentError,
   ResolutionError,
   type ResolvedSource,
   type Source,
@@ -9,46 +11,47 @@ import {
   XMLError,
 } from '@exemplarjs/xml';
 import {
+  abandon,
   ADD_FILTER,
   type AsyncOpenedSource,
   type DecoderRegistry,
   type EntityListener,
+  ErrorFactory,
   INCLUDED_DECLARATIONS,
+  isAllWhitespace,
+  isCharacterData,
   LISTEN_ENTITIES,
   type OpenedSource,
-  type ResolvedOptions,
-  isCharacterData,
-  isAllWhitespace,
   openSource,
-  escapeAndResolveURI,
+  type ResolvedOptions,
+  resolveEscapedTargetURI,
 } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
 import { Declarations } from './declarations.ts';
 import {
-  type IncludeAttributes,
   attributeProblem,
   headersOf,
-  inclusionKey,
+  type IncludeAttributes,
   includeAttributesOf,
+  inclusionKey,
   isDocumentLoop,
   isIntraDocumentLoop,
 } from './include.ts';
 import { Inclusion } from './inclusion.ts';
-import { type NamespaceDeclaration, NO_FIXUPS, endTagOverlay, topOverlay } from './overlay.ts';
-import { type PointerPart, Selection, parsePointer } from './pointer.ts';
+import { endTagOverlay, type NamespaceDeclaration, NO_FIXUPS, topOverlay } from './overlay.ts';
+import { parsePointer, type PointerPart, Selection } from './pointer.ts';
 import {
+  contentOf,
+  findResource,
   type FoundResource,
   type Headers,
+  isStreamOnly,
   Pending,
   ResourceError,
   type Resume,
-  contentOf,
-  findResource,
-  isStreamOnly,
 } from './resources.ts';
 import { type Parent, type Scope, ScopeStack } from './scopes.ts';
 import { SplicingReader } from './splice.ts';
-import { TextInclusionError, includedText } from './text.ts';
+import { includedText, TextInclusionError } from './text.ts';
 
 // Module-level constants, so V8 can inline them; imported bindings are read again on every use.
 const { START_ELEMENT, END_ELEMENT, CHARACTERS, SPACE, START_DOCUMENT, END_DOCUMENT, DTD, NEED_INPUT } = EventType;
@@ -57,14 +60,19 @@ const { START_ELEMENT, END_ELEMENT, CHARACTERS, SPACE, START_DOCUMENT, END_DOCUM
 export const XINCLUDE_NAMESPACE = 'http://www.w3.org/2001/XInclude';
 
 /** What `xincludeProcessor()` takes: whether included elements get `xml:base` and `xml:lang`. */
-export interface XIncludeSettings {
-  readonly fixupBaseURIs: boolean;
-  readonly fixupLanguage: boolean;
+export interface XIncludeOptions {
+  /** Whether an included element gets an `xml:base` saying where it came from; true by default. */
+  readonly fixupBaseURIs?: boolean;
+  /** Whether an included element gets an `xml:lang` keeping the language it had; true by default. */
+  readonly fixupLanguage?: boolean;
 }
+
+/** The options with their defaults filled in. */
+export type Fixups = Required<XIncludeOptions>;
 
 /** Where a reader sits among inclusions: the resources being included around it, for finding loops. */
 interface InclusionContext {
-  readonly settings: XIncludeSettings;
+  readonly settings: Fixups;
   /** The inclusion keys of the documents being included around this one, outermost first. */
   readonly chain: readonly string[];
   /** Whether the reader, and so the readers of included documents, may wait for promises and streams. */
@@ -143,7 +151,8 @@ export class XIncludeReader extends SplicingReader {
     pointer: readonly PointerPart[] = []
   ) {
     super(opened, options, registry, input);
-    if (!options.namespaceAware) throw ErrorFactory.create(TypeError, 'XInclude needs a namespace-aware reader');
+    if (!options.namespaceAware)
+      throw ErrorFactory.create(InvalidArgumentError, 'XInclude needs a namespace-aware reader');
     this.#source = source;
     this.#options = options;
     this.#registry = registry;
@@ -338,7 +347,7 @@ export class XIncludeReader extends SplicingReader {
     openInclude: OpenInclude,
     tag: XIncludeReader,
     scope: Scope,
-    fixups: XIncludeSettings
+    fixups: Fixups
   ): readonly NamespaceDeclaration[] {
     // Only one element may replace an xi:include at the root.
     if (openInclude.parent.isRoot && ++openInclude.rootElementCount > 1) this.#failNotOneRoot();
@@ -389,7 +398,8 @@ export class XIncludeReader extends SplicingReader {
       const looped = isIntraDocument ? isIntraDocumentLoop(chain, uri, xpointer) : isDocumentLoop(chain, uri);
       if (looped) this.#fatal(ErrorCode.XINCLUDE_LOOP, `${uri} includes itself`);
     };
-    checkLoop(isIntraDocument ? this.#documentURI : (escapeAndResolveURI(href, base || undefined) ?? href));
+    if (isIntraDocument) checkLoop(this.#documentURI);
+    else checkLoop(resolveEscapedTargetURI(href, base || undefined));
     return this.#acquire(isIntraDocument, href, base, headersOf(include), (source, uri) => {
       checkLoop(uri);
       this.#inclusion = this.#openInclusion(source, uri, parts, parent, inclusionKey(uri, xpointer), isIntraDocument);
@@ -466,9 +476,10 @@ export class XIncludeReader extends SplicingReader {
     const promised = found instanceof Promise;
     if (!promised && !isStreamOnly(found)) return resume(found, found.systemId ?? uri);
     if (!this.#context.async) {
+      if (promised) abandon(found);
       const how = promised ? 'with a promise' : 'with a stream';
       throw ErrorFactory.create(
-        TypeError,
+        AsyncReaderRequiredError,
         `The resolver for ${uri} answers ${how}, which needs an asynchronous reader`
       );
     }
@@ -611,9 +622,9 @@ export class XIncludeReader extends SplicingReader {
     this.#filters.push(filter);
   }
 
-  override [LISTEN_ENTITIES](listener: EntityListener): void {
+  override [LISTEN_ENTITIES](listener: EntityListener | undefined): void {
     this.#listener = listener;
-    super[LISTEN_ENTITIES](this.#ownEntities(listener));
+    super[LISTEN_ENTITIES](listener === undefined ? undefined : this.#ownEntities(listener));
   }
 
   /** Passes on the entities expanded in the document's own content, not those in content an xi:include ignores (§3.1). */

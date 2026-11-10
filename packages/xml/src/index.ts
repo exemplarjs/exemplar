@@ -16,6 +16,7 @@ export type {
 export type { DtdItem } from './dtd/store.ts';
 export { ErrorCode } from './errors/codes.ts';
 export { AsyncEventReader, type EventFilter, EventReader } from './events/event-reader.ts';
+export { XMLEventFactory } from './events/event-factory.ts';
 export {
   Attribute,
   type CharactersEvent,
@@ -33,6 +34,8 @@ export {
   type XMLEvent,
 } from './events/events.ts';
 export { type ErrorHandler, type Location, XMLError } from './errors/xml-error.ts';
+export { AsyncReaderRequiredError, IllegalStateError, InvalidArgumentError } from './util/errors.ts';
+export { XML_NAMESPACE, XMLNS_NAMESPACE } from './util/namespaces.ts';
 export type { Decoder, DecoderFactory } from './input/decoders.ts';
 export type { Source, SourceObject } from './input/source.ts';
 export {

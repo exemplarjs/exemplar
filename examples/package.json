@@ -1,0 +1,29 @@
+{
+  "name": "@exemplarjs/examples",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Worked examples of exemplar, each tested against its expected result",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/io-timeout/exemplar.git",
+    "directory": "examples"
+  },
+  "type": "module",
+  "scripts": {
+    "clean:output": "rimraf .turbo",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "@exemplarjs/sax": "workspace:*",
+    "@exemplarjs/writer": "workspace:*",
+    "@exemplarjs/xdm": "workspace:*",
+    "@exemplarjs/xml": "workspace:*",
+    "@exemplarjs/xpath": "workspace:*"
+  },
+  "devDependencies": {
+    "@exemplarjs/build-config": "workspace:*"
+  }
+}

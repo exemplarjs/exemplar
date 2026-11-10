@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TypeInfo } from '@/index.ts';
+import { TypeInfo } from '@/index';
 
 describe('TypeInfo', () => {
   it('numbers the derivation methods (DOM Level 3 TypeInfo)', () => {

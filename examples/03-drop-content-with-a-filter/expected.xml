@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+  <book id="b1">
+    <title>The Lighthouse Keeper</title>
+    <price>8.99</price>
+  </book>
+  <book id="b2">
+    <title>Small Worlds</title>
+    <price>14.50</price>
+  </book>
+</catalog>

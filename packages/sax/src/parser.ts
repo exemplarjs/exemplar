@@ -1,4 +1,5 @@
 import {
+  type AsyncStreamReader,
   type AttributeDeclaration,
   type DtdItem,
   type EntityDeclaration,
@@ -6,16 +7,24 @@ import {
   EventType,
   type Source,
   type SourceObject,
+  type StreamReader as PublicStreamReader,
   type XMLError,
   XMLInputFactory,
 } from '@exemplarjs/xml';
+import type { StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import {
   CREATE_READER,
+  cursorOf,
+  declareEntity,
   DTD_ITEMS,
   INCLUDED_DECLARATIONS,
+  isReader,
   LISTEN_ENTITIES,
+  READER_OPTIONS,
+  ReaderInput,
+  type ResolvedOptions,
+  resolveTargetURI,
   StreamReader,
-  resolveURI,
 } from '@exemplarjs/xml/internal';
 import { NoXmlnsURIAttributes, ReaderAttributes } from './attributes.ts';
 import type { Locator, SAXHandler } from './handler.ts';
@@ -35,6 +44,9 @@ const {
   END_DOCUMENT,
   NEED_INPUT,
 } = EventType;
+
+/** SAX hears of entity boundaries through startEntity and endEntity, not as events. */
+const READER_OVERRIDES = { reportEntityBoundaries: false } as const;
 
 /** What a SAX parser adds to its factory's options, after SAX's own features. */
 export interface SAXOptions {
@@ -57,6 +69,11 @@ export interface SAXOptions {
  *
  * It reads through a cursor made by `factory`, so the factory's options apply; `options` adds the
  * SAX features the factory doesn't have.
+ *
+ * It also reads a reader, which can be filtered or a delegate that changes what it reports, from
+ * where the reader stands: at the start of a document, the whole document; at a start tag, that
+ * element as a document of its own, leaving the reader at its end tag. The reader's own options
+ * and error handler then apply.
  */
 export class SAXParser {
   /** Makes the cursor each parse reads through. */
@@ -72,52 +89,126 @@ export class SAXParser {
     this.#xmlnsURIs = options.xmlnsURIs ?? false;
   }
 
-  /** Parses a document, calling the handler's methods as it goes. */
-  parse(source: Source, handler: SAXHandler): void {
-    const reporting = new ErrorReporting();
-    const dispatcher = this.#dispatcher(this.#reader(source, handler, false, reporting), handler, source, reporting);
-    for (let type = dispatcher.reader.eventType(); !dispatcher.dispatch(type); type = dispatcher.reader.next());
+  /** Parses a document, or reads a reader from where it stands, calling the handler's methods as it goes. */
+  parse(source: Source | PublicStreamReader | StreamReaderDelegate, handler: SAXHandler): void {
+    if (isReader(source)) this.#parseReader(source as StreamReader, handler);
+    else this.#parseSource(source, handler);
   }
 
-  /** Parses a stream or any other source, awaiting input as it arrives. */
-  async parseAsync(source: Source, handler: SAXHandler): Promise<void> {
+  /** Parses a document from a source with the factory's cursor. */
+  #parseSource(source: Source, handler: SAXHandler): void {
     const reporting = new ErrorReporting();
-    const dispatcher = this.#dispatcher(this.#reader(source, handler, true, reporting), handler, source, reporting);
+    const reader = this.#reader(source, handler, false, reporting);
+    const dispatcher = this.#dispatcher(reader, handler, this.factory.options, source, reporting);
+    let type = dispatcher.reader.eventType();
+    while (!dispatcher.dispatch(type)) type = dispatcher.reader.next();
+  }
+
+  /** Parses a stream or any other source, or reads a reader, awaiting input as it arrives. */
+  parseAsync(
+    source: Source | PublicStreamReader | AsyncStreamReader | StreamReaderDelegate,
+    handler: SAXHandler
+  ): Promise<void> {
+    return isReader(source)
+      ? this.#parseReaderAsync(source as StreamReader, handler)
+      : this.#parseSourceAsync(source, handler);
+  }
+
+  /** Parses a document from a source with the factory's cursor, awaiting input as it arrives. */
+  async #parseSourceAsync(source: Source, handler: SAXHandler): Promise<void> {
+    const reporting = new ErrorReporting();
+    const reader = this.#reader(source, handler, true, reporting);
+    const dispatcher = this.#dispatcher(reader, handler, this.factory.options, source, reporting);
     for (let type = dispatcher.reader.eventType(); ; type = dispatcher.reader.next()) {
       if (type === NEED_INPUT) await dispatcher.reader.fill();
       else if (dispatcher.dispatch(type)) return;
     }
   }
 
+  /** Reads a reader from where it stands. */
+  #parseReader(reader: StreamReader, handler: SAXHandler): void {
+    const input = new ReaderInput(reader, { consumer: 'SAXParser.parse', mode: 'sync' });
+    input.read(new InheritingDispatch(input, this.#readerDispatcher(reader, handler), handler));
+  }
+
+  /** Reads a reader from where it stands, awaiting input as it arrives. */
+  async #parseReaderAsync(reader: StreamReader, handler: SAXHandler): Promise<void> {
+    const input = new ReaderInput(reader, { consumer: 'SAXParser.parseAsync', mode: 'async' });
+    await input.readAsync(new InheritingDispatch(input, this.#readerDispatcher(reader, handler), handler));
+  }
+
+  /** The dispatcher for a reader given to the parser, with the reader's options. */
+  #readerDispatcher(reader: StreamReader, handler: SAXHandler): ReaderDispatcher {
+    this.#listen(reader, handler);
+    return this.#dispatcher(reader, handler, cursorOf(reader)[READER_OPTIONS], undefined, new ErrorReporting());
+  }
+
   /** The dispatcher for one parse, with the `Attributes` the namespace features call for. */
-  #dispatcher(reader: StreamReader, handler: SAXHandler, source: Source, reporting: ErrorReporting): EventDispatcher {
-    const { namespaceAware, namespacePrefixes } = this.factory.options;
-    const attributes =
-      namespaceAware && namespacePrefixes && !this.#xmlnsURIs
-        ? new NoXmlnsURIAttributes(reader, true)
-        : new ReaderAttributes(reader, namespaceAware);
+  #dispatcher(
+    reader: StreamReader,
+    handler: SAXHandler,
+    options: ResolvedOptions,
+    source: Source | undefined,
+    reporting: ErrorReporting
+  ): ReaderDispatcher {
+    const { namespaceAware, namespacePrefixes } = options;
+    // Reported namespace declarations carry no namespace URI unless xmlns-uris is on.
+    const dropsXmlnsURIs = namespaceAware && namespacePrefixes && !this.#xmlnsURIs;
+    const attributes = dropsXmlnsURIs
+      ? new NoXmlnsURIAttributes(reader, true)
+      : new ReaderAttributes(reader, namespaceAware);
     const locator = new ReaderLocator(reader, source, reporting);
-    return new EventDispatcher(reader, handler, locator, attributes, namespaceAware, this.#resolveDTDURIs);
+    return new ReaderDispatcher(reader, handler, locator, attributes, namespaceAware, this.#resolveDTDURIs);
   }
 
   /** A cursor whose errors go to the handler, falling back on the factory's error handler. */
   #reader(source: Source, handler: SAXHandler, async: boolean, reporting: ErrorReporting): StreamReader {
     const reader = this.factory[CREATE_READER](
       source,
-      // SAX hears of entity boundaries through startEntity and endEntity, not as events.
-      {
-        errorHandler: errorHandlerFor(handler, this.factory.options.errorHandler, reporting),
-        reportEntityBoundaries: false,
-      },
-      async
+      READER_OVERRIDES,
+      async,
+      errorHandlerFor(handler, this.factory.options.errorHandler, reporting)
     );
+    this.#listen(reader, handler);
+    return reader;
+  }
+
+  /** Has the reader tell the handler where expanded entities start and end, if it wants to hear. */
+  #listen(reader: StreamReader, handler: SAXHandler): void {
     if (handler.startEntity !== undefined || handler.endEntity !== undefined) {
-      reader[LISTEN_ENTITIES]({
+      cursorOf(reader)[LISTEN_ENTITIES]({
         startEntity: (name) => handler.startEntity?.(name),
         endEntity: (name) => handler.endEntity?.(name),
       });
     }
-    return reader;
+  }
+}
+
+/**
+ * Dispatches what a reader given to the parser reads. An element read on its own has the prefix
+ * mappings it inherits reported around it: started before its start tag, ended after its end tag.
+ */
+class InheritingDispatch {
+  readonly #input: ReaderInput;
+  readonly #dispatcher: ReaderDispatcher;
+  readonly #handler: SAXHandler;
+
+  constructor(input: ReaderInput, dispatcher: ReaderDispatcher, handler: SAXHandler) {
+    this.#input = input;
+    this.#dispatcher = dispatcher;
+    this.#handler = handler;
+  }
+
+  /** Calls the handler for one event; returns true at the end of the input. */
+  add(type: EventType): boolean {
+    const handler = this.#handler;
+    const { depth, inherited } = this.#input;
+    if (type === START_ELEMENT && depth === 1) {
+      for (const [prefix, uri] of inherited) handler.startPrefixMapping?.(prefix, uri);
+    }
+    const ended = this.#dispatcher.dispatch(type);
+    if (type === END_ELEMENT && depth === 0) for (const prefix of inherited.keys()) handler.endPrefixMapping?.(prefix);
+    return ended;
   }
 }
 
@@ -151,11 +242,12 @@ class ReaderLocator implements Locator {
   readonly #systemId: string | undefined;
   readonly #publicId: string | undefined;
 
-  constructor(reader: StreamReader, source: Source, reporting: ErrorReporting) {
+  constructor(reader: StreamReader, source: Source | undefined, reporting: ErrorReporting) {
     this.#reader = reader;
     this.#reporting = reporting;
     // Strings, bytes and chunks carry no identifiers; a source object may give either or both.
-    const object = typeof source === 'object' && !(source instanceof Uint8Array) ? (source as SourceObject) : undefined;
+    const isSourceObject = typeof source === 'object' && !(source instanceof Uint8Array);
+    const object = isSourceObject ? (source as SourceObject) : undefined;
     this.#systemId = object?.systemId;
     this.#publicId = object?.publicId;
   }
@@ -181,7 +273,7 @@ class ReaderLocator implements Locator {
   }
 
   get encoding(): string | undefined {
-    return this.#reader.encoding();
+    return this.#reader.declaredEncoding() ?? this.#reader.encoding();
   }
 }
 
@@ -190,7 +282,7 @@ class ReaderLocator implements Locator {
  * doesn't, or reports them differently: prefix mappings around each element, the DTD's declarations
  * one by one, and CDATA as `characters` between `startCDATA` and `endCDATA`.
  */
-class EventDispatcher {
+class ReaderDispatcher {
   readonly reader: StreamReader;
   readonly #handler: SAXHandler;
   /** The `Attributes` passed to `startElement`, reading the cursor's current start tag. */
@@ -224,12 +316,13 @@ class EventDispatcher {
     this.#namespaceAware = namespaceAware;
     this.#resolveDTDURIs = resolveDTDURIs;
     this.#attributes = attributes;
-    this.#including = reader[INCLUDED_DECLARATIONS] !== StreamReader.prototype[INCLUDED_DECLARATIONS];
+    this.#including = cursorOf(reader)[INCLUDED_DECLARATIONS] !== StreamReader.prototype[INCLUDED_DECLARATIONS];
   }
 
   /** A system id from a declaration, made absolute against its base when `resolve-dtd-uris` is on. */
   #resolvedSystemId(systemId: string, baseURI: string | undefined): string {
-    return this.#resolveDTDURIs ? (resolveURI(systemId, baseURI) ?? systemId) : systemId;
+    if (!this.#resolveDTDURIs) return systemId;
+    return resolveTargetURI(systemId, baseURI);
   }
 
   /** Calls the handler for one event; returns true at the end of the document. */
@@ -289,7 +382,7 @@ class EventDispatcher {
     } else if (type === DTD) {
       const doctype = this.reader.doctype();
       handler.startDTD?.(doctype.name, doctype.publicId, doctype.systemId);
-      for (const item of this.reader[DTD_ITEMS]()) this.#dtdItem(item);
+      for (const item of cursorOf(this.reader)[DTD_ITEMS]()) this.#dtdItem(item);
       handler.endDTD?.();
     } else if (type === END_DOCUMENT) {
       handler.endDocument?.();
@@ -340,7 +433,7 @@ class EventDispatcher {
 
   /** Reports the declarations XInclude has added since the last start tag, as it includes the content naming them. */
   #reportIncluded(): void {
-    const items = this.reader[INCLUDED_DECLARATIONS]();
+    const items = cursorOf(this.reader)[INCLUDED_DECLARATIONS]();
     for (; this.#includedReported < items.length; this.#includedReported++) {
       this.#dtdItem(items[this.#includedReported] as DtdItem);
     }
@@ -402,15 +495,9 @@ class EventDispatcher {
 
   /** Reports an entity declaration: internal, external or unparsed; parameter entities are named `%name`. */
   #entityDeclaration(entity: EntityDeclaration): void {
-    const handler = this.#handler;
     const name = entity.isParameterEntity ? `%${entity.name}` : entity.name;
-    if (entity.value !== undefined) {
-      handler.internalEntityDecl?.(name, entity.value);
-      return;
-    }
-    const systemId = this.#resolvedSystemId(entity.systemId ?? '', entity.baseURI);
-    if (entity.notation === undefined) handler.externalEntityDecl?.(name, entity.publicId, systemId);
-    else handler.unparsedEntityDecl?.(name, entity.publicId, systemId, entity.notation);
+    const systemId = entity.value === undefined ? this.#resolvedSystemId(entity.systemId ?? '', entity.baseURI) : '';
+    declareEntity(this.#handler, name, entity, systemId);
   }
 }
 

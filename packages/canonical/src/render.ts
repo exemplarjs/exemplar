@@ -1,7 +1,9 @@
-import { Unicode, XML_NAMESPACE, prefixOf } from '@exemplarjs/xml/internal';
+import { byCodePoint, prefixOf, XML_NAMESPACE } from '@exemplarjs/xml/internal';
 import type { CanonicalizeOptions } from './canonicalize.ts';
+import { type AncestorAttribute, withInheritedXmlAttributes } from './inheritance.ts';
 
-const { SUPPLEMENTARY_FIRST } = Unicode;
+/** The forms Canonical XML has: 1.0, 1.1, and Exclusive Canonicalization. */
+export type CanonicalXMLMethod = 'c14n' | 'c14n11' | 'exc-c14n';
 
 /** An attribute to write: namespace URI, local name, qualified name and value. */
 export type CanonicalAttribute = [string, string, string, string];
@@ -28,18 +30,6 @@ function escape(text: string, findOne: RegExp, findAll: RegExp, references: Read
   return findOne.test(text) ? text.replaceAll(findAll, (char) => references[char] as string) : text;
 }
 
-/** Compares strings by code point, as the recommendations order names. */
-function byCodePoint(a: string, b: string): number {
-  for (let i = 0; i < a.length && i < b.length; i++) {
-    const codeA = a.codePointAt(i) as number;
-    const codeB = b.codePointAt(i) as number;
-    if (codeA !== codeB) return codeA - codeB;
-    // A code point beyond the BMP takes two code units.
-    if (codeA >= SUPPLEMENTARY_FIRST) i++;
-  }
-  return a.length - b.length;
-}
-
 /** Sorts attributes by namespace URI, then local name. */
 export function sortAttributes(attributes: readonly CanonicalAttribute[]): CanonicalAttribute[] {
   return attributes.toSorted((a, b) => byCodePoint(a[0], b[0]) || byCodePoint(a[1], b[1]));
@@ -55,6 +45,7 @@ export function sortAttributes(attributes: readonly CanonicalAttribute[]): Canon
  * subclasses walk the document; this class writes each piece and adds it to `output`.
  */
 export abstract class Canonicalizer {
+  protected readonly method: CanonicalXMLMethod;
   /** Whether this is Exclusive Canonicalization, which declares only the namespaces an element uses. */
   protected readonly isExclusive: boolean;
   /** Whether comments are kept; the forms leave them out by default. */
@@ -66,8 +57,9 @@ export abstract class Canonicalizer {
   /** The canonical form written so far. */
   protected output = '';
 
-  constructor(exclusive: boolean, options: CanonicalizeOptions, encoding: string | null | undefined) {
-    this.isExclusive = exclusive;
+  protected constructor(method: CanonicalXMLMethod, options: CanonicalizeOptions, encoding: string | null | undefined) {
+    this.method = method;
+    this.isExclusive = method === 'exc-c14n';
     this.keepsComments = options.comments ?? false;
     this.#inclusivePrefixes = new Set(
       (options.inclusivePrefixes ?? []).map((prefix) => (prefix === '#default' ? '' : prefix))
@@ -111,6 +103,31 @@ export abstract class Canonicalizer {
     for (const [uri, , name] of attributes) if (uri !== '' && uri !== XML_NAMESPACE) candidates.add(prefixOf(name));
     for (const inclusive of this.#inclusivePrefixes) if (scope.has(inclusive)) candidates.add(inclusive);
     return candidates;
+  }
+
+  /**
+   * The prefixes a start tag may declare: for Exclusive Canonicalization, those it uses; else every
+   * prefix in scope at the apex, which has no ancestor in the subset, and those it declares elsewhere.
+   */
+  protected candidatePrefixes(
+    isApex: boolean,
+    scope: ReadonlyMap<string, string>,
+    prefix: string,
+    attributes: readonly CanonicalAttribute[],
+    declaredHere: () => Iterable<string>
+  ): Iterable<string> {
+    if (this.isExclusive) return this.usedPrefixes(prefix, attributes, scope);
+    return isApex ? scope.keys() : declaredHere();
+  }
+
+  /** A start tag's attributes sorted; the apex's with its ancestors' `xml:` attributes, which the inclusive forms have it take on. */
+  protected sortedAttributes(
+    attributes: readonly CanonicalAttribute[],
+    ancestors: readonly AncestorAttribute[] | undefined
+  ): CanonicalAttribute[] {
+    const method = this.method;
+    if (ancestors === undefined || method === 'exc-c14n') return sortAttributes(attributes);
+    return sortAttributes(withInheritedXmlAttributes(method, attributes, ancestors));
   }
 
   /**

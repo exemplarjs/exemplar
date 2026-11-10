@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { StringSink, XMLOutputFactory } from '@/index.ts';
+import { StringSink, XMLOutputFactory } from '@/index';
 
 /** Copies a document through the event writer from a reader that reports entity boundaries. */
 function copiedWithBoundaries(xml: string): string {

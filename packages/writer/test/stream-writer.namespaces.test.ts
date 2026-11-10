@@ -1,7 +1,7 @@
-import { names } from '@test/helpers/canonical.ts';
-import { codeOf, written } from '@test/helpers/write.ts';
+import { names } from '@test/helpers/canonical';
+import { codeOf, written } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
-import { type StreamWriter, StringSink, XMLOutputFactory } from '@/index.ts';
+import { type StreamWriter, StringSink, XMLOutputFactory } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -19,7 +19,7 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
       w.writeNamespace('p', 'urn:p');
       w.writeStartElement('urn:p', 'c');
       w.writeAttribute('urn:p', 'x', '1');
-      w.writeAttribute('', 'urn:p', 'y', '2');
+      w.writeAttribute('', 'y', 'urn:p', '2');
       w.writeEndDocument();
     });
     expect(out).toBe('<r xmlns:p="urn:p"><p:c p:x="1" p:y="2"/></r>');
@@ -43,10 +43,10 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
     w.writeStartElement('r');
     w.writeStartElement('a');
     w.writeNamespace('p', 'urn:p');
-    expect(w.getNamespaceURI('p')).toBe('urn:p');
+    expect(w.namespaceOf('p')).toBe('urn:p');
     w.writeEndElement();
-    expect(w.getNamespaceURI('p')).toBeUndefined();
-    expect(w.getPrefix('urn:p')).toBeUndefined();
+    expect(w.namespaceOf('p')).toBeUndefined();
+    expect(w.prefixOf('urn:p')).toBeUndefined();
     expect(() => w.writeStartElement('urn:p', 'b')).toThrow(expect.objectContaining({ code: 'WRITE_UNBOUND_PREFIX' }));
   });
 
@@ -106,19 +106,19 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
 
   it('knows the xml and xmlns prefixes from the start (Namespaces §3)', () => {
     const w = writer();
-    expect(w.getNamespaceURI('xml')).toBe(XML);
-    expect(w.getNamespaceURI('xmlns')).toBe(XMLNS);
-    expect(w.getPrefix(XML)).toBe('xml');
-    expect(w.getPrefix(XMLNS)).toBe('xmlns');
-    expect(w.getNamespaceURI('')).toBeUndefined();
-    expect(w.getPrefix('urn:none')).toBeUndefined();
+    expect(w.namespaceOf('xml')).toBe(XML);
+    expect(w.namespaceOf('xmlns')).toBe(XMLNS);
+    expect(w.prefixOf(XML)).toBe('xml');
+    expect(w.prefixOf(XMLNS)).toBe('xmlns');
+    expect(w.namespaceOf('')).toBeUndefined();
+    expect(w.prefixOf('urn:none')).toBeUndefined();
   });
 
   it('binds a prefix for lookups with setPrefix, without declaring it, as StAX does', () => {
     const out = written((w) => {
       w.setPrefix('p', 'urn:p');
-      expect(w.getPrefix('urn:p')).toBe('p');
-      expect(w.getNamespaceURI('p')).toBe('urn:p');
+      expect(w.prefixOf('urn:p')).toBe('p');
+      expect(w.namespaceOf('p')).toBe('urn:p');
       w.writeStartElement('urn:p', 'a');
       w.writeNamespace('p', 'urn:p');
       w.writeEndElement();
@@ -129,7 +129,7 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
   it('binds the default namespace for lookups with setDefaultNamespace', () => {
     const out = written((w) => {
       w.setDefaultNamespace('urn:d');
-      expect(w.getNamespaceURI('')).toBe('urn:d');
+      expect(w.namespaceOf('')).toBe('urn:d');
       w.writeStartElement('urn:d', 'a');
       w.writeDefaultNamespace('urn:d');
       w.writeEndElement();
@@ -143,7 +143,7 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
     w.writeStartElement('a');
     w.setPrefix('p', 'urn:p');
     w.writeEndElement();
-    expect(w.getNamespaceURI('p')).toBeUndefined();
+    expect(w.namespaceOf('p')).toBeUndefined();
   });
 
   it('gives no prefix for a URI whose prefix an inner element has rebound', () => {
@@ -152,8 +152,8 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
     w.writeNamespace('p', 'urn:1');
     w.writeStartElement('c');
     w.writeNamespace('p', 'urn:2');
-    expect(w.getPrefix('urn:1')).toBeUndefined();
-    expect(w.getPrefix('urn:2')).toBe('p');
+    expect(w.prefixOf('urn:1')).toBeUndefined();
+    expect(w.prefixOf('urn:2')).toBe('p');
   });
 
   it('gives the innermost of several prefixes for one URI', () => {
@@ -161,7 +161,7 @@ describe('StreamWriter namespaces, as the caller declares them', () => {
     w.writeStartElement('r');
     w.writeNamespace('p', 'urn:x');
     w.writeNamespace('q', 'urn:x');
-    expect(w.getPrefix('urn:x')).toBe('q');
+    expect(w.prefixOf('urn:x')).toBe('q');
   });
 
   it('writes the xml prefix for the XML namespace without declaring it', () => {
@@ -223,7 +223,7 @@ describe('StreamWriter namespaces in repairing mode (IS_REPAIRING_NAMESPACES)', 
     const out = written((w) => {
       w.writeStartElement('p', 'a', 'urn:p');
       w.writeStartElement('p', 'b', 'urn:p');
-      w.writeAttribute('p', 'urn:p', 'x', '1');
+      w.writeAttribute('p', 'x', 'urn:p', '1');
       w.writeStartElement('urn:p', 'c');
       w.writeEndDocument();
     }, repairing);
@@ -239,7 +239,7 @@ describe('StreamWriter namespaces in repairing mode (IS_REPAIRING_NAMESPACES)', 
   it('declares an attribute prefix on the element whose attribute needs it', () => {
     expect(
       written(
-        (w) => (w.writeStartElement('a'), w.writeAttribute('q', 'urn:q', 'x', '1'), w.writeEndElement()),
+        (w) => (w.writeStartElement('a'), w.writeAttribute('q', 'x', 'urn:q', '1'), w.writeEndElement()),
         repairing
       )
     ).toBe('<a xmlns:q="urn:q" q:x="1"/>');
@@ -250,7 +250,7 @@ describe('StreamWriter namespaces in repairing mode (IS_REPAIRING_NAMESPACES)', 
       w.writeStartElement('a');
       w.writeNamespace('ns1', 'urn:taken');
       w.writeAttribute('urn:x', 'b', '1');
-      w.writeAttribute('', 'urn:y', 'c', '2');
+      w.writeAttribute('', 'c', 'urn:y', '2');
       w.writeAttribute('urn:x', 'd', '3');
       w.writeEndElement();
     }, repairing);
@@ -270,7 +270,7 @@ describe('StreamWriter namespaces in repairing mode (IS_REPAIRING_NAMESPACES)', 
     const out = written((w) => {
       w.writeStartElement('p', 'a', 'urn:1');
       w.writeStartElement('b');
-      w.writeAttribute('p', 'urn:2', 'x', '1');
+      w.writeAttribute('p', 'x', 'urn:2', '1');
       w.writeEndDocument();
     }, repairing);
     expect(out).toBe('<p:a xmlns:p="urn:1"><b xmlns:p="urn:2" p:x="1"/></p:a>');
@@ -278,7 +278,7 @@ describe('StreamWriter namespaces in repairing mode (IS_REPAIRING_NAMESPACES)', 
 
   it('refuses a prefix the element already binds to another URI', () => {
     expect(
-      codeOf((w) => (w.writeStartElement('p', 'a', 'urn:1'), w.writeAttribute('p', 'urn:2', 'x', '1')), repairing)
+      codeOf((w) => (w.writeStartElement('p', 'a', 'urn:1'), w.writeAttribute('p', 'x', 'urn:2', '1')), repairing)
     ).toBe('WRITE_UNBOUND_PREFIX');
   });
 
@@ -339,8 +339,8 @@ describe('StreamWriter namespace declarations written as attributes', () => {
   it.each<[string, (w: StreamWriter) => void]>([
     ['by local name', (w) => w.writeAttribute('xmlns', 'urn:d')],
     ['by the xmlns namespace and local name', (w) => w.writeAttribute(XMLNS, 'xmlns', 'urn:d')],
-    ['by no prefix, no namespace and local name', (w) => w.writeAttribute('', '', 'xmlns', 'urn:d')],
-    ['by no prefix, the xmlns namespace and local name', (w) => w.writeAttribute('', XMLNS, 'xmlns', 'urn:d')],
+    ['by no prefix, no namespace and local name', (w) => w.writeAttribute('', 'xmlns', '', 'urn:d')],
+    ['by no prefix, the xmlns namespace and local name', (w) => w.writeAttribute('', 'xmlns', XMLNS, 'urn:d')],
   ])('takes the default namespace declared %s as writeDefaultNamespace', (_title, writeDeclaration) => {
     const out = written((w) => {
       w.writeStartElement('', 'a', 'urn:d');
@@ -353,9 +353,9 @@ describe('StreamWriter namespace declarations written as attributes', () => {
 
   it.each<[string, (w: StreamWriter) => void]>([
     ['by the xmlns namespace and the prefix as local name', (w) => w.writeAttribute(XMLNS, 'p', 'urn:p')],
-    ['by the xmlns prefix and namespace', (w) => w.writeAttribute('xmlns', XMLNS, 'p', 'urn:p')],
-    ['by the xmlns prefix alone', (w) => w.writeAttribute('xmlns', '', 'p', 'urn:p')],
-    ['by no prefix and the xmlns namespace', (w) => w.writeAttribute('', XMLNS, 'p', 'urn:p')],
+    ['by the xmlns prefix and namespace', (w) => w.writeAttribute('xmlns', 'p', XMLNS, 'urn:p')],
+    ['by the xmlns prefix alone', (w) => w.writeAttribute('xmlns', 'p', '', 'urn:p')],
+    ['by no prefix and the xmlns namespace', (w) => w.writeAttribute('', 'p', XMLNS, 'urn:p')],
   ])('takes a prefix declared %s as writeNamespace', (_title, writeDeclaration) => {
     const out = written((w) => {
       w.writeStartElement('r');
@@ -384,7 +384,7 @@ describe('StreamWriter namespace declarations written as attributes', () => {
     for (const checkWellFormedness of [true, false]) {
       expect(
         codeOf(
-          (w) => (w.writeStartElement('r'), w.writeNamespace('p', 'u1'), w.writeAttribute('xmlns', XMLNS, 'p', 'u2')),
+          (w) => (w.writeStartElement('r'), w.writeNamespace('p', 'u1'), w.writeAttribute('xmlns', 'p', XMLNS, 'u2')),
           { checkWellFormedness }
         )
       ).toBe('WRITE_DUPLICATE_ATTRIBUTE');
@@ -397,9 +397,9 @@ describe('StreamWriter namespace declarations written as attributes', () => {
   });
 
   it.each<[string, (w: StreamWriter) => void]>([
-    ['declaring the xmlns prefix', (w) => w.writeAttribute('xmlns', XMLNS, 'xmlns', 'urn:x')],
-    ['with the xmlns prefix in another namespace', (w) => w.writeAttribute('xmlns', 'urn:x', 'p', 'u')],
-    ['in the xmlns namespace with another prefix', (w) => w.writeAttribute('q', XMLNS, 'p', 'u')],
+    ['declaring the xmlns prefix', (w) => w.writeAttribute('xmlns', 'xmlns', XMLNS, 'urn:x')],
+    ['with the xmlns prefix in another namespace', (w) => w.writeAttribute('xmlns', 'p', 'urn:x', 'u')],
+    ['in the xmlns namespace with another prefix', (w) => w.writeAttribute('q', 'p', XMLNS, 'u')],
   ])('refuses an attribute %s (Namespaces §3)', (_title, write) => {
     expect(codeOf((w) => (w.writeStartElement('r'), write(w)))).toBe('WRITE_NAME');
   });
@@ -408,7 +408,7 @@ describe('StreamWriter namespace declarations written as attributes', () => {
     const out = written((w) => {
       w.writeStartElement('r');
       w.writeNamespace('p', 'urn:p');
-      w.writeAttribute('p', 'urn:p', 'xmlns', '1');
+      w.writeAttribute('p', 'xmlns', 'urn:p', '1');
       w.writeEndElement();
     });
     expect(out).toBe('<r xmlns:p="urn:p" p:xmlns="1"/>');
@@ -436,7 +436,7 @@ describe('StreamWriter that is not namespace-aware (namespaceAware: false)', () 
       w.writeAttribute('q:x', '1');
       w.writeAttribute(':y', '2');
       w.writeStartElement('q', 'b', 'urn:ignored');
-      w.writeAttribute('r', 'urn:ignored', 'z', '3');
+      w.writeAttribute('r', 'z', 'urn:ignored', '3');
       w.writeEmptyElement('urn:ignored', 'c:d');
       w.writeNamespace('s', 'urn:s');
       w.writeDefaultNamespace('urn:d');
@@ -466,7 +466,7 @@ describe('StreamWriter that is not namespace-aware (namespaceAware: false)', () 
     ['a PI target that is not a name', (w) => w.writeProcessingInstruction('1p'), 'WRITE_PI'],
     [
       'an attribute written twice by its whole name',
-      (w) => (w.writeStartElement('a'), w.writeAttribute('p', 'u1', 'x', '1'), w.writeAttribute('p:x', '2')),
+      (w) => (w.writeStartElement('a'), w.writeAttribute('p', 'x', 'u1', '1'), w.writeAttribute('p:x', '2')),
       'WRITE_DUPLICATE_ATTRIBUTE',
     ],
     [

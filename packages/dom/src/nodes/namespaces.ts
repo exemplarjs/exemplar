@@ -1,5 +1,5 @@
 import { XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
-import { orNull } from '../names.ts';
+import { orNull } from '@/names';
 import type { Element } from './element.ts';
 import { elementAbove } from './tree.ts';
 

@@ -1,6 +1,6 @@
-import { eventsEveryWay, parseAsyncEveryWay, parseAtEverySplit, parseEveryWay } from '@test/helpers/parse.ts';
+import { eventsEveryWay, parseAsyncEveryWay, parseAtEverySplit, parseEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { type InputOptions, XMLError } from '@/index.ts';
+import { type InputOptions, XMLError } from '@/index';
 
 /** What reading a document every synchronous way gives: `accepted <canonical form>` or `rejected <code> at <line>:<column>`. */
 function everyWay(read: () => string): string {

@@ -1,4 +1,4 @@
-import { NodeType } from '../node-type.ts';
+import { NodeType } from '@/node-type';
 import { Declared } from './declared.ts';
 import type { Document } from './document.ts';
 import type { Node } from './node.ts';

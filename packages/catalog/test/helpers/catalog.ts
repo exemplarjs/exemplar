@@ -1,5 +1,5 @@
 import type { ResolvedSource } from '@exemplarjs/xml';
-import { type CatalogOptions, type CatalogResolver, catalogResolver } from '@/index.ts';
+import { type CatalogOptions, type CatalogResolver, catalogResolver } from '@/index';
 
 /** The catalog namespace, declared as the default namespace. */
 export const NS = 'xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog"';
@@ -23,7 +23,7 @@ export function memoryReader(files: Files): { read: (uri: string) => ResolvedSou
 
 /** A catalog over in-memory files, starting from ROOT, that carries on when nothing matches unless told otherwise. */
 export function catalog(files: Files, options: Partial<CatalogOptions> = {}): CatalogResolver {
-  return catalogResolver({ files: [ROOT], read: memoryReader(files).read, resolve: 'continue', ...options });
+  return catalogResolver({ files: [ROOT], read: memoryReader(files).read, resolution: 'continue', ...options });
 }
 
 /** A catalog of one file, ROOT, holding the given entries. */

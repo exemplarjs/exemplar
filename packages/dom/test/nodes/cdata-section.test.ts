@@ -1,6 +1,6 @@
-import { newDocument } from '@test/helpers/dom.ts';
+import { newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { CDATASection, Text } from '@/index.ts';
+import { CDATASection, Text } from '@/index';
 
 describe('CDATASection', () => {
   it('is a CDATA section node named #cdata-section', () => {

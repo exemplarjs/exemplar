@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type StreamReader, XMLInputFactory } from '@exemplarjs/xml';
-import { NO_FIXUPS, endTagOverlay, topOverlay } from '@/overlay.ts';
-import type { Scope } from '@/scopes.ts';
+import { endTagOverlay, NO_FIXUPS, topOverlay } from '@/overlay';
+import type { Scope } from '@/scopes';
 
 const XML_NS = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';

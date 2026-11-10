@@ -1,13 +1,14 @@
-import type { ResolvedOptions } from '../config/options.ts';
-import type { EntityDeclaration, NotationDeclaration } from '../dtd/declarations.ts';
-import type { DtdItem } from '../dtd/store.ts';
-import type { Location } from '../errors/xml-error.ts';
-import type { DecoderRegistry } from '../input/decoders.ts';
-import type { AsyncOpenedSource, OpenedSource, ChunkSource } from '../input/source.ts';
-import { ScanFlag } from '../scan/scanner.ts';
-import type { LineSegment } from '../tokenizer/lines.ts';
-import { Token, Tokenizer, type TokenizerOptions } from '../tokenizer/tokenizer.ts';
-import { isAllWhitespace, isWhitespaceSpan } from '../util/whitespace.ts';
+import type { ResolvedOptions } from '@/config/options';
+import type { EntityDeclaration, NotationDeclaration } from '@/dtd/declarations';
+import type { DtdItem } from '@/dtd/store';
+import type { Location } from '@/errors/xml-error';
+import { StreamReaderDelegate } from '@/filters/delegate';
+import type { DecoderRegistry } from '@/input/decoders';
+import type { AsyncOpenedSource, ChunkSource, OpenedSource } from '@/input/source';
+import { ScanFlag } from '@/scan/scanner';
+import type { LineSegment } from '@/tokenizer/lines';
+import { Token, Tokenizer, type TokenizerOptions } from '@/tokenizer/tokenizer';
+import { isAllWhitespace, isWhitespaceSpan } from '@/util/whitespace';
 import { AsyncInput } from './async-input.ts';
 import { AttributeCollector } from './attribute-collector.ts';
 import { DtdLoader } from './dtd-loader.ts';
@@ -20,18 +21,21 @@ import { EventProcessing } from './event-processing.ts';
 import { EventType } from './event-type.ts';
 import {
   ADD_FILTER,
+  ANCESTOR_XML_ATTRIBUTES,
+  copyString,
   DTD_COMPLETE,
-  INCLUDED_DECLARATIONS,
-  INPUT_ENCODING,
-  XML_ENCODING,
   DTD_ITEMS,
+  type EntityListener,
   EVENT_OFFSET,
   EVENT_POSITION,
-  type EntityListener,
-  LISTEN_ENTITIES,
-  copyString,
+  INCLUDED_DECLARATIONS,
+  INPUT_ENCODING,
   isIndex,
+  LISTEN_ENTITIES,
+  NAMESPACES_IN_SCOPE,
   outOfRange,
+  READER_OPTIONS,
+  XML_ENCODING,
 } from './internal.ts';
 import { NamespaceScopes } from './namespace-scopes.ts';
 import * as navigation from './navigation.ts';
@@ -79,6 +83,8 @@ export type StreamFilter = (reader: PublicStreamReader | AsyncStreamReader) => b
 
 /** No DTD items, shared so that nothing allocates an empty list. */
 const NO_ITEMS: readonly DtdItem[] = [];
+/** No namespace bindings: those a reader without namespaces has in scope. */
+export const NO_BINDINGS: ReadonlyMap<string, string> = new Map();
 
 /**
  * The pull reader at the core of every API, following StAX's `XMLStreamReader`. The caller asks
@@ -128,7 +134,8 @@ export class StreamReader {
     this.#attributes = new AttributeCollector(
       options,
       this.#scopes,
-      (code, message, index) => this.#errors.error(code, message, this[LOCATION_AT](index)),
+      this.#elements,
+      (code, message, index) => this.#errors.warn(code, message, this[LOCATION_AT](index)),
       (tagAttributeIndex) => this.#expander.expandedAttributeValue(tagAttributeIndex, this.#core.store)
     );
     const validating = options.validator !== undefined;
@@ -223,9 +230,24 @@ export class StreamReader {
     this.#passesStraightThrough = false;
   }
 
-  /** Tells a listener where expanded entities start and end. @internal */
-  [LISTEN_ENTITIES](listener: EntityListener): void {
+  /** Tells a listener where expanded entities start and end; undefined stops telling the last one. @internal */
+  [LISTEN_ENTITIES](listener: EntityListener | undefined): void {
     this.#processing.listener = listener;
+  }
+
+  /** The options the reader reads with. @internal */
+  get [READER_OPTIONS](): ResolvedOptions {
+    return this.#options;
+  }
+
+  /** The `xml:` attributes of the current element's ancestors, outermost first, as qualified name and value. @internal */
+  [ANCESTOR_XML_ATTRIBUTES](): readonly [string, string][] {
+    return this.#attributes.xmlAttributesAbove(this[CURRENT_ELEMENT_DEPTH]());
+  }
+
+  /** The namespace bindings in scope at the current element, prefix to URI; none when namespaces are off. @internal */
+  [NAMESPACES_IN_SCOPE](): ReadonlyMap<string, string> {
+    return this.#options.namespaceAware ? this.#scopes.inScope(this.#core.tokenizer) : NO_BINDINGS;
   }
 
   /** The current event's position: a line segment that finds its line later, or its location now. @internal */
@@ -278,7 +300,7 @@ export class StreamReader {
 
   /** Whether there are more events after this one. */
   hasNext(): boolean {
-    return this.#core.event !== EventType.END_DOCUMENT;
+    return this.#core.event !== EventType.END_DOCUMENT && !this.#core.failed;
   }
 
   /** The current event's type. */
@@ -309,15 +331,15 @@ export class StreamReader {
   /** The depth of the element the current START_ELEMENT or END_ELEMENT is about, or -1 for any other event. */
   private [CURRENT_ELEMENT_DEPTH](): number {
     const event = this.#core.event;
-    return event === EventType.START_ELEMENT || event === EventType.END_ELEMENT ? this.#elements.depth - 1 : -1;
+    if (event === EventType.START_ELEMENT || event === EventType.END_ELEMENT) return this.#elements.depth - 1;
+    return -1;
   }
 
   /** Where the colon is in the current element's name, or -1 when it has none or namespaces are off. */
   private [CURRENT_NAME_COLON](): number {
     const elementDepth = this[CURRENT_ELEMENT_DEPTH]();
-    return elementDepth < 0 || !this.#options.namespaceAware
-      ? -1
-      : (this.#elements.nameFirstColons[elementDepth] as number);
+    if (elementDepth < 0 || !this.#options.namespaceAware) return -1;
+    return this.#elements.nameFirstColons[elementDepth] as number;
   }
 
   /** The current element's qualified name, or the entity's name for ENTITY_REFERENCE. */
@@ -430,21 +452,14 @@ export class StreamReader {
     return this.#attributes.specified(this[TAG_ATTRIBUTE_INDEX](index));
   }
 
-  /** An attribute's normalized value, by index or by namespace URI (`''` for none) and local name. */
-  attributeValue(index: number): string;
-  attributeValue(namespaceURI: string, localName: string): string | undefined;
-  attributeValue(indexOrNamespace: number | string, localName?: string): string | undefined {
-    if (typeof indexOrNamespace === 'number') {
-      return this[AS_RETURNED](
-        this.#attributes.value(this.#core.tokenizer, this[TAG_ATTRIBUTE_INDEX](indexOrNamespace))
-      );
-    }
-    for (let i = 0; i < this.attributeCount(); i++) {
-      if (this.attributeLocalName(i) === localName && this.attributeNamespace(i) === indexOrNamespace) {
-        return this.attributeValue(i);
-      }
-    }
-    return undefined;
+  /** An attribute's normalized value. */
+  attributeValue(index: number): string {
+    return this[AS_RETURNED](this.#attributes.value(this.#core.tokenizer, this[TAG_ATTRIBUTE_INDEX](index)));
+  }
+
+  /** The value of the attribute with a local name and namespace URI, `''` for none; undefined when there is none. */
+  attribute(localName: string, namespaceURI = ''): string | undefined {
+    return navigation.attributeNamed(this, localName, namespaceURI);
   }
 
   /** The text of CHARACTERS, SPACE, CDATA and COMMENT events, the DOCTYPE for DTD, and an entity's replacement text for ENTITY_REFERENCE. */
@@ -479,7 +494,7 @@ export class StreamReader {
     if (literalText !== undefined) return isAllWhitespace(literalText);
     return (
       event === EventType.SPACE ||
-      (event === EventType.CHARACTERS &&
+      ((event === EventType.CHARACTERS || event === EventType.CDATA) &&
         isWhitespaceSpan(tokenizer.buffer, tokenizer.valueStart, tokenizer.valueEnd, tokenizer.version11))
     );
   }
@@ -505,9 +520,14 @@ export class StreamReader {
     return this.#entities.document.declaration?.version;
   }
 
-  /** The encoding the XML declaration names, or else the one detection chose. */
+  /** The encoding the document's bytes were read in; undefined for a document given as text. */
   encoding(): string | undefined {
-    return this.#entities.document.declaration?.encoding ?? this.#opened.text.detection?.decoderName;
+    return this.#opened.text.detection?.decoderName;
+  }
+
+  /** The encoding the XML declaration names, if it names one. */
+  declaredEncoding(): string | undefined {
+    return this.#entities.document.declaration?.encoding;
   }
 
   /** The standalone value the XML declaration gives, if any. */
@@ -553,13 +573,23 @@ export class StreamReader {
     return navigation.elementTextAsync(this);
   }
 
+  /** At a start tag, skips the element and everything in it, stopping at its end tag. */
+  skipElement(): void {
+    navigation.skipElement(this);
+  }
+
+  /** Like `skipElement()`, awaiting input when an asynchronous reader needs it. */
+  skipElementAsync(): Promise<void> {
+    return navigation.skipElementAsync(this);
+  }
+
   /** Calls `handle` for each event to the end of the document, awaiting input as it is needed. */
   forEachEvent(handle: (type: Exclude<EventType, typeof EventType.NEED_INPUT>, reader: this) => void): Promise<void> {
     return navigation.forEachEvent(this, handle);
   }
 }
 
-/** Whether a value is a reader rather than a source. */
-export function isReader(value: unknown): value is PublicStreamReader | AsyncStreamReader {
-  return value instanceof StreamReader;
+/** Whether a value is a reader rather than a source: a cursor, or a delegate over one. */
+export function isReader(value: unknown): value is PublicStreamReader | AsyncStreamReader | StreamReaderDelegate {
+  return value instanceof StreamReader || value instanceof StreamReaderDelegate;
 }

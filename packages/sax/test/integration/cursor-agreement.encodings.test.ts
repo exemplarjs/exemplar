@@ -1,4 +1,4 @@
-import { latin1, readEveryWay, utf16 } from '@test/helpers/agreement.ts';
+import { latin1, readEveryWay, utf16 } from '@test/helpers/agreement';
 import { describe, expect, it } from 'vitest';
 
 const UTF8 = new TextEncoder();

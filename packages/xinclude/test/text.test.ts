@@ -1,7 +1,7 @@
-import { decoderRegistry } from '@test/helpers/xinclude.ts';
+import { decoderRegistry } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import type { ResolvedSource } from '@exemplarjs/xml';
-import { TextInclusionError, includedText } from '@/text.ts';
+import { includedText, TextInclusionError } from '@/text';
 
 const REGISTRY = decoderRegistry();
 

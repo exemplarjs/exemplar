@@ -1,15 +1,15 @@
-import { bytes, framed, join, singleByte, split, utf32, utf8, verdict } from '@test/helpers/lexical.ts';
+import { bytes, framed, join, singleByte, split, utf32, utf8, verdict } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
 import {
   DecodeError,
+  isEbcdic,
   SINGLE_BYTE_DECODERS,
   Utf16Decoder,
   Utf32Decoder,
-  isEbcdic,
   withCarry,
-} from '@/encodings/decoders.ts';
-import { SINGLE_BYTE_TABLES } from '@/encodings/tables.ts';
-import { NO_BYTES } from '@/util/bytes.ts';
+} from '@/encodings/decoders';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
+import { NO_BYTES } from '@/util/bytes';
 
 /** The DecodeError a decoding raises. */
 function failure(decode: () => string): DecodeError {

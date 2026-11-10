@@ -1,8 +1,8 @@
-import { canonical, names } from '@test/helpers/canonical.ts';
-import { written, writtenBytes } from '@test/helpers/write.ts';
+import { canonical, names } from '@test/helpers/canonical';
+import { written, writtenBytes } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
 import { EventType, type InputOptions, XMLInputFactory } from '@exemplarjs/xml';
-import { BytesSink, type OutputOptions, type StreamWriter, StringSink, XMLOutputFactory } from '@/index.ts';
+import { BytesSink, type OutputOptions, type StreamWriter, StringSink, XMLOutputFactory } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -250,7 +250,7 @@ describe('the stream writer read back: namespaces (Namespaces in XML)', () => {
       w.writeStartElement('', 'r', 'urn:d');
       w.writeDefaultNamespace('urn:d');
       w.writeNamespace('p', 'urn:p');
-      w.writeAttribute('p', 'urn:p', 'a', '1');
+      w.writeAttribute('p', 'a', 'urn:p', '1');
       w.writeAttribute(XML, 'lang', 'en');
       w.writeStartElement('urn:p', 'c');
       w.writeStartElement('', 'n', '');
@@ -276,7 +276,7 @@ describe('the stream writer read back: namespaces (Namespaces in XML)', () => {
         w.writeAttribute('urn:x', 'a', '1');
         w.writeAttribute('urn:d', 'b', '2');
         w.writeStartElement('p', 'c', 'urn:p');
-        w.writeAttribute('q', 'urn:other', 'z', '3');
+        w.writeAttribute('q', 'z', 'urn:other', '3');
         w.writeStartElement('', 'n', '');
         w.writeEndDocument();
       },
@@ -302,7 +302,7 @@ describe('the stream writer read back: namespaces (Namespaces in XML)', () => {
           w.writeStartElement('feed');
           w.writeAttribute('xmlns', 'urn:atom');
           w.writeAttribute(XMLNS, 'p', 'urn:p');
-          w.writeAttribute('p', 'urn:p', 'a', '1');
+          w.writeAttribute('p', 'a', 'urn:p', '1');
           w.writeStartElement('entry');
           w.writeEndDocument();
         },

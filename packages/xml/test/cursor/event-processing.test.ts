@@ -1,4 +1,4 @@
-import { eventsEveryWay } from '@test/helpers/parse.ts';
+import { eventsEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 
 const DECLARED = '<!DOCTYPE r [<!ENTITY e "x"><!ENTITY m "<a/>"><!ENTITY bad "<b">]>';

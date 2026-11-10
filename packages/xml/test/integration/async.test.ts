@@ -1,7 +1,15 @@
-import { canonicalOfAsync } from '@test/helpers/canonical.ts';
-import { canonical } from '@test/helpers/parse.ts';
+import { canonicalOfAsync } from '@test/helpers/canonical';
+import { canonical } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, type ResolveRequest, type Source, XMLInputFactory } from '@/index.ts';
+import { IllegalStateError } from '@/index';
+import {
+  AsyncReaderRequiredError,
+  EventType,
+  type InputOptions,
+  type ResolveRequest,
+  type Source,
+  XMLInputFactory,
+} from '@/index';
 
 const encoder = new TextEncoder();
 
@@ -63,7 +71,7 @@ describe('the async cursor', () => {
       await reader.fill();
       event = reader.next();
     }
-    expect([event, reader.version(), reader.encoding()]).toEqual([EventType.START_DOCUMENT, '1.1', 'UTF-8']);
+    expect([event, reader.version(), reader.declaredEncoding()]).toEqual([EventType.START_DOCUMENT, '1.1', 'UTF-8']);
   });
 
   it('gives events as soon as each is complete when fed', () => {
@@ -131,7 +139,7 @@ describe('the async cursor', () => {
 
   it('refuses to be fed when it reads a stream', () => {
     const reader = new XMLInputFactory().createAsyncStreamReader(stream('<a/>', 1));
-    expect(() => reader.feed(new Uint8Array(1))).toThrow(TypeError);
+    expect(() => reader.feed(new Uint8Array(1))).toThrow(IllegalStateError);
   });
 
   it('waits for resolvers that answer with promises or streams', async () => {
@@ -161,9 +169,7 @@ describe('the async cursor', () => {
 
   it('reports a DTD error once, though it reads the DTD again after each answer', async () => {
     const errors: string[] = [];
-    const entityResolver = {
-      resolveEntity: () => Promise.resolve({ text: '<!ENTITY x "1">' }),
-    };
+    const entityResolver = { resolveEntity: () => Promise.resolve({ text: '<!ENTITY x "1">' }) };
     const factory = new XMLInputFactory({
       entityResolver,
       accessExternalDTD: 'all',
@@ -177,7 +183,15 @@ describe('the async cursor', () => {
   it('tells a sync reader to use an async one when a resolver answers with a promise', () => {
     const entityResolver = { resolveEntity: () => Promise.resolve({ text: '' }) };
     const xml = '<!DOCTYPE a SYSTEM "http://x/a.dtd"><a/>';
+    expect(() => canonical(xml, { entityResolver, accessExternalDTD: 'all' })).toThrow(AsyncReaderRequiredError);
     expect(() => canonical(xml, { entityResolver, accessExternalDTD: 'all' })).toThrow(/asynchronous reader/);
+  });
+
+  it('tells a sync reader to use an async one for a stream, raising the same error', () => {
+    const stream = new Blob(['<a/>']).stream();
+    expect(() => new XMLInputFactory().createStreamReader(stream)).toThrow(AsyncReaderRequiredError);
+    expect(() => new XMLInputFactory().createStreamReader({ stream })).toThrow(AsyncReaderRequiredError);
+    expect(new AsyncReaderRequiredError('x')).toBeInstanceOf(TypeError);
   });
 });
 
@@ -284,11 +298,13 @@ describe('the async cursor over streams', () => {
       },
     });
     expect(await drive(failing)).toEqual(['7@1:1', '1a@1:1', 'thrown RangeError: broken']);
+
     /** A chunk, then a failure. */
     async function* breaking() {
       yield encoder.encode('<a>');
       throw new RangeError('broken too');
     }
+
     expect(await drive(breaking())).toEqual(['7@1:1', '1a@1:1', 'thrown RangeError: broken too']);
   });
 
@@ -321,7 +337,7 @@ describe('the async cursor over streams', () => {
       await reader.fill();
       event = reader.next();
     }
-    expect([event, reader.version(), reader.encoding(), reader.standalone()]).toEqual([
+    expect([event, reader.version(), reader.declaredEncoding(), reader.standalone()]).toEqual([
       EventType.START_DOCUMENT,
       '1.0',
       'UTF-8',

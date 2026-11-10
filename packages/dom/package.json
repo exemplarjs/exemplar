@@ -10,6 +10,7 @@
     "directory": "packages/dom"
   },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "exemplar-source": "./src/index.ts",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@exemplarjs/build-config": "workspace:*",
+    "@exemplarjs/sax": "workspace:*",
     "@exemplarjs/writer": "workspace:*",
     "@exemplarjs/xml": "workspace:*"
   }

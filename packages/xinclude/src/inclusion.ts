@@ -44,7 +44,8 @@ export class Inclusion {
     this.isIntraDocument = isIntraDocument;
     this.scopes = new ScopeStack(uri);
     // A pointer into this document has its reader select from the source, which gives only what it selects.
-    this.#selection = parts.length > 0 && !isIntraDocument ? new Selection(parts) : undefined;
+    const selectsFromSource = parts.length > 0 && !isIntraDocument;
+    this.#selection = selectsFromSource ? new Selection(parts) : undefined;
   }
 
   /** Whether the inclusion has given all it gives. */

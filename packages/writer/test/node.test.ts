@@ -1,8 +1,8 @@
-import { canonical, names } from '@test/helpers/canonical.ts';
-import { codeOf, written } from '@test/helpers/write.ts';
+import { canonical, names } from '@test/helpers/canonical';
+import { codeOf, written } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
-import { type StreamWriter, type WritableNode } from '@/index.ts';
-import { writeNode } from '@/node.ts';
+import { type StreamWriter, type WritableNode } from '@/index';
+import { writeNode } from '@/node';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';

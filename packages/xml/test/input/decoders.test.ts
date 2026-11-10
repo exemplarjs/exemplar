@@ -1,9 +1,9 @@
-import { bytes, framed, utf8, verdict } from '@test/helpers/lexical.ts';
+import { bytes, framed, utf8, verdict } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
-import { SINGLE_BYTE_TABLES } from '@/encodings/tables.ts';
-import { ALIASES } from '@/input/aliases.ts';
-import type { Decoder } from '@/input/decoders.ts';
-import { DecoderRegistry, canonicalEncoding } from '@/input/decoders.ts';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
+import { ALIASES } from '@/input/aliases';
+import type { Decoder } from '@/input/decoders';
+import { canonicalEncoding, DecoderRegistry } from '@/input/decoders';
 
 /** A decoder that reads every byte as the code point of the same value. */
 const latin = (): Decoder => ({ decode: (data?: Uint8Array) => (data ? String.fromCharCode(...data) : '') });

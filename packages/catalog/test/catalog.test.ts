@@ -1,7 +1,7 @@
-import { type Files, NS, ROOT, catalog, entries, file, memoryReader } from '@test/helpers/catalog.ts';
+import { catalog, entries, file, type Files, memoryReader, NS, ROOT } from '@test/helpers/catalog';
 import { describe, expect, it } from 'vitest';
 import { ResolutionError } from '@exemplarjs/xml';
-import { CatalogResolver, catalogResolver } from '@/index.ts';
+import { CatalogResolver, catalogResolver } from '@/index';
 
 /** The error code a call throws as a ResolutionError. */
 function codeOf(call: () => unknown): string {
@@ -379,7 +379,7 @@ describe('catalog entry files (§4, §8)', () => {
     const c = catalogResolver({
       files: ['file:///c/first.xml', 'file:///c/second.xml'],
       read: memoryReader(files).read,
-      resolve: 'continue',
+      resolution: 'continue',
     });
     expect(['1', '2', '3'].map((n) => c.matchEntity(undefined, `http://x/${n}`))).toEqual([
       'file:///c/first-1',
@@ -396,7 +396,7 @@ describe('catalog entry files (§4, §8)', () => {
       'file:///c/shared.xml': file('<system systemId="http://x/s" uri="s"/>'),
     };
     const { read, asked } = memoryReader(files);
-    const c = catalogResolver({ files: [ROOT, ROOT], read, resolve: 'continue' });
+    const c = catalogResolver({ files: [ROOT, ROOT], read, resolution: 'continue' });
     expect(c.matchEntity(undefined, 'http://x/none')).toBeUndefined();
     expect(c.matchEntity(undefined, 'http://x/s')).toBe('file:///c/s');
     expect(asked.toSorted()).toEqual([ROOT, 'file:///c/a.xml', 'file:///c/b.xml', 'file:///c/shared.xml'].toSorted());
@@ -411,7 +411,7 @@ describe('catalog entry files (§4, §8)', () => {
       'file:///c/d.xml': file('<uri name="http://d/a" uri="d-a"/>'),
     };
     const { read, asked } = memoryReader(files);
-    const c = catalogResolver({ files: [ROOT], read, resolve: 'continue' });
+    const c = catalogResolver({ files: [ROOT], read, resolution: 'continue' });
     expect(asked).toEqual([]);
     c.matchEntity(undefined, 'http://x/0');
     expect(asked).toEqual([ROOT]);
@@ -428,35 +428,47 @@ describe('catalog entry files (§4, §8)', () => {
         '<nextCatalog catalog="next.xml"/><delegatePublic publicIdStartString="-//P" catalog="p.xml"/>' +
           '<delegateSystem systemIdStartString="http://s/" catalog="s.xml"/><delegateURI uriStartString="http://u/" catalog="u.xml"/>'
       ),
-      'file:///c/next.xml': file('<nextCatalog catalog="p.xml"/>'),
+      'file:///c/next.xml': file('<nextCatalog catalog="p.xml"/><nextCatalog catalog="missing.xml"/>'),
       'file:///c/p.xml': file('<public publicId="-//P//EN" uri="p.dtd"/>'),
       'file:///c/s.xml': file(''),
       'file:///c/u.xml': '<not-a-catalog/>',
     };
     const { read, asked } = memoryReader(files);
-    const c = catalogResolver({ files: [ROOT, 'file:///c/missing.xml'], read, defer: false, resolve: 'continue' });
+    const c = catalogResolver({ files: [ROOT], read, defer: false, resolution: 'continue' });
     expect(asked).toEqual([
       ROOT,
       'file:///c/next.xml',
       'file:///c/p.xml',
+      'file:///c/missing.xml',
       'file:///c/s.xml',
       'file:///c/u.xml',
-      'file:///c/missing.xml',
     ]);
     expect(c.matchEntity('-//P//EN', undefined)).toBe('file:///c/p.dtd');
     expect(asked).toHaveLength(6);
   });
 
-  it('treats a catalog file whose reader throws as one that cannot be read (§8)', () => {
+  it('passes over a catalog file another leads to whose reader throws, as one that cannot be read (§8)', () => {
     const c = catalogResolver({
       files: [ROOT, 'file:///c/b.xml'],
       read: (uri) => {
-        if (uri === ROOT) throw new Error('unreadable');
-        return { text: file('<system systemId="http://x/a" uri="b.dtd"/>'), systemId: uri };
+        if (uri === 'file:///c/next.xml') throw new Error('unreadable');
+        const entries =
+          uri === ROOT ? '<nextCatalog catalog="next.xml"/>' : '<system systemId="http://x/a" uri="b.dtd"/>';
+        return { text: file(entries), systemId: uri };
       },
-      resolve: 'continue',
+      resolution: 'continue',
     });
     expect(c.matchEntity(undefined, 'http://x/a')).toBe('file:///c/b.dtd');
+  });
+
+  it('fails when a catalog file it was given cannot be read', () => {
+    const unread = { code: 'CATALOG_UNREADABLE', message: 'The catalog file file:///c/missing.xml cannot be read' };
+    const { read } = memoryReader({ [ROOT]: file('') });
+    const lazy = catalogResolver({ files: [ROOT, 'file:///c/missing.xml'], read, resolution: 'continue' });
+    expect(() => lazy.matchEntity(undefined, 'http://x/a')).toThrow(expect.objectContaining(unread));
+    expect(() => catalogResolver({ files: ['file:///c/missing.xml'], read, defer: false })).toThrow(
+      expect.objectContaining(unread)
+    );
   });
 
   it('returns the first match without resolving it again (§5.3)', () => {
@@ -494,8 +506,10 @@ describe('catalog entry files (§4, §8)', () => {
   });
 
   it('reads files from the default reader when given none, which finds no file: catalog that does not exist', () => {
-    const c = catalogResolver({ files: ['file:///no/such/catalog.xml'], resolve: 'continue' });
-    expect(c.matchEntity(undefined, 'http://x/a')).toBeUndefined();
+    const c = catalogResolver({ files: ['file:///no/such/catalog.xml'], resolution: 'continue' });
+    expect(() => c.matchEntity(undefined, 'http://x/a')).toThrow(
+      'The catalog file file:///no/such/catalog.xml cannot be read'
+    );
   });
 });
 
@@ -525,7 +539,7 @@ describe('CatalogResolver as a resolver itself', () => {
   });
 
   it('gives undefined for a mapped resource its reader cannot read', () => {
-    expect(catalog(FILES, { resolve: 'strict' }).resolve('http://x/gone.xml', undefined)).toBeUndefined();
+    expect(catalog(FILES, { resolution: 'strict' }).resolve('http://x/gone.xml', undefined)).toBeUndefined();
   });
 
   it('reads with its reader, giving undefined when the reader throws', () => {
@@ -540,7 +554,7 @@ describe('CatalogResolver as a resolver itself', () => {
   });
 
   it('fails with CATALOG_NO_MATCH under strict when nothing matches', () => {
-    const strict = catalog(FILES, { resolve: 'strict' });
+    const strict = catalog(FILES, { resolution: 'strict' });
     expect(strict.resolution).toBe('strict');
     expect(
       codeOf(() =>
@@ -552,21 +566,21 @@ describe('CatalogResolver as a resolver itself', () => {
   });
 
   it('names the identifiers nothing matches in its error', () => {
-    const strict = catalog(FILES, { resolve: 'strict' });
+    const strict = catalog(FILES, { resolution: 'strict' });
     expect(() =>
       strict.resolveEntity({ name: 'e', publicId: '-//X//EN', systemId: 'e.ent', baseURI: 'http://x/doc/' })
     ).toThrow(/-\/\/X\/\/EN.*http:\/\/x\/doc\/e\.ent/);
   });
 
   it('gives undefined under continue when nothing matches', () => {
-    const c = catalog(FILES, { resolve: 'continue' });
+    const c = catalog(FILES, { resolution: 'continue' });
     expect(c.resolution).toBe('continue');
     expect(c.resolveEntity({ name: 'e', systemId: 'http://x/none' })).toBeUndefined();
     expect(c.resolve('http://x/none.xml', undefined)).toBeUndefined();
   });
 
   it('gives an entity empty content under ignore when nothing matches, and a URI nothing', () => {
-    const c = catalog(FILES, { resolve: 'ignore' });
+    const c = catalog(FILES, { resolution: 'ignore' });
     expect(c.resolution).toBe('ignore');
     expect(c.resolveEntity({ name: 'e', systemId: 'none.ent', baseURI: 'http://x/doc/' })).toEqual({
       text: '',

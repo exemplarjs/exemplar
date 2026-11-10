@@ -1,8 +1,8 @@
-import { type Files, MAIN, XI, XI_NS, factory, included, read } from '@test/helpers/xinclude.ts';
+import { factory, type Files, included, MAIN, read, XI, XI_NS } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import { DocumentBuilder } from '@exemplarjs/dom';
 import { EventType, type StreamReader } from '@exemplarjs/xml';
-import { XMLNS_NAMESPACE, XML_NAMESPACE } from '@exemplarjs/xml/internal';
+import { XML_NAMESPACE, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
 
 const FILES: Files = {
   'file:///doc/part.xml': '<?xml version="1.0"?><!--c--><part xml:lang="fr"><p xml:id="a">A</p><p>B</p></part>',
@@ -262,10 +262,11 @@ describe('attributes the fix-ups add', () => {
       ['xml:base', 'base', 'xml', XML_NAMESPACE, 'CDATA', true, 'part.xml'],
       ['xml:lang', 'lang', 'xml', XML_NAMESPACE, 'CDATA', true, 'fr'],
     ]);
-    expect([reader.attributeValue(XML_NAMESPACE, 'base'), reader.attributeValue(XML_NAMESPACE, 'id')]).toEqual([
-      'part.xml',
-      'a',
-    ]);
+    expect([
+      reader.attribute('base', XML_NAMESPACE),
+      reader.attribute('id', XML_NAMESPACE),
+      reader.attribute('id'),
+    ]).toEqual(['part.xml', 'a', undefined]);
   });
 
   it('throw a RangeError for an index past the last attribute or declaration', () => {

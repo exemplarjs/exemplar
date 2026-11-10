@@ -16,8 +16,12 @@ export interface OutputOptions {
   readonly doctypePublic?: string;
   /** Write a DOCTYPE with this system identifier before the root element, unless one is written already. */
   readonly doctypeSystem?: string;
-  /** Elements, by qualified name, whose text is written as CDATA sections. */
+  /** Elements whose text is written as CDATA sections, by qualified name or by expanded name as `{uri}local`. */
   readonly cdataSectionElements?: readonly string[];
+  /** Elements inside which indentation adds no whitespace, named as `cdataSectionElements` names them. */
+  readonly suppressIndentation?: readonly string[];
+  /** Characters written as the strings they map to, unescaped, in text and attribute values, as XSLT's character maps do. */
+  readonly characterMap?: Readonly<Record<string, string>>;
   /** The encoding for byte output, and the one the XML declaration names; UTF-8 by default. */
   readonly encoding?: string;
   /** Keep namespaces, the default; when false, names are written as given, colons and all. */
@@ -35,6 +39,8 @@ export interface ResolvedOutputOptions {
   readonly doctypePublic: string | undefined;
   readonly doctypeSystem: string | undefined;
   readonly cdataSectionElements: ReadonlySet<string>;
+  readonly suppressIndentation: ReadonlySet<string>;
+  readonly characterMap: ReadonlyMap<string, string>;
   readonly encoding: string;
   readonly namespaceAware: boolean;
 }
@@ -51,6 +57,8 @@ export function resolveOutputOptions(options: OutputOptions): ResolvedOutputOpti
     doctypePublic: options.doctypePublic,
     doctypeSystem: options.doctypeSystem,
     cdataSectionElements: new Set(options.cdataSectionElements),
+    suppressIndentation: new Set(options.suppressIndentation),
+    characterMap: new Map(Object.entries(options.characterMap ?? {})),
     encoding: options.encoding ?? 'UTF-8',
     namespaceAware: options.namespaceAware ?? true,
   };

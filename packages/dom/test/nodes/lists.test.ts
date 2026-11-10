@@ -1,4 +1,4 @@
-import { build, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type Attr,
@@ -9,7 +9,7 @@ import {
   type Node,
   NodeList,
   Text,
-} from '@/index.ts';
+} from '@/index';
 
 /** A document `<r><a/><b/><c/></r>` and its nodes. */
 function tree(): { document: Document; r: Element; a: Element; b: Element; c: Element } {
@@ -347,5 +347,19 @@ describe('getElementsByTagName, kept up to date', () => {
     ]);
     ((document.documentElement as Element).firstChild as Node).remove();
     expect([[...list].length, list[2], list.item(1)?.parentNode?.nodeName]).toEqual([2, undefined, 'r']);
+  });
+});
+
+describe('the own properties of a list', () => {
+  it('are its nodes alone, so that Object.keys and Object.values give what an array would', () => {
+    const r = build('<r a="1"><b/><c/></r>').documentElement as Element;
+    const children = r.childNodes;
+    expect(Object.keys(children)).toEqual(['0', '1']);
+    expect(Object.values(children)).toEqual([r.firstChild, r.lastChild]);
+    r.firstChild?.remove();
+    expect(children.length).toBe(1);
+    expect(Object.keys(children)).toEqual(['0']);
+    expect(Object.keys(r.attributes)).toEqual(['0']);
+    expect(Object.keys(r.getElementsByTagName('c'))).toEqual(['0']);
   });
 });

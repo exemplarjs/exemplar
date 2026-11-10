@@ -1,31 +1,32 @@
 import {
-  type Files,
-  MAIN,
-  XI,
   asyncErrorOf,
   errorOf,
   events,
   eventsAsync,
   factory,
+  type Files,
   lookup,
+  MAIN,
   memoryResolver,
   read,
-} from '@test/helpers/xinclude.ts';
+  XI,
+} from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import {
+  AsyncReaderRequiredError,
   type CatalogProcessor,
   type CatalogResolution,
   ErrorCode,
   EventType,
   type InputOptions,
-  ResolutionError,
   type Resolution,
-  type ResolveRequest,
+  ResolutionError,
   type ResolvedSource,
+  type ResolveRequest,
   XMLInputFactory,
 } from '@exemplarjs/xml';
 import { fetchResolver } from '@exemplarjs/xml/resolvers';
-import { xincludeProcessor } from '@/index.ts';
+import { xincludeProcessor } from '@/index';
 
 const FILES: Files = {
   'file:///doc/part.xml': '<part/>',
@@ -68,6 +69,15 @@ const INCLUDE = `<r ${XI}><xi:include href="part.xml"/></r>`;
 const WITH_FALLBACK = `<r ${XI}><xi:include href="part.xml"><xi:fallback>F</xi:fallback></xi:include></r>`;
 
 describe('the resolvers XInclude asks (XInclude §4.1)', () => {
+  it('fails with RESOLVER_MISSING, fallback or not, for an include it may read with no resolver or catalog to read it', () => {
+    const error = errorOf(() => through(bare({ accessExternalEntities: 'all' }), WITH_FALLBACK));
+    expect(error).toMatchObject({ code: 'RESOLVER_MISSING' });
+    expect(error.description).toMatch(/^Reading \S+part\.xml is allowed but there is no resolver to read it/);
+    expect(through(bare({}), WITH_FALLBACK)).toContain('F');
+    const declining = bare({ accessExternalEntities: 'all', entityResolver: { resolveEntity: () => undefined } });
+    expect(through(declining, WITH_FALLBACK)).toContain('F');
+  });
+
   it('asks the URI resolver first, with the escaped href, the base URI and the headers', () => {
     const asked: unknown[] = [];
     const f = bare({
@@ -128,7 +138,7 @@ describe('the resolvers XInclude asks (XInclude §4.1)', () => {
 
   it('treats a resource no resolver supplies as a resource error', () => {
     expect(read({}, WITH_FALLBACK)).toBe(`<r ${XI}>F</r>`);
-    expect(through(bare({ accessExternalEntities: 'all' }), WITH_FALLBACK)).toBe(`<r ${XI}>F</r>`);
+    expect(through(bare({}), WITH_FALLBACK)).toBe(`<r ${XI}>F</r>`);
   });
 
   it('fails at the xi:include when a resolver throws a ResolutionError', () => {
@@ -475,5 +485,6 @@ describe('resolvers that answer with streams', () => {
     const text = `<r ${XI}><xi:include href="note.txt" parse="text"><xi:fallback>F</xi:fallback></xi:include></r>`;
     expect(() => through(f, xml)).toThrow(/answers with a stream, which needs an asynchronous reader/);
     expect(() => through(f, text)).toThrow(/answers with a stream, which needs an asynchronous reader/);
+    expect(() => through(f, text)).toThrow(AsyncReaderRequiredError);
   });
 });

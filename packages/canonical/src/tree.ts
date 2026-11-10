@@ -1,21 +1,19 @@
 import { ErrorCode, XMLError } from '@exemplarjs/xml';
 import {
-  type NodeLike,
-  NodeType,
-  XML_NAMESPACE,
   attributesOf,
-  prefixDeclaredBy,
+  ErrorFactory,
   hasScheme,
   localPartOf,
+  type NodeLike,
+  NodeType,
+  NOWHERE,
+  prefixDeclaredBy,
   prefixOf,
+  XML_NAMESPACE,
 } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
-import { joinURIReferences } from './base.ts';
 import type { CanonicalizeOptions } from './canonicalize.ts';
-import { Canonicalizer, type CanonicalAttribute, sortAttributes } from './render.ts';
-
-/** How the qualified name of an attribute in the xml namespace starts. */
-const XML_COLON = 'xml:';
+import type { AncestorAttribute } from './inheritance.ts';
+import { type CanonicalAttribute, Canonicalizer, type CanonicalXMLMethod } from './render.ts';
 
 /** The parts of a DOM node canonicalization reads, so that any DOM Level 2 tree can be canonicalized. */
 export interface CanonicalNode extends NodeLike<CanonicalNode> {
@@ -33,7 +31,7 @@ export function isNode(value: unknown): value is CanonicalNode {
 
 /** Fails canonicalization of a tree, which has no location to report. */
 function fail(code: ErrorCode, message: string): never {
-  throw ErrorFactory.create(XMLError, code, message, { line: 0, column: 0, offset: 0 });
+  throw ErrorFactory.create(XMLError, code, message, NOWHERE);
 }
 
 /**
@@ -44,14 +42,11 @@ function fail(code: ErrorCode, message: string): never {
  * gives `<b xmlns:p="urn:p" xml:lang="en"></b>`.
  */
 export class TreeCanonicalizer extends Canonicalizer {
-  readonly #method: 'c14n' | 'c14n11' | 'exc-c14n';
-
-  constructor(node: CanonicalNode, method: 'c14n' | 'c14n11' | 'exc-c14n', options: CanonicalizeOptions) {
+  constructor(node: CanonicalNode, method: CanonicalXMLMethod, options: CanonicalizeOptions) {
     const document = node.nodeType === NodeType.DOCUMENT_NODE ? node : node.ownerDocument;
     if (document?.xmlVersion === '1.1') fail(ErrorCode.C14N_VERSION, 'Canonical XML is not defined for XML 1.1');
     // As for a source: the encoding declared, or else the one detected.
-    super(method === 'exc-c14n', options, document?.xmlEncoding ?? document?.inputEncoding);
-    this.#method = method;
+    super(method, options, document?.xmlEncoding ?? document?.inputEncoding);
   }
 
   /** The canonical form of a document, or of a node and everything below it. */
@@ -127,67 +122,31 @@ export class TreeCanonicalizer extends Canonicalizer {
     const [scope, declaredHere] = declareNamespaces(ownAttributes, parentScope);
     // The apex's namespace nodes include those it inherits, which must not be relative either.
     if (isApex) for (const uri of scope.values()) requireAbsolute(uri);
-    const attributes = this.#sortedAttributes(node, ownAttributes, isApex);
-    // The apex renders every namespace in scope, as no ancestor of it is in the subset.
-    let candidates: Iterable<string> = isApex ? scope.keys() : declaredHere;
-    if (this.isExclusive) candidates = this.usedPrefixes(prefixOf(node.nodeName), attributes, scope);
+    const own = ownAttributes.flatMap((attr) => canonicalAttribute(attr));
+    const attributes = this.sortedAttributes(own, isApex ? ancestorXmlAttributes(node) : undefined);
+    const candidates = this.candidatePrefixes(isApex, scope, prefixOf(node.nodeName), attributes, () => declaredHere);
     const rendered = this.writeStartTag(node.nodeName, candidates, scope, parentRendered, attributes);
     for (let child = node.firstChild; child !== null; child = child.nextSibling)
       this.#writeChild(child, scope, rendered);
     this.output += `</${node.nodeName}>`;
   }
+}
 
-  /** The element's attributes without declarations, with the `xml:` attributes the apex inherits, sorted. */
-  #sortedAttributes(
-    node: CanonicalNode,
-    ownAttributes: readonly CanonicalNode[],
-    isApex: boolean
-  ): CanonicalAttribute[] {
-    /** The attributes by namespace URI and local name, so that an inherited one never replaces the element's own. */
-    const byExpandedName = new Map<string, CanonicalAttribute>();
-    for (const attr of ownAttributes) {
-      if (prefixDeclaredBy(attr) !== undefined) continue;
-      const uri = attr.namespaceURI ?? (prefixOf(attr.nodeName) === 'xml' ? XML_NAMESPACE : '');
-      const local = attr.localName ?? localPartOf(attr.nodeName);
-      byExpandedName.set(`${uri} ${local}`, [uri, local, attr.nodeName, attr.nodeValue ?? '']);
-    }
-    if (isApex && !this.isExclusive) this.#inheritXmlAttributes(node, byExpandedName);
-    return sortAttributes([...byExpandedName.values()]);
-  }
+/** An attribute as canonicalization writes it; none for a namespace declaration. */
+function canonicalAttribute(attr: CanonicalNode): CanonicalAttribute[] {
+  if (prefixDeclaredBy(attr) !== undefined) return [];
+  const uri = attr.namespaceURI ?? (prefixOf(attr.nodeName) === 'xml' ? XML_NAMESPACE : '');
+  return [[uri, attr.localName ?? localPartOf(attr.nodeName), attr.nodeName, attr.nodeValue ?? '']];
+}
 
-  /** Adds the `xml:` attributes of the apex's ancestors: all of them for 1.0; for 1.1 xml:lang and xml:space, and xml:base joined. */
-  #inheritXmlAttributes(node: CanonicalNode, byExpandedName: Map<string, CanonicalAttribute>): void {
-    const bases: string[] = [];
-    for (
-      let ancestor = node.parentNode;
-      ancestor !== null && ancestor.nodeType === NodeType.ELEMENT_NODE;
-      ancestor = ancestor.parentNode
-    ) {
-      for (const attr of attributesOf(ancestor)) this.#inheritXmlAttribute(attr, byExpandedName, bases);
-    }
-    if (bases.length === 0) return;
-    const key = `${XML_NAMESPACE} base`;
-    const own = byExpandedName.get(key);
-    if (own !== undefined) bases.push(own[3]);
-    // Innermost first, each value joined onto the one around it.
-    let joined = bases.at(-1) as string;
-    for (let i = bases.length - 2; i >= 0; i--) joined = joinURIReferences(bases[i] as string, joined);
-    if (joined === '') byExpandedName.delete(key);
-    else byExpandedName.set(key, [XML_NAMESPACE, 'base', 'xml:base', joined]);
+/** The `xml:` attributes of a node's ancestors, outermost first. */
+function ancestorXmlAttributes(node: CanonicalNode): AncestorAttribute[] {
+  const attributes: AncestorAttribute[] = [];
+  for (let ancestor = node.parentNode; ancestor?.nodeType === NodeType.ELEMENT_NODE; ancestor = ancestor.parentNode) {
+    const own = attributesOf(ancestor).filter((attr) => prefixOf(attr.nodeName) === 'xml');
+    attributes.unshift(...own.map((attr): AncestorAttribute => [attr.nodeName, attr.nodeValue ?? '']));
   }
-
-  /** Inherits one ancestor attribute, nearest first, or keeps an xml:base value for 1.1 to join. */
-  #inheritXmlAttribute(attr: CanonicalNode, byExpandedName: Map<string, CanonicalAttribute>, bases: string[]): void {
-    if (prefixOf(attr.nodeName) !== 'xml') return;
-    const local = attr.nodeName.slice(XML_COLON.length);
-    if (this.#method === 'c14n11' && local === 'base') {
-      bases.unshift(attr.nodeValue ?? '');
-      return;
-    }
-    if (this.#method !== 'c14n' && local !== 'lang' && local !== 'space') return;
-    const key = `${XML_NAMESPACE} ${local}`;
-    if (!byExpandedName.has(key)) byExpandedName.set(key, [XML_NAMESPACE, local, attr.nodeName, attr.nodeValue ?? '']);
-  }
+  return attributes;
 }
 
 /** No namespaces bound, or rendered, but the empty default. */

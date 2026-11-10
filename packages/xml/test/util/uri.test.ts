@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { escapeAndResolveURI, escapeURI, hasScheme, protocolOf, resolveURI } from '@/util/uri.ts';
+import {
+  escapeAndResolveURI,
+  resolveEscapedTargetURI,
+  escapeURI,
+  hasScheme,
+  percentEscape,
+  protocolOf,
+  resolveTargetURI,
+  resolveURI,
+} from '@/util/uri';
 
 describe('escapeURI (XML 1.1 §4.2.2, XML Catalogs §6.3)', () => {
   it('returns a URI with nothing to escape as it is', () => {
@@ -13,6 +22,14 @@ describe('escapeURI (XML 1.1 §4.2.2, XML Catalogs §6.3)', () => {
     expect(escapeURI('é')).toBe('%C3%A9');
     expect(escapeURI('𝄞')).toBe('%F0%9D%84%9E');
     expect(escapeURI('a\tb\u007F')).toBe('a%09b%7F');
+    expect(escapeURI('x𝄞y\u0800\uFFFF')).toBe('x%F0%9D%84%9Ey%E0%A0%80%EF%BF%BF');
+  });
+
+  it('escapes a lone surrogate as U+FFFD, as its UTF-8 cannot be written', () => {
+    expect(escapeURI('a\uD800b\uDC00')).toBe('a%EF%BF%BDb%EF%BF%BD');
+    expect(percentEscape('\uDFFF')).toBe('%EF%BF%BD');
+    expect(percentEscape(' ')).toBe('%20');
+    expect(percentEscape('é') + escapeURI('é𝄞\uD800')).toBe('%C3%A9%C3%A9%F0%9D%84%9E%EF%BF%BD');
   });
 
   it('keeps the characters a URI may hold among those it escapes', () => {
@@ -67,5 +84,14 @@ describe('escapeAndResolveURI (XML Base §3.1)', () => {
 describe('protocolOf', () => {
   it("gives an absolute URI's protocol in lower case", () => {
     expect([protocolOf('HTTPS://example.com/'), protocolOf('file:///a')]).toEqual(['https', 'file']);
+  });
+});
+
+describe('resolveTargetURI and resolveEscapedTargetURI', () => {
+  it('resolve a reference, or give it as written when it cannot be made absolute', () => {
+    expect(resolveTargetURI('b', 'http://example.com/a')).toBe('http://example.com/b');
+    expect(resolveTargetURI('b', undefined)).toBe('b');
+    expect(resolveEscapedTargetURI('b c', 'http://example.com/a')).toBe('http://example.com/b%20c');
+    expect(resolveEscapedTargetURI('b c', undefined)).toBe('b c');
   });
 });

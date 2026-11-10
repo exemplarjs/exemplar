@@ -1,8 +1,8 @@
-import { tree } from '@test/helpers/c14n.ts';
+import { tree } from '@test/helpers/c14n';
 import { describe, expect, it } from 'vitest';
 import { StringSink, XMLOutputFactory } from '@exemplarjs/writer';
 import { EventType, XMLInputFactory } from '@exemplarjs/xml';
-import { canonicalize } from '@/index.ts';
+import { canonicalize } from '@/index';
 
 const DOCUMENTS = [
   '<?xml version="1.0"?>\n<!--c--><?p d?><r xmlns="urn:d" xmlns:p="urn:p" a="1&#9;2"><p:x p:b="&lt;&amp;"/>\r\n<![CDATA[t]]></r><?q?>',

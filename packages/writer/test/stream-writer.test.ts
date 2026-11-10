@@ -1,8 +1,8 @@
-import { canonical } from '@test/helpers/canonical.ts';
-import { codeOf, inRoot, written, writtenBytes } from '@test/helpers/write.ts';
+import { canonical } from '@test/helpers/canonical';
+import { codeOf, inRoot, written, writtenBytes } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
 import { QName, XMLInputFactory } from '@exemplarjs/xml';
-import { BytesSink, type Sink, type StreamWriter, StringSink, WriterError, XMLOutputFactory } from '@/index.ts';
+import { BytesSink, type Sink, type StreamWriter, StringSink, WriterError, XMLOutputFactory } from '@/index';
 
 describe('StreamWriter: the document', () => {
   it('writes the guide example', () => {
@@ -192,7 +192,7 @@ describe('StreamWriter: elements', () => {
       (w) => (
         w.writeStartElement('x', 'a', 'urn:x'),
         w.writeNamespace('x', 'urn:x'),
-        w.writeAttribute('x', 'urn:x', 'b', '1'),
+        w.writeAttribute('x', 'b', 'urn:x', '1'),
         w.writeEndElement()
       )
     );
@@ -267,7 +267,7 @@ describe('StreamWriter: attributes', () => {
 
   it('writes the xml prefix with no declaration (Namespaces §3)', () => {
     const XML = 'http://www.w3.org/XML/1998/namespace';
-    expect(written(inRoot((w) => w.writeAttribute('xml', XML, 'lang', 'en')))).toBe('<r xml:lang="en">');
+    expect(written(inRoot((w) => w.writeAttribute('xml', 'lang', XML, 'en')))).toBe('<r xml:lang="en">');
     expect(written(inRoot((w) => w.writeAttribute(XML, 'space', 'preserve')))).toBe('<r xml:space="preserve">');
   });
 
@@ -338,6 +338,67 @@ describe('StreamWriter: character data', () => {
     expect(out).toBe(
       '<html xmlns:s="urn:s"><script><![CDATA[a < b ]]]]><![CDATA[> c]]></script><s:script>x&lt;y</s:script><p>a &lt; b</p></html>'
     );
+  });
+
+  it('writes text as CDATA sections in elements named by expanded name, as {uri}local', () => {
+    const out = written(
+      (w) => {
+        w.writeStartElement('a', 'r', 'urn:a');
+        w.writeNamespace('a', 'urn:a');
+        w.writeStartElement('b', 'script', 'urn:b');
+        w.writeNamespace('b', 'urn:b');
+        w.writeCharacters('x<y');
+        w.writeEndElement();
+        w.writeStartElement('script');
+        w.writeCharacters('x<y');
+        w.writeEndDocument();
+      },
+      { cdataSectionElements: ['{urn:b}script'] }
+    );
+    expect(out).toBe(
+      '<a:r xmlns:a="urn:a"><b:script xmlns:b="urn:b"><![CDATA[x<y]]></b:script><script>x&lt;y</script></a:r>'
+    );
+  });
+
+  it('names an element by the default namespace its own start tag declares', () => {
+    const out = written(
+      (w) => {
+        w.writeStartElement('script');
+        w.writeDefaultNamespace('urn:b');
+        w.writeCharacters('x<y');
+        w.writeEndDocument();
+      },
+      { cdataSectionElements: ['{urn:b}script'] }
+    );
+    expect(out).toBe('<script xmlns="urn:b"><![CDATA[x<y]]></script>');
+  });
+
+  it('writes the strings a character map gives in place of its characters, unescaped, in text and attribute values', () => {
+    const out = written(
+      (w) => {
+        w.writeStartElement('r');
+        w.writeAttribute('a', '$<');
+        w.writeCharacters('a$b\u{1F600}&');
+        w.writeComment('$');
+        w.writeEndDocument();
+      },
+      { characterMap: { $: '<?dollar?>', '\u{1F600}': '&smile;' } }
+    );
+    expect(out).toBe('<r a="<?dollar?>&lt;">a<?dollar?>b&smile;&amp;<!--$--></r>');
+  });
+
+  it('maps characters that regular expressions give meaning, in either escaping and any encoding', () => {
+    const characterMap = { '-': '[dash]', ']': '[close]', '\\': '[slash]', '^': '[caret]', '*': '[star]' };
+    const write = (w: StreamWriter) => {
+      w.writeStartElement('r');
+      w.writeAttribute('a', 'a-b]c');
+      w.writeCharacters(String.raw`\^*-é`);
+      w.writeEndDocument();
+    };
+    const expected = '<r a="a[dash]b[close]c">[slash][caret][star][dash]é</r>';
+    expect(written(write, { characterMap })).toBe(expected);
+    expect(written(write, { characterMap, escaping: 'minimal' })).toBe(expected);
+    expect(written(write, { characterMap, encoding: 'US-ASCII' })).toBe(expected.replace('é', '&#233;'));
   });
 
   it('writes CDATA sections', () => {
@@ -480,10 +541,7 @@ describe('StreamWriter: output', () => {
 
   it('closes the sink on close, after flushing', async () => {
     const events: string[] = [];
-    const sink: Sink = {
-      write: (chunk) => void events.push(chunk),
-      close: () => void events.push('closed'),
-    };
+    const sink: Sink = { write: (chunk) => void events.push(chunk), close: () => void events.push('closed') };
     const w = new XMLOutputFactory().createStreamWriter(sink);
     w.writeStartElement('a');
     await w.close();

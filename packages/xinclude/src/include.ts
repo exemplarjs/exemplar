@@ -19,7 +19,7 @@ const STRAY_PERCENT = /%(?![\dA-Fa-f]{2})/;
 
 /** Reads an xi:include's attributes from its start tag. */
 export function includeAttributesOf(tag: StreamReader | AsyncStreamReader): IncludeAttributes {
-  const attribute = (name: string): string | undefined => tag.attributeValue('', name);
+  const attribute = (name: string): string | undefined => tag.attribute(name);
   return {
     parse: attribute('parse') ?? 'xml',
     href: attribute('href') ?? '',
@@ -47,10 +47,7 @@ export function attributeProblem(include: IncludeAttributes): string | undefined
 /** The headers an xi:include asks a resolver to send, leaving out those it does not give. */
 export function headersOf(include: IncludeAttributes): Headers {
   const { accept, acceptLanguage } = include;
-  return {
-    ...(accept !== undefined && { accept }),
-    ...(acceptLanguage !== undefined && { acceptLanguage }),
-  };
+  return { ...(accept !== undefined && { accept }), ...(acceptLanguage !== undefined && { acceptLanguage }) };
 }
 
 /** How the chain of inclusions knows a resource and pointer. */

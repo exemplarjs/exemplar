@@ -1,8 +1,8 @@
-import { canonical } from '@test/helpers/canonical.ts';
-import { codeOf, written } from '@test/helpers/write.ts';
+import { canonical } from '@test/helpers/canonical';
+import { codeOf, written } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
 import { XMLError } from '@exemplarjs/xml';
-import type { StreamWriter } from '@/index.ts';
+import type { StreamWriter } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -157,7 +157,7 @@ describe('the writer refuses what the reader would reject', () => {
     ],
     [
       'another prefix on an attribute in the XML namespace',
-      inside((w) => w.writeAttribute('p', XML, 'a', '1')),
+      inside((w) => w.writeAttribute('p', 'a', XML, '1')),
       'WRITE_NAME',
       'NS_UNBOUND_PREFIX',
     ],
@@ -184,8 +184,8 @@ describe('the writer refuses what the reader would reject', () => {
       inside((w) => {
         w.writeNamespace('p', 'u');
         w.writeNamespace('q', 'u');
-        w.writeAttribute('p', 'u', 'a', '1');
-        w.writeAttribute('q', 'u', 'a', '2');
+        w.writeAttribute('p', 'a', 'u', '1');
+        w.writeAttribute('q', 'a', 'u', '2');
       }),
       'WRITE_DUPLICATE_ATTRIBUTE',
       'NS_DUPLICATE_ATTRIBUTE',
@@ -198,7 +198,7 @@ describe('the writer refuses what the reader would reject', () => {
     ],
     [
       'an attribute prefix never declared',
-      inside((w) => w.writeAttribute('p', 'urn:p', 'a', '1')),
+      inside((w) => w.writeAttribute('p', 'a', 'urn:p', '1')),
       'WRITE_UNBOUND_PREFIX',
       'NS_UNBOUND_PREFIX',
     ],

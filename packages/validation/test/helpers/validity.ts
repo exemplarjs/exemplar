@@ -1,5 +1,5 @@
 import { EventType, type InputOptions, type XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { dtdValidator } from '@/index.ts';
+import { dtdValidator } from '@/index';
 
 /** A validating factory that collects validity errors; the options are merged in. */
 export function validating(errors: XMLError[], options: InputOptions = {}): XMLInputFactory {

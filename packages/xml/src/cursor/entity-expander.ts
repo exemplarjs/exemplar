@@ -1,15 +1,15 @@
-import type { ResolvedOptions } from '../config/options.ts';
-import type { EntityDeclaration } from '../dtd/declarations.ts';
-import type { DeclarationStore } from '../dtd/store.ts';
-import { type ExpansionContext, expandAttributeValue, lookupGeneral } from '../entities/attribute-value.ts';
-import { ExternalReader, ResolutionPendingError, entityRequest } from '../entities/external.ts';
-import { EntityCounter, type ExceededLimit } from '../entities/limits.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import type { DecoderRegistry } from '../input/decoders.ts';
-import { checkDeclaredEncoding } from '../input/detect.ts';
-import { CountedSource, type ChunkSource, stringSource } from '../input/source.ts';
-import { scanError } from '../scan/scanner.ts';
-import type { Tokenizer, TokenizerOptions } from '../tokenizer/tokenizer.ts';
+import type { ResolvedOptions } from '@/config/options';
+import type { EntityDeclaration } from '@/dtd/declarations';
+import type { DeclarationStore } from '@/dtd/store';
+import { expandAttributeValue, type ExpansionContext, lookupGeneral } from '@/entities/attribute-value';
+import { entityRequest, ExternalReader, ResolutionPendingError } from '@/entities/external';
+import { EntityCounter, type ExceededLimit } from '@/entities/limits';
+import { ErrorCode } from '@/errors/codes';
+import type { DecoderRegistry } from '@/input/decoders';
+import { checkDeclaredEncoding } from '@/input/detect';
+import { type ChunkSource, CountedSource, stringSource } from '@/input/source';
+import { scanError } from '@/scan/scanner';
+import type { Tokenizer, TokenizerOptions } from '@/tokenizer/tokenizer';
 import type { ElementStack } from './element-stack.ts';
 import type { EntityStack } from './entity-stack.ts';
 import type { ErrorReporter } from './error-reporter.ts';
@@ -23,8 +23,10 @@ export interface ExpanderParts {
   readonly elements: ElementStack;
   readonly errors: ErrorReporter;
   readonly processing: EventProcessing;
+
   /** Creates a tokenizer for an entity's text, set up as the reader's own tokenizers are. */
   createTokenizer(source: ChunkSource, options: Omit<TokenizerOptions, 'maxNameLength'>): Tokenizer;
+
   /** Slices the names and bindings that still point into a tokenizer's buffer, before another text is read in its place. */
   sliceBeforeLeaving(tokenizer: Tokenizer): void;
 }

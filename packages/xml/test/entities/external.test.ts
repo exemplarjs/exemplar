@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { type CatalogProcessor, type InputOptions, resolveOptions } from '@/config/options.ts';
+import { type CatalogProcessor, type InputOptions, resolveOptions } from '@/config/options';
 import {
   ExternalReader,
-  ResolutionPendingError,
-  locationIn,
   lineLocator,
+  locationIn,
+  ResolutionPendingError,
   unmatchedByCatalog,
-} from '@/entities/external.ts';
-import { DecoderRegistry } from '@/input/decoders.ts';
-import { type OpenedSource, PENDING, UnsupportedEncodingError } from '@/input/source.ts';
-import { type ResolveRequest, type ResolvedSource, accessRefusedError } from '@/resolvers/resolver.ts';
+} from '@/entities/external';
+import { InvalidArgumentError } from '@/index';
+import { DecoderRegistry } from '@/input/decoders';
+import { type OpenedSource, PENDING, UnsupportedEncodingError } from '@/input/source';
+import { accessRefusedError, type ResolvedSource, type ResolveRequest } from '@/resolvers/resolver';
 
 /** Throws the refusal a resolver that keeps to the access list throws. */
 function refuse(uri: string): never {
@@ -64,8 +65,18 @@ function readText(source: ResolvedSource, version11 = false) {
 }
 
 describe('ExternalReader.resolve', () => {
-  it('asks nothing without a resolver or a catalog', () => {
-    expect(readerOf({ accessExternalDTD: 'all' }).resolve({ name: '[dtd]', systemId: 'a.dtd' }, 'all')).toBeUndefined();
+  it('reads nothing without a resolver or a catalog, and says so when the read is allowed', () => {
+    const request = { name: '[dtd]', systemId: 'a.dtd', baseURI: BASE };
+    expect(readerOf({}).resolve(request, [])).toBeUndefined();
+    expect(() => readerOf({}).resolve(request, ['http'])).toThrow(
+      'Reading http://example.org/a.dtd is allowed but there is no resolver to read it: set entityResolver or a catalog'
+    );
+    expect(() => readerOf({}).resolve({ name: '[dtd]', systemId: 'a.dtd' }, 'all')).toThrow(
+      expect.objectContaining({
+        code: 'RESOLVER_MISSING',
+        message: expect.stringContaining('Reading [dtd] is allowed'),
+      })
+    );
   });
 
   it('asks the resolver first, whatever the access list, passing the list on with the request', () => {
@@ -91,10 +102,7 @@ describe('ExternalReader.resolve', () => {
     const { resolver } = recording(() => ({ systemId: 'urn:moved', text: 'x' }));
     expect(
       readerOf({ entityResolver: resolver }).resolve({ name: 'e', systemId: 'e.xml', baseURI: BASE }, 'all')
-    ).toEqual({
-      source: { systemId: 'urn:moved', text: 'x' },
-      systemId: 'urn:moved',
-    });
+    ).toEqual({ source: { systemId: 'urn:moved', text: 'x' }, systemId: 'urn:moved' });
   });
 
   it('gives nothing when the resolver supplies nothing', () => {
@@ -195,6 +203,7 @@ describe('ExternalReader.resolve in an asynchronous reader', () => {
       yield encoder.encode('<b>');
       yield encoder.encode('</b>');
     }
+
     const { resolver } = recording(() => ({ systemId: 'urn:s', stream: chunks() }));
     const reader = readerOf({ entityResolver: resolver }, true);
     expect(() => reader.resolve({ name: 'e', systemId: 'urn:e' }, 'all')).toThrow(ResolutionPendingError);
@@ -348,6 +357,7 @@ describe('ExternalReader.open and readText', () => {
     async function* chunks() {
       yield encoder.encode('x');
     }
+
     const reader = readerOf({});
     expect(() => reader.openResolved({ stream: chunks() }, 'urn:e')).toThrow(TypeError);
   });
@@ -357,10 +367,8 @@ describe('ExternalReader.open and readText', () => {
   });
 
   it('refuses a source that would have to wait for input', () => {
-    const waiting: OpenedSource = {
-      text: { read: (): typeof PENDING => PENDING, detection: undefined },
-    };
-    expect(() => readerOf({}).readText(waiting, 'urn:e', false, fail)).toThrow(TypeError);
+    const waiting: OpenedSource = { text: { read: (): typeof PENDING => PENDING, detection: undefined } };
+    expect(() => readerOf({}).readText(waiting, 'urn:e', false, fail)).toThrow(InvalidArgumentError);
   });
 
   it('opens a source with its public id and system id', () => {

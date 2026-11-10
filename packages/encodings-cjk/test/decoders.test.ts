@@ -1,5 +1,5 @@
-import { bytes, decodeChunks, hex, splits } from '@test/helpers/bytes.ts';
-import { leadMask, packOverrides, unitsBase64 } from '@test/helpers/tables.ts';
+import { bytes, decodeChunks, hex, splits } from '@test/helpers/bytes';
+import { leadMask, packOverrides, unitsBase64 } from '@test/helpers/tables';
 import { describe, expect, it } from 'vitest';
 import type { Decoder } from '@exemplarjs/xml';
 import { DecodeError } from '@exemplarjs/xml/internal';
@@ -10,8 +10,8 @@ import {
   PairTable,
   ShiftJisDecoder,
   unitsFromBase64,
-} from '@/decoders.ts';
-import { CHARSETS, JIS0208, JIS0212 } from '@/tables.ts';
+} from '@/decoders';
+import { CHARSETS, JIS0208, JIS0212 } from '@/tables';
 
 /** The DecodeError a decoder throws on bytes, decoded whole. */
 function failure(decoder: Decoder, input: Uint8Array): DecodeError {
@@ -151,6 +151,7 @@ describe('DoubleByteDecoder', () => {
         return input[start] === 0x83 ? 3 : super.sequenceLength(input, start);
       }
     }
+
     expect(failure(new Longer('Test', table, leads, {}), bytes('A', [0x83, 0x40, 0x40])).decoded).toBe('A');
   });
 

@@ -1,4 +1,4 @@
-import { validity, validityErrors, withSubset } from '@test/helpers/validity.ts';
+import { validity, validityErrors, withSubset } from '@test/helpers/validity';
 import { describe, expect, it } from 'vitest';
 import { ErrorCode } from '@exemplarjs/xml';
 

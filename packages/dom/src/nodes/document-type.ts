@@ -1,7 +1,7 @@
-import { NodeType } from '../node-type.ts';
+import { NodeType } from '@/node-type';
 import type { Document } from './document.ts';
 import { NamedNodeMap } from './lists.ts';
-import { Node, holdsNoChildren } from './node.ts';
+import { holdsNoChildren, Node } from './node.ts';
 
 // Module-level constants, so V8 can inline them.
 const { DOCUMENT_TYPE_NODE } = NodeType;

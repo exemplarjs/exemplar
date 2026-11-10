@@ -1,4 +1,4 @@
-import { type Files, ROOT, catalog, file } from '@test/helpers/catalog.ts';
+import { catalog, file, type Files, ROOT } from '@test/helpers/catalog';
 import { describe, expect, it } from 'vitest';
 import { DocumentBuilder } from '@exemplarjs/dom';
 import { xincludeProcessor } from '@exemplarjs/xinclude';
@@ -54,7 +54,7 @@ describe('XML Catalogs for DTDs and external entities', () => {
     const closed = new XMLInputFactory({ catalog: catalog(CATALOG), accessExternalDTD: ['file'] });
     expect(() => text(closed, DOC)).toThrow(expect.objectContaining({ code: 'ACCESS_REFUSED' }));
     const refused: string[] = [];
-    const reporting = closed.withOptions({ errorHandler: { error: (e) => void refused.push(e.message) } });
+    const reporting = closed.withOptions({ errorHandler: { error: (e) => void refused.push(e.description) } });
     expect(text(reporting, DOC)).toBe('<doc>hello ');
     expect(refused).toEqual(["Reading file:///c/ent.xml is not allowed: the access list does not name 'file'"]);
     // The DTD maps to a file: copy, so allowing http: is not enough.
@@ -103,11 +103,14 @@ describe('XML Catalogs for DTDs and external entities', () => {
 
   it('fails at the reference under strict when nothing matches, and reads nothing under ignore', () => {
     const xml = '<!DOCTYPE doc SYSTEM "http://example.com/unknown.dtd"><doc/>';
-    const strict = new XMLInputFactory({ catalog: catalog(CATALOG, { resolve: 'strict' }), accessExternalDTD: 'all' });
+    const strict = new XMLInputFactory({
+      catalog: catalog(CATALOG, { resolution: 'strict' }),
+      accessExternalDTD: 'all',
+    });
     const error = errorOf(() => text(strict, xml));
     expect([error.code, error.line, error.column]).toEqual(['CATALOG_NO_MATCH', 1, 1]);
     const ignoring = new XMLInputFactory({
-      catalog: catalog(CATALOG, { resolve: 'ignore' }),
+      catalog: catalog(CATALOG, { resolution: 'ignore' }),
       accessExternalDTD: 'all',
     });
     expect(text(ignoring, '<!DOCTYPE doc SYSTEM "http://example.com/unknown.dtd"><doc>x</doc>')).toBe('<doc>x');
@@ -116,7 +119,7 @@ describe('XML Catalogs for DTDs and external entities', () => {
   it('carries on as if there were no catalog under continue', () => {
     const asked: string[] = [];
     const factory = new XMLInputFactory({
-      catalog: catalog(CATALOG, { resolve: 'continue' }),
+      catalog: catalog(CATALOG, { resolution: 'continue' }),
       accessExternalDTD: 'all',
       entityResolver: { resolveEntity: ({ systemId }) => void asked.push(systemId ?? '') },
     });
@@ -146,7 +149,7 @@ describe('XML Catalogs for DTDs and external entities', () => {
   });
 
   it('serves as the entity resolver itself, with no access list, reading with its own reader', () => {
-    const c = catalog(CATALOG, { resolve: 'ignore' });
+    const c = catalog(CATALOG, { resolution: 'ignore' });
     const factory = new XMLInputFactory({ entityResolver: c, accessExternalDTD: 'all', accessExternalEntities: 'all' });
     expect(text(factory, DOC)).toBe('<doc>hello <e>external');
     expect(text(factory, '<!DOCTYPE d SYSTEM "http://example.com/unknown.dtd"><d>x</d>')).toBe('<d>x');
@@ -171,7 +174,7 @@ describe('XML Catalogs for DTDs and external entities', () => {
     });
     const doc = await new DocumentBuilder(factory).parseAsync({ text: DOC, systemId: 'file:///doc/main.xml' });
     expect(doc.documentElement?.textContent).toBe('hello external');
-    const strict = factory.withOptions({ catalog: catalog(CATALOG, { resolve: 'strict' }) });
+    const strict = factory.withOptions({ catalog: catalog(CATALOG, { resolution: 'strict' }) });
     const unknown = '<!DOCTYPE doc SYSTEM "http://example.com/unknown.dtd"><doc/>';
     await expect(new DocumentBuilder(strict).parseAsync({ text: unknown })).rejects.toThrow(
       expect.objectContaining({ code: 'CATALOG_NO_MATCH' })
@@ -181,7 +184,7 @@ describe('XML Catalogs for DTDs and external entities', () => {
 
 describe('XML Catalogs for XInclude', () => {
   /** A factory with XInclude on and the catalog, reading file: URIs only. */
-  function including(options: { resolve?: 'strict' | 'continue' | 'ignore' } = {}): XMLInputFactory {
+  function including(options: { resolution?: 'strict' | 'continue' | 'ignore' } = {}): XMLInputFactory {
     return new XMLInputFactory({
       catalog: catalog(CATALOG, options),
       xinclude: xincludeProcessor({ fixupBaseURIs: false }),
@@ -201,19 +204,19 @@ describe('XML Catalogs for XInclude', () => {
     ).toBe('<doc>a note');
   });
 
-  it.each(['continue', 'ignore'] as const)('falls back for a target nothing matches under %s', (resolve) => {
+  it.each(['continue', 'ignore'] as const)('falls back for a target nothing matches under %s', (resolution) => {
     const xml = `<doc ${XI}><xi:include href="http://example.com/none.xml"><xi:fallback>F</xi:fallback></xi:include></doc>`;
-    expect(text(including({ resolve }), xml)).toBe('<doc>F');
+    expect(text(including({ resolution }), xml)).toBe('<doc>F');
   });
 
   it('fails with CATALOG_NO_MATCH for a target nothing matches under strict', () => {
     const xml = `<doc ${XI}><xi:include href="http://example.com/none.xml"><xi:fallback>F</xi:fallback></xi:include></doc>`;
-    expect(errorOf(() => text(including({ resolve: 'strict' }), xml)).code).toBe('CATALOG_NO_MATCH');
+    expect(errorOf(() => text(including({ resolution: 'strict' }), xml)).code).toBe('CATALOG_NO_MATCH');
   });
 
   it('serves as the URI resolver itself', () => {
     const factory = new XMLInputFactory({
-      uriResolver: catalog(CATALOG, { resolve: 'strict' }),
+      uriResolver: catalog(CATALOG, { resolution: 'strict' }),
       xinclude: xincludeProcessor(),
       accessExternalEntities: 'all',
     });

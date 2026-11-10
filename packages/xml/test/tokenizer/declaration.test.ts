@@ -1,15 +1,15 @@
-import { verdict } from '@test/helpers/lexical.ts';
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { verdict } from '@test/helpers/lexical';
+import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { ScanError } from '@/scan/scanner.ts';
+import { ScanError } from '@/scan/scanner';
 import {
   couldStartDeclaration,
   type Declaration,
-  type DeclarationKind,
   DECLARATION_START_LENGTH,
+  type DeclarationKind,
   DeclarationParser,
   startsWithDeclaration,
-} from '@/tokenizer/declaration.ts';
+} from '@/tokenizer/declaration';
 
 /** Parses a declaration at the start of text: what it says and where it ends, or the error's code and index. */
 function parse(text: string, kind: DeclarationKind = 'xml'): (Declaration & { end: number }) | string {
@@ -132,7 +132,7 @@ describe('spotting a declaration', () => {
 describe('the XML declaration in documents', () => {
   it('reads version, encoding and standalone', () => {
     const r = reader('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a/>');
-    expect([r.version(), r.encoding(), r.standalone()]).toEqual(['1.0', 'UTF-8', true]);
+    expect([r.version(), r.declaredEncoding(), r.standalone()]).toEqual(['1.0', 'UTF-8', true]);
     const no = reader('<?xml version="1.0" standalone="no"?><a/>');
     expect(no.standalone()).toBe(false);
   });

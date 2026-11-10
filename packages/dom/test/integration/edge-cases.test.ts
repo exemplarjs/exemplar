@@ -1,7 +1,7 @@
-import { build, buildAsync, children, serialize, streamOf, utf16, utf8 } from '@test/helpers/dom.ts';
+import { build, buildAsync, children, serialize, streamOf, utf16, utf8 } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import { XMLError } from '@exemplarjs/xml';
-import { type Attr, type CDATASection, DOMParser, type Element, type Node, type Text } from '@/index.ts';
+import { type Attr, type CDATASection, DOMParser, type Element, type Node, type Text } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -80,7 +80,7 @@ describe('namespaces and their scope (Namespaces in XML 1.0)', () => {
   it('tells a prefixed attribute from an unprefixed one of the same local name', () => {
     const f = build('<f xmlns="A" xmlns:a="A" id="x" a:title="y"/>').documentElement as Element;
     expect(attributesOf(f)).toEqual(['{}id=x', '{A}title=y']);
-    expect([f.getAttributeNS('A', 'title'), f.getAttribute('title')]).toEqual(['y', '']);
+    expect([f.getAttributeNS('A', 'title'), f.getAttribute('title')]).toEqual(['y', null]);
     const x = build('<x xmlns="A" xmlns:a="A" t="1" a:t="2"/>').documentElement as Element;
     expect(attributesOf(x)).toEqual(['{}t=1', '{A}t=2']);
   });

@@ -1,4 +1,4 @@
-import { SINGLE_BYTE_DECODERS, Utf16Decoder, Utf32Decoder } from '../encodings/decoders.ts';
+import { SINGLE_BYTE_DECODERS, Utf16Decoder, Utf32Decoder } from '@/encodings/decoders';
 import { ALIASES } from './aliases.ts';
 
 /** Anything that decodes bytes the way `TextDecoder` does. */

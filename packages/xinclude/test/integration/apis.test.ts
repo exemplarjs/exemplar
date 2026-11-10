@@ -1,8 +1,8 @@
-import { type Files, MAIN, XI, eventsAsync, factory, read } from '@test/helpers/xinclude.ts';
+import { eventsAsync, factory, type Files, MAIN, read, XI } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import { canonicalize } from '@exemplarjs/canonical';
-import { DocumentBuilder, type Element, XMLSerializer } from '@exemplarjs/dom';
-import { SAXParser, type SAXHandler } from '@exemplarjs/sax';
+import { DocumentBuilder, type Element, type Entity, XMLSerializer } from '@exemplarjs/dom';
+import { type SAXHandler, SAXParser } from '@exemplarjs/sax';
 import { EventType, XMLError, type XMLEvent } from '@exemplarjs/xml';
 import { createFilteredReader } from '@exemplarjs/xml/filters';
 
@@ -126,6 +126,18 @@ describe('XInclude through every API', () => {
     expect([shared.baseURI, shared.textContent]).toEqual(['file:///doc/shared.xml', 'S']);
   });
 
+  it('records how an external entity was read, through the XInclude reader, on the DOM entity', () => {
+    const files: Files = { ...FILES, 'file:///doc/ext.ent': '<?xml version="1.0" encoding="ISO-8859-1"?>external' };
+    const source = {
+      text: `<!DOCTYPE r [<!ENTITY ext SYSTEM "ext.ent">]><r ${XI}>&ext;<xi:include href="book.xml"/></r>`,
+      systemId: MAIN,
+    };
+    const doc = new DocumentBuilder(factory(files)).parse(source);
+    const entity = doc.doctype?.entities.getNamedItem('ext') as Entity;
+    // The resolver gives text, so the entity had no input encoding of its own.
+    expect([entity.inputEncoding, entity.xmlEncoding, entity.xmlVersion]).toEqual([null, 'ISO-8859-1', '1.0']);
+  });
+
   it('serializes an included element with the namespaces it needs', () => {
     const doc = new DocumentBuilder(factory(FILES, { settings: { fixupBaseURIs: false, fixupLanguage: false } })).parse(
       {
@@ -236,5 +248,18 @@ describe('XInclude through every API', () => {
       )
     ).toThrow(XMLError);
     expect(fatal).toEqual(['XINCLUDE_RESOURCE']);
+  });
+});
+
+describe('XInclude: a reader given to a builder', () => {
+  it('reads on through entities once a builder has built an element from it', () => {
+    const reader = factory({}).createStreamReader('<!DOCTYPE r [<!ENTITY e "x">]><r><a/><b>&e;</b></r>');
+    while (reader.next() !== EventType.START_ELEMENT || reader.localName() !== 'a');
+    new DocumentBuilder().parse(reader);
+    let text = '';
+    for (let type = reader.next(); type !== EventType.END_DOCUMENT; type = reader.next()) {
+      if (type === EventType.CHARACTERS) text += reader.text();
+    }
+    expect(text).toBe('x');
   });
 });

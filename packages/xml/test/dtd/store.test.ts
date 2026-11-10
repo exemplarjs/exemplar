@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EntityDeclaration } from '@/dtd/declarations.ts';
-import { DeclarationStore } from '@/dtd/store.ts';
+import type { EntityDeclaration } from '@/dtd/declarations';
+import { DeclarationStore } from '@/dtd/store';
 
 /** An internal general entity declaration. */
 const entity = (name: string, value: string, external = false): EntityDeclaration => ({

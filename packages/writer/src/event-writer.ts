@@ -1,14 +1,15 @@
-import {
-  type AsyncEventReader,
-  type EventReader,
-  EventType,
-  type StartElementEvent,
-  type XMLEvent,
-} from '@exemplarjs/xml';
+import { AsyncEventReader, EventType, type StartElementEvent, type XMLEvent } from '@exemplarjs/xml';
 import { XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
 import type { StreamWriter } from './stream-writer.ts';
 
-/** Writes event objects, following StAX's `XMLEventWriter`; it takes the event reader's events, so a loop copies a document. */
+/** How many of an async iterable's events are written between waits for the destination to have room. */
+const EVENTS_PER_DRAIN = 1024;
+
+/**
+ * Writes event objects, following StAX's `XMLEventWriter`: one at a time, or all that an event
+ * reader, a generator or any other iterable gives, so that a document can be copied and changed on
+ * the way.
+ */
 export class EventWriter {
   readonly #writer: StreamWriter;
 
@@ -16,20 +17,35 @@ export class EventWriter {
     this.#writer = writer;
   }
 
-  /** Writes one event, or every event an event reader gives. */
-  add(event: XMLEvent | EventReader): void {
-    if ('nextEvent' in event) {
-      for (const each of event) this.#write(each);
+  /** Writes one event. */
+  add(event: XMLEvent): void;
+  /** Writes every event an event reader, a generator or any other iterable gives. */
+  add(events: Iterable<XMLEvent>): void;
+  add(eventOrEvents: XMLEvent | Iterable<XMLEvent>): void {
+    if (!(Symbol.iterator in eventOrEvents)) {
+      this.#write(eventOrEvents);
       return;
     }
-    this.#write(event);
+    for (const event of eventOrEvents) this.#write(event);
   }
 
-  /** Writes every event an async event reader gives, waiting for the destination to have room after each batch. */
-  async addAsync(reader: AsyncEventReader): Promise<void> {
-    for await (const batch of reader.batches()) {
-      for (const event of batch) this.#write(event);
-      await this.#writer.drain();
+  /**
+   * Writes every event an asynchronous event reader or any async iterable gives, waiting for the
+   * destination to have room after each batch an event reader gives, or every so many events.
+   */
+  async addAsync(events: AsyncEventReader | AsyncIterable<XMLEvent>): Promise<void> {
+    if (events instanceof AsyncEventReader) {
+      for await (const batch of events.batches()) {
+        for (const event of batch) this.#write(event);
+        await this.#writer.drain();
+      }
+      return;
+    }
+    let written = 0;
+    for await (const event of events) {
+      this.#write(event);
+      written++;
+      if (written % EVENTS_PER_DRAIN === 0) await this.#writer.drain();
     }
   }
 
@@ -42,7 +58,8 @@ export class EventWriter {
         break;
       }
       case EventType.END_ELEMENT: {
-        writer.writeEndElement();
+        // A name without a prefix is its local name, which needs no new string.
+        writer.writeEndElement(event.name.prefix === '' ? event.name.localName : event.name.toString());
         break;
       }
       case EventType.CHARACTERS:
@@ -94,7 +111,7 @@ export class EventWriter {
     for (const attribute of event.attributes) {
       // Declarations reported as attributes are written from the namespaces already.
       if (attribute.namespaceURI !== XMLNS_NAMESPACE) {
-        writer.writeAttribute(attribute.prefix, attribute.namespaceURI, attribute.localName, attribute.value);
+        writer.writeAttribute(attribute.prefix, attribute.localName, attribute.namespaceURI, attribute.value);
       }
     }
   }

@@ -7,11 +7,11 @@
  * `<!-- abc` returns MORE while the source may send more, and fails with `WF_UNEXPECTED_END`
  * once it can't. `bufferEnded` and `throwUnexpected` apply that rule.
  */
-import { ErrorCode } from '../errors/codes.ts';
-import { MORE, scanError, scanName } from '../scan/scanner.ts';
-import { Char } from '../util/chars.ts';
-import { isWhitespaceChar } from '../util/whitespace.ts';
-import type { Tokenizer } from './tokenizer.ts';
+import { ErrorCode } from '@/errors/codes';
+import { MORE, scanError, scanName } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
+import { Char } from '@/util/chars';
+import { isWhitespaceChar } from '@/util/whitespace';
 
 /** The lengths of the markup the tokenizer steps over, defined once for every scanner. */
 export const XML_DECLARATION_OPEN_LENGTH = '<?xml'.length;
@@ -78,7 +78,8 @@ export function skipWhitespace(tokenizer: Tokenizer, start: number): number {
   let pos = start;
   // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
   while (isWhitespaceChar(text.charCodeAt(pos), tokenizer.version11)) pos++;
-  return pos >= text.length && !tokenizer.final ? MORE : pos;
+  if (pos >= text.length && !tokenizer.final) return MORE;
+  return pos;
 }
 
 /**

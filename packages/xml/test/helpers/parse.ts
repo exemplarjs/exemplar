@@ -1,4 +1,4 @@
-import { canonicalOf, write, writeEvent } from '@test/helpers/canonical.ts';
+import { canonicalOf, write, writeEvent } from '@test/helpers/canonical';
 import {
   type AsyncStreamReader,
   EventType,
@@ -7,8 +7,8 @@ import {
   type StreamReader,
   XMLError,
   XMLInputFactory,
-} from '@/index.ts';
-import { CREATE_READER, type StreamReader as Cursor } from '@/internal.ts';
+} from '@/index';
+import { CREATE_READER, type StreamReader as Cursor } from '@/internal';
 
 /** The chunk sizes `parseEveryWay` feeds bytes in. */
 const CHUNK_SIZES = [1, 2, 3, 7, 64];
@@ -90,7 +90,7 @@ export function parseEveryWay(xml: string, options: InputOptions = {}): string {
 }
 
 /** Describes one event with everything the accessors give for it, and where it starts. */
-export function describeEvent(r: StreamReader | AsyncStreamReader, event: EventType): string {
+function describeEvent(r: StreamReader | AsyncStreamReader, event: EventType): string {
   const { line, column, systemId = '' } = r.location();
   const at = `${event}@${line}:${column}${systemId}`;
   switch (event) {
@@ -168,8 +168,9 @@ function eventsFed(bytes: Uint8Array, size: number, options: InputOptions): stri
   return describedEvents((out) => {
     const event = r.next();
     if (event === EventType.NEED_INPUT) {
-      if (at < bytes.length) r.feed(bytes.subarray(at, (at += size)));
+      if (at < bytes.length) r.feed(bytes.subarray(at, at + size));
       else r.endOfInput();
+      at += size;
     } else if (event !== EventType.END_DOCUMENT && event !== EventType.START_DOCUMENT)
       out.push(describeEvent(r, event));
     return event;
@@ -293,6 +294,7 @@ async function cursorAsync(source: Source, options: InputOptions): Promise<strin
   const r = new XMLInputFactory(options).createAsyncStreamReader(source);
   let out = '';
   for (let event = r.next(); event !== EventType.END_DOCUMENT; event = r.next()) {
+    // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
     if (event === EventType.NEED_INPUT) await r.fill();
     else out += write(r, event);
   }
@@ -342,9 +344,8 @@ export async function parseAsyncEveryWay(xml: string, options: InputOptions = {}
       },
     ]
   );
-  for (const [way, read] of ways) {
-    const summary = await outcomeAsync(read);
-    if (summary !== first) throw new Error(`As ${way}: ${summary}, but synchronously: ${first}`);
-  }
+  const summaries = await Promise.all(ways.map(async ([, read]) => outcomeAsync(read)));
+  for (const [index, [way]] of ways.entries())
+    if (summaries[index] !== first) throw new Error(`As ${way}: ${summaries[index]}, but synchronously: ${first}`);
   return first;
 }

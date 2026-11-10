@@ -1,12 +1,13 @@
 import {
+  attributesOf,
+  declarationName,
   type NodeLike,
   NodeType,
-  XML_NAMESPACE,
-  attributesOf,
   prefixDeclaredBy,
   splitQName,
+  XML_NAMESPACE,
 } from '@exemplarjs/xml/internal';
-import { quotedLiteral } from './escape.ts';
+import { doctypeDeclaration } from './escape.ts';
 import type { StreamWriter } from './stream-writer.ts';
 
 /** The parts of a DOM node the writer reads, so that any DOM Level 2 tree can be written. */
@@ -106,12 +107,7 @@ function writeEnd(writer: StreamWriter, node: WritableNode): void {
 
 /** A DOCTYPE from a document type node. */
 function doctype(node: WritableNode): string {
-  const { publicId, systemId, internalSubset } = node;
-  let declaration = `<!DOCTYPE ${node.name ?? node.nodeName}`;
-  if (publicId) declaration += ` PUBLIC ${quotedLiteral(publicId)} ${quotedLiteral(systemId ?? '')}`;
-  else if (systemId) declaration += ` SYSTEM ${quotedLiteral(systemId)}`;
-  if (internalSubset) declaration += ` [${internalSubset}]`;
-  return declaration + '>';
+  return doctypeDeclaration(node.name ?? node.nodeName, node.publicId, node.systemId, node.internalSubset);
 }
 
 /** An element's or attribute's prefix and local name; a DOM Level 1 name splits only if it is a qualified name. */
@@ -122,7 +118,7 @@ function prefixAndLocalName(node: WritableNode): [string, string] {
 
 /** The URI a DOM Level 1 element's prefix is declared for by its own or its ancestors' attributes. */
 function declaredURI(node: WritableNode, prefix: string): string {
-  const name = prefix === '' ? 'xmlns' : `xmlns:${prefix}`;
+  const name = declarationName(prefix);
   for (
     let element: WritableNode | null = node;
     element !== null && element.nodeType === NodeType.ELEMENT_NODE;
@@ -137,11 +133,14 @@ function declaredURI(node: WritableNode, prefix: string): string {
 /** Writes an element's start tag with its declarations and attributes, for a namespace-aware writer. */
 function writeStartTag(writer: StreamWriter, node: WritableNode): void {
   const [prefix, localName] = prefixAndLocalName(node);
-  const uri = node.localName === null ? declaredURI(node, prefix) : (node.namespaceURI ?? '');
+  // A DOM Level 1 node has no namespace of its own: take the one its declarations bind.
+  let uri: string;
+  if (node.localName === null) uri = declaredURI(node, prefix);
+  else uri = node.namespaceURI ?? '';
   writer.writeStartElement(prefix, localName, uri);
   const declared = writeDeclarations(writer, node, prefix, uri);
   // Declares the element's own namespace when the output does not bind its prefix to it yet.
-  if ((writer.getNamespaceURI(prefix) ?? '') !== uri && !declared.has(prefix))
+  if ((writer.namespaceOf(prefix) ?? '') !== uri && !declared.has(prefix))
     declareNamespace(writer, declared, prefix, uri);
   for (const attr of attributesOf(node)) {
     if (prefixDeclaredBy(attr) === undefined) writeAttribute(writer, node, attr, declared);
@@ -187,16 +186,17 @@ function writeAttribute(writer: StreamWriter, element: WritableNode, attr: Writa
     writer.writeAttribute(localName, value);
     return;
   }
-  if (prefix === 'xml' || (prefix !== '' && writer.getNamespaceURI(prefix) === uri)) {
-    writer.writeAttribute(prefix, uri, localName, value);
+  if (prefix === 'xml' || (prefix !== '' && writer.namespaceOf(prefix) === uri)) {
+    writer.writeAttribute(prefix, localName, uri, value);
     return;
   }
-  let chosen = writer.getPrefix(uri);
+  let chosen = writer.prefixOf(uri);
   if (chosen === undefined || chosen === '') {
-    chosen = prefix !== '' && !declared.has(prefix) ? prefix : freePrefix(writer, declared);
+    const keepsPrefix = prefix !== '' && !declared.has(prefix);
+    chosen = keepsPrefix ? prefix : freePrefix(writer, declared);
     declareNamespace(writer, declared, chosen, uri);
   }
-  writer.writeAttribute(chosen, uri, localName, value);
+  writer.writeAttribute(chosen, localName, uri, value);
 }
 
 /** Writes a DOM Level 1 attribute by its own name, declaring its prefix as the tree does when the output lacks it. */
@@ -209,15 +209,15 @@ function writeLevel1Attribute(
   declared: Set<string>
 ): void {
   const uri = prefix === '' ? '' : declaredURI(element, prefix);
-  if (uri !== '' && !declared.has(prefix) && writer.getNamespaceURI(prefix) !== uri)
+  if (uri !== '' && !declared.has(prefix) && writer.namespaceOf(prefix) !== uri)
     declareNamespace(writer, declared, prefix, uri);
-  writer.writeAttribute(prefix, uri, localName, value);
+  writer.writeAttribute(prefix, localName, uri, value);
 }
 
 /** A prefix bound neither in scope nor on the open tag. */
 function freePrefix(writer: StreamWriter, declared: Set<string>): string {
   for (let number = 1; ; number++) {
     const prefix = `ns${number}`;
-    if (!declared.has(prefix) && writer.getNamespaceURI(prefix) === undefined) return prefix;
+    if (!declared.has(prefix) && writer.namespaceOf(prefix) === undefined) return prefix;
   }
 }
