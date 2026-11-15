@@ -1,9 +1,9 @@
-import { DOCUMENTS } from '@test/helpers/documents.ts';
-import { build, newDocument, serialize } from '@test/helpers/dom.ts';
+import { DOCUMENTS } from '@test/helpers/documents';
+import { build, newDocument, serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import { StringSink, XMLOutputFactory } from '@exemplarjs/writer';
 import { type InputOptions } from '@exemplarjs/xml';
-import { type Document, DOMParser, type Element, type Node, type Text } from '@/index.ts';
+import { type Document, DOMParser, type Element, type Node, type Text } from '@/index';
 
 /** Parses, serializes and parses again; returns both trees and the text between. */
 function roundTrip(xml: string, options: InputOptions = {}): { first: Document; second: Document; text: string } {
@@ -113,9 +113,7 @@ describe('writing a tree with the stream writer', () => {
   it('writes a DOM tree with writeNode', () => {
     const source = DOCUMENTS['a document type'] as string;
     const text = written(
-      build(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>${source}`, {
-        replaceEntityReferences: false,
-      })
+      build(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>${source}`, { replaceEntityReferences: false })
     );
     expect(text).toBe(
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!DOCTYPE r PUBLIC "-//P//EN" "r.dtd" [<!ENTITY e "x"><!ATTLIST r d CDATA "dv">]><r d="dv">&e;</r>'

@@ -1,7 +1,7 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { scanError } from '../scan/scanner.ts';
-import { Char } from '../util/chars.ts';
-import { isWhitespaceChar } from '../util/whitespace.ts';
+import { ErrorCode } from '@/errors/codes';
+import { scanError } from '@/scan/scanner';
+import { Char } from '@/util/chars';
+import { isWhitespaceChar } from '@/util/whitespace';
 import { XML_DECLARATION_OPEN_LENGTH } from './syntax.ts';
 
 // Module-level constants, so V8 can inline them.
@@ -97,7 +97,7 @@ export class DeclarationParser {
     const standalone = isTextDeclaration ? undefined : this.#readPseudoAttribute('standalone', false, VALID_STANDALONE);
     this.#skipWhitespace();
     if (!this.#text.startsWith('?>', this.#pos)) this.#fail('Expected ?> to end the declaration');
-    this.#pos += 2;
+    this.#pos += '?>'.length;
     return {
       ...(version !== undefined && { version }),
       ...(encoding !== undefined && { encoding }),

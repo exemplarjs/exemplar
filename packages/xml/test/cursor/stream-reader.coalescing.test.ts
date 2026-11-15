@@ -1,7 +1,7 @@
-import { parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { createFilteredReader } from '@/filters/index.ts';
-import { type AsyncStreamReader, EventType, type InputOptions, type StreamReader, XMLInputFactory } from '@/index.ts';
+import { createFilteredReader } from '@/filters/index';
+import { type AsyncStreamReader, EventType, type InputOptions, type StreamReader, XMLInputFactory } from '@/index';
 
 const COALESCING: InputOptions = { coalescing: true };
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { XMLInputFactory } from '@exemplarjs/xml';
-import { encoderFor } from '@/encoders.ts';
+import { InvalidArgumentError, XMLInputFactory } from '@exemplarjs/xml';
+import { encoderFor } from '@/encoders';
 
 const UTF8 = new TextEncoder();
 
@@ -40,9 +40,14 @@ describe('encoderFor', () => {
     expect(encoderFor(name).name).toBe(declared);
   });
 
-  it.each(['UTF-32', 'Shift_JIS', 'x-unknown', ''])('throws a RangeError for %s, which has no encoder', (name) => {
-    expect(() => encoderFor(name)).toThrow(RangeError);
-  });
+  it.each(['UTF-32', 'Shift_JIS', 'x-unknown', ''])(
+    'throws an InvalidArgumentError for %s, which has no encoder',
+    (name) => {
+      expect(() => encoderFor(name)).toThrow(
+        new InvalidArgumentError(`The encoding ${name} is not one the writer has an encoder for`)
+      );
+    }
+  );
 
   it('encodes ISO-8859-1 one byte per character, and finds what it cannot hold', () => {
     const encoder = encoderFor('ISO-8859-1');

@@ -1,7 +1,7 @@
-import { recorder } from '@test/helpers/recorder.ts';
+import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { SAXParser } from '@/index.ts';
+import { SAXParser } from '@/index';
 
 const BOUNDARIES = ['startEntity', 'endEntity', 'characters', 'startElement', 'endElement', 'skippedEntity'];
 

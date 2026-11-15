@@ -1,22 +1,22 @@
-import { verdict } from '@test/helpers/lexical.ts';
-import { canonical, errorOf, parseEveryWay } from '@test/helpers/parse.ts';
+import { verdict } from '@test/helpers/lexical';
+import { canonical, errorOf, parseEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { TABLES_XML_10, TABLES_XML_11, TABLES_REPLACEMENT_TEXT } from '@/scan/classes.ts';
+import { TABLES_REPLACEMENT_TEXT, TABLES_XML_10, TABLES_XML_11 } from '@/scan/classes';
 import {
-  MORE,
-  ScanError,
-  ScanFlag,
-  type ScanState,
-  Terminator,
   holdsAt,
+  MORE,
   sameSpan,
   scanAttributeValue,
+  ScanError,
+  ScanFlag,
   scanName,
   scanSpan,
+  type ScanState,
   scanText,
   scanTo,
   skipSpacesTabsAndLineFeeds,
-} from '@/scan/scanner.ts';
+  Terminator,
+} from '@/scan/scanner';
 
 /** A scan state over text: final, XML 1.0 and not replacement text unless said otherwise. */
 function state(text: string, { final = true, version11 = false, raw = false } = {}): ScanState {

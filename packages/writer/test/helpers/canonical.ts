@@ -28,7 +28,7 @@ function startTag(reader: StreamReader): string {
 }
 
 /** Writes one event in the first canonical form; comments, the DOCTYPE and skipped entities write nothing. */
-export function write(reader: StreamReader, event: EventType): string {
+function write(reader: StreamReader, event: EventType): string {
   switch (event) {
     case EventType.START_ELEMENT: {
       return startTag(reader);
@@ -51,7 +51,7 @@ export function write(reader: StreamReader, event: EventType): string {
 }
 
 /** Reads a document to its end and returns it in the suite's first canonical form. */
-export function canonicalOf(reader: StreamReader): string {
+function canonicalOf(reader: StreamReader): string {
   let out = '';
   for (let event = reader.next(); event !== EventType.END_DOCUMENT; event = reader.next()) out += write(reader, event);
   return out;

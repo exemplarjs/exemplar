@@ -1,14 +1,7 @@
-import { cursor, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { cursor, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, type StreamReader, type XMLError, XMLInputFactory } from '@/index.ts';
-import {
-  DTD_COMPLETE,
-  DTD_ITEMS,
-  EVENT_OFFSET,
-  INCLUDED_DECLARATIONS,
-  INPUT_ENCODING,
-  XML_ENCODING,
-} from '@/internal.ts';
+import { EventType, type InputOptions, type StreamReader, type XMLError, XMLInputFactory } from '@/index';
+import { DTD_COMPLETE, DTD_ITEMS, EVENT_OFFSET, INCLUDED_DECLARATIONS, INPUT_ENCODING, XML_ENCODING } from '@/internal';
 
 const encoder = new TextEncoder();
 
@@ -207,14 +200,14 @@ describe('accessors', () => {
   it('give attribute values by index and by name', () => {
     const r = reader('<a x="1" y="&lt;2&gt;"/>');
     r.next();
-    expect([r.attributeCount(), r.attributeValue(0), r.attributeValue(1), r.attributeValue('', 'y')]).toEqual([
+    expect([r.attributeCount(), r.attributeValue(0), r.attributeValue(1), r.attribute('y')]).toEqual([
       2,
       '1',
       '<2>',
       '<2>',
     ]);
     expect([r.attributeType(0), r.isAttributeSpecified(0)]).toEqual(['CDATA', true]);
-    expect([r.attributeValue('', 'z'), r.attributeValue('urn:x', 'x')]).toEqual([undefined, undefined]);
+    expect([r.attribute('z'), r.attribute('x', 'urn:x')]).toEqual([undefined, undefined]);
     r.next();
     expect(r.attributeCount()).toBe(0);
   });
@@ -232,7 +225,7 @@ describe('accessors', () => {
       ['p:x', 'x', 'p', 'urn:p'],
       ['y', 'y', '', ''],
     ]);
-    expect(r.attributeValue('urn:p', 'x')).toBe('1');
+    expect(r.attribute('x', 'urn:p')).toBe('1');
   });
 
   it('throw a RangeError for an attribute index that is not an integer below attributeCount()', () => {
@@ -343,9 +336,9 @@ describe('accessors', () => {
 
   it('give the version, encoding and standalone of the XML declaration', () => {
     const r = reader('<?xml version="1.0" encoding="UTF-8" standalone="no"?><a/>');
-    expect([r.version(), r.encoding(), r.standalone()]).toEqual(['1.0', 'UTF-8', false]);
+    expect([r.version(), r.declaredEncoding(), r.standalone()]).toEqual(['1.0', 'UTF-8', false]);
     const none = reader('<a/>');
-    expect([none.version(), none.encoding(), none.standalone()]).toEqual([undefined, undefined, undefined]);
+    expect([none.version(), none.declaredEncoding(), none.standalone()]).toEqual([undefined, undefined, undefined]);
   });
 
   it('give the encoding detection chose when bytes have no declaration', () => {
@@ -465,6 +458,89 @@ describe('nextTag and elementText (StAX)', () => {
   });
 });
 
+describe('after a failure, and what a reader says of its encoding and errors', () => {
+  it('has no next event once a parse has failed', () => {
+    const r = reader('<a></b>');
+    expect(() => {
+      while (r.hasNext()) r.next();
+    }).toThrow('WF_END_TAG_MISMATCH');
+    expect(r.hasNext()).toBe(false);
+    const unhandled = reader('<!DOCTYPE a [%p;]><a/>');
+    expect(() => unhandled.next()).toThrow('VC_ENTITY_DECLARED');
+    expect(unhandled.hasNext()).toBe(false);
+  });
+
+  it('gives the encoding its bytes were read in, and apart from it the one the declaration names', () => {
+    const factory = new XMLInputFactory();
+    const latin1 = Uint8Array.from(
+      '<?xml version="1.0" encoding="UTF-8"?><a>\u00E9</a>',
+      (c) => c.codePointAt(0) as number
+    );
+    const overridden = factory.createStreamReader({ bytes: latin1, encoding: 'ISO-8859-1' });
+    expect([overridden.encoding(), overridden.declaredEncoding()]).toEqual(['iso-8859-1', 'UTF-8']);
+    const text = factory.createStreamReader('<?xml version="1.0" encoding="ISO-8859-1"?><a/>');
+    expect([text.encoding(), text.declaredEncoding()]).toEqual([undefined, 'ISO-8859-1']);
+    const undeclared = factory.createStreamReader(new TextEncoder().encode('<a/>'));
+    expect([undeclared.encoding(), undeclared.declaredEncoding()]).toEqual(['utf-8', undefined]);
+  });
+
+  it('reports a broken xml:id as a warning, and reads on without a handler', () => {
+    expect(reported('<a><b xml:id="x"/><c xml:id="x"/><d xml:id="1 2"/></a>')).toEqual([
+      'warning XMLID_DUPLICATE',
+      'warning XMLID_NAME',
+    ]);
+    const r = reader('<a><b xml:id="x"/><c xml:id="x"/></a>');
+    expect(() => {
+      while (r.hasNext()) r.next();
+    }).not.toThrow();
+  });
+
+  it('puts the code and the position in an error message, and keeps the description apart', () => {
+    const failure = (source: string | { text: string; systemId: string }): XMLError => {
+      try {
+        const r = new XMLInputFactory().createStreamReader(source);
+        while (r.hasNext()) r.next();
+      } catch (error) {
+        return error as XMLError;
+      }
+      throw new Error('nothing was thrown');
+    };
+    const plain = failure('<a>\n</b>');
+    expect(plain.message).toBe(`WF_END_TAG_MISMATCH: ${plain.description} (2:3)`);
+    expect(plain.description).not.toContain('WF_END_TAG_MISMATCH');
+    const named = failure({ text: '<a></b>', systemId: 'file:///orders.xml' });
+    expect(named.message).toBe(`WF_END_TAG_MISMATCH: ${named.description} (file:///orders.xml 1:6)`);
+    expect(String(named)).toBe(`XMLError: ${named.message}`);
+  });
+});
+
+describe('isWhitespace at a CDATA section', () => {
+  it('is true for a section of whitespace only, which nextTag passes over as it does other whitespace', () => {
+    const r = reader('<a><![CDATA[ \n ]]><![CDATA[x]]></a>');
+    r.next();
+    expect([r.next(), r.isWhitespace()]).toEqual([EventType.CDATA, true]);
+    expect([r.next(), r.isWhitespace()]).toEqual([EventType.CDATA, false]);
+    const skipping = reader('<a><![CDATA[ ]]><b/></a>');
+    skipping.next();
+    expect([skipping.nextTag(), skipping.name()]).toEqual([EventType.START_ELEMENT, 'b']);
+  });
+});
+
+describe('skipElement', () => {
+  it('skips an element and everything in it, stopping at its end tag', () => {
+    const r = reader('<a><b>x<c><b/></c><!--d--></b><e/></a>');
+    r.nextTag();
+    r.nextTag();
+    r.skipElement();
+    expect([r.eventType(), r.localName()]).toEqual([EventType.END_ELEMENT, 'b']);
+    expect([r.nextTag(), r.localName()]).toEqual([EventType.START_ELEMENT, 'e']);
+  });
+
+  it('needs a START_ELEMENT', () => {
+    expect(() => reader('<a/>').skipElement()).toThrow('skipElement() needs a START_ELEMENT');
+  });
+});
+
 describe('error handling (§1.2, SAX ErrorHandler)', () => {
   it('tells the error handler of a fatal error before throwing it', () => {
     expect(reported('<a></b>')).toEqual(['fatal WF_END_TAG_MISMATCH', 'thrown']);
@@ -472,6 +548,25 @@ describe('error handling (§1.2, SAX ErrorHandler)', () => {
 
   it('tells the error handler of a fatal error in the XML declaration, found by the constructor', () => {
     expect(reported('<?xml version="2.0"?><a/>')).toEqual(['fatal WF_XML_DECLARATION', 'thrown']);
+  });
+
+  it('warns of a second declaration of an entity or an attribute, which is ignored', () => {
+    const dtd = '<!ENTITY e "1"><!ENTITY e "2"><!ENTITY % p "x"><!ENTITY % p "y"><!ATTLIST a b CDATA "1" b CDATA "2">';
+    expect(reported(`<!DOCTYPE a [${dtd}]><a>&e;</a>`)).toEqual([
+      'warning DTD_DUPLICATE_ENTITY',
+      'warning DTD_DUPLICATE_ENTITY',
+      'warning DTD_DUPLICATE_ATTRIBUTE',
+    ]);
+    const messages: string[] = [];
+    const errorHandler = { warning: (e: XMLError) => messages.push(e.description) };
+    const r = new XMLInputFactory({ errorHandler }).createStreamReader(`<!DOCTYPE a [${dtd}]><a/>`);
+    while (r.next() !== EventType.START_ELEMENT);
+    expect(messages).toEqual([
+      'The entity e is declared more than once; the first declaration is used',
+      'The entity p is declared more than once; the first declaration is used',
+      'The attribute b of a is declared more than once; the first declaration is used',
+    ]);
+    expect(r.attributeValue(0)).toBe('1');
   });
 
   it('lets a handler that returns from error() go on parsing', () => {

@@ -225,7 +225,8 @@ export class Automaton {
     if (repeat === '*' || repeat === '+') {
       for (const position of positions.last) for (const first of positions.first) this.#follow[position]?.add(first);
     }
-    return repeat === '?' || repeat === '*' ? { ...positions, nullable: true } : positions;
+    const isOptional = repeat === '?' || repeat === '*';
+    return isOptional ? { ...positions, nullable: true } : positions;
   }
 }
 

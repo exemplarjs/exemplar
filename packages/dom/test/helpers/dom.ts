@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import { type InputOptions, type Source, XMLInputFactory } from '@exemplarjs/xml';
-import { type BuilderOptions, type Document, DocumentBuilder, type Node, XMLSerializer } from '@/index.ts';
+import { type BuilderOptions, type Document, DocumentBuilder, type Node, XMLSerializer } from '@/index';
 
 /** The legacy DOMException codes of the exceptions the DOM raises. */
 const CODES = {

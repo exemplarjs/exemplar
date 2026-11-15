@@ -1,5 +1,5 @@
 import { EventType, type ResolvedSource, type StreamReader, XMLInputFactory } from '@exemplarjs/xml';
-import { XML_NAMESPACE, escapeAndResolveURI } from '@exemplarjs/xml/internal';
+import { escapeAndResolveURI, XML_NAMESPACE } from '@exemplarjs/xml/internal';
 import { CATALOG_NAMESPACE, normalizePublicId, normalizeURI } from './normalize.ts';
 
 /** A rewrite entry: identifiers starting with `startString` start with `rewritePrefix` instead. */
@@ -151,8 +151,8 @@ function preferenceOf(value: string | undefined, inherited: boolean): boolean {
 function readElement(reader: StreamReader, scope: Scope, file: CatalogFile, isRoot: boolean): Scope {
   // Elements in other namespaces are ignored with all they hold (§6), and so are unknown ones.
   if (scope === null || reader.namespaceURI() !== CATALOG_NAMESPACE) return null;
-  const attribute: AttributeReader = (name) => reader.attributeValue('', name);
-  const base = absoluteURI(reader.attributeValue(XML_NAMESPACE, 'base'), scope.base) ?? scope.base;
+  const attribute: AttributeReader = (name) => reader.attribute(name);
+  const base = absoluteURI(reader.attribute('base', XML_NAMESPACE), scope.base) ?? scope.base;
   const name = reader.localName();
   if (name === 'group' || (isRoot && name === 'catalog')) {
     return { base, preferPublic: preferenceOf(attribute('prefer'), scope.preferPublic) };

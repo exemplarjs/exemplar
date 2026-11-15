@@ -1,8 +1,8 @@
-import { type Files, MAIN, XI, errorOf, factory, failure, included, read } from '@test/helpers/xinclude.ts';
+import { errorOf, factory, failure, type Files, included, MAIN, read, XI } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import { SAXParser } from '@exemplarjs/sax';
-import { EventType, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { xincludeProcessor } from '@/index.ts';
+import { EventType, InvalidArgumentError, XMLError, XMLInputFactory } from '@exemplarjs/xml';
+import { xincludeProcessor } from '@/index';
 
 const FILES: Files = {
   'file:///doc/part.xml':
@@ -509,7 +509,7 @@ describe('XIncludeReader', () => {
 
   it('needs a namespace-aware reader', () => {
     const factory = new XMLInputFactory({ xinclude: xincludeProcessor(), namespaceAware: false });
-    expect(() => factory.createStreamReader('<r/>')).toThrow(TypeError);
+    expect(() => factory.createStreamReader('<r/>')).toThrow(InvalidArgumentError);
   });
 
   it('reads documents without xi:include as any reader does', () => {

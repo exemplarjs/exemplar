@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorCode, ResolutionError, XMLError, XMLInputFactory } from '@/index.ts';
-import { accessRefusedError } from '@/internal.ts';
-import { ErrorFactory } from '@/util/errors.ts';
+import {
+  ErrorCode,
+  IllegalStateError,
+  InvalidArgumentError,
+  ResolutionError,
+  XMLError,
+  XMLInputFactory,
+} from '@/index';
+import { accessRefusedError } from '@/internal';
+import { ErrorFactory } from '@/util/errors';
 
 /** Whether a stack lists any frames, in V8's or WebKit's format. */
 const hasFrames = (error: unknown): boolean => /\n\s+at |@/.test((error as Error).stack ?? '');
@@ -47,6 +54,7 @@ describe('ErrorFactory.create', () => {
 
   it('puts the limit back when the constructor throws', () => {
     const limit = Error.stackTraceLimit;
+
     /** An error class whose constructor fails. */
     class FailingError extends Error {
       override name = 'FailingError';
@@ -56,6 +64,7 @@ describe('ErrorFactory.create', () => {
         throw new Error('constructor failed');
       }
     }
+
     expect(() => ErrorFactory.create(FailingError)).toThrow('constructor failed');
     expect(Error.stackTraceLimit).toBe(limit);
   });
@@ -90,5 +99,30 @@ describe.runIf(Error.stackTraceLimit !== undefined)('the errors the reader raise
     for (const error of [fatal, ...recoverable, accessRefusedError('http://x/a.dtd'), misuse]) {
       expect(hasFrames(error)).toBe(false);
     }
+  });
+});
+
+describe('InvalidArgumentError and IllegalStateError', () => {
+  it('are errors of their own, not TypeErrors, each named after its class', () => {
+    const invalid = new InvalidArgumentError('bad value');
+    const illegal = new IllegalStateError('wrong moment');
+    expect([invalid.name, invalid.message, invalid instanceof Error, invalid instanceof TypeError]).toEqual([
+      'InvalidArgumentError',
+      'bad value',
+      true,
+      false,
+    ]);
+    expect([illegal.name, illegal.message, illegal instanceof Error, illegal instanceof TypeError]).toEqual([
+      'IllegalStateError',
+      'wrong moment',
+      true,
+      false,
+    ]);
+  });
+
+  it('are what a bad value and a call at the wrong moment raise', () => {
+    const factory = new XMLInputFactory();
+    expect(() => factory.createStreamReader({ systemId: 'a.xml' })).toThrow(InvalidArgumentError);
+    expect(() => factory.createStreamReader('<a/>').elementText()).toThrow(IllegalStateError);
   });
 });

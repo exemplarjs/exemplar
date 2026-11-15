@@ -1,10 +1,12 @@
-import { CREATE_READER } from '../cursor/internal.ts';
-import type { AsyncStreamReader, StreamReader as PublicStreamReader } from '../cursor/readers.ts';
-import { StreamReader, isReader } from '../cursor/stream-reader.ts';
-import { AsyncEventReader, EventReader } from '../events/event-reader.ts';
-import type { XMLEvent } from '../events/events.ts';
-import { DecoderRegistry } from '../input/decoders.ts';
-import { type Source, openAsyncSource, openSource } from '../input/source.ts';
+import { CREATE_READER } from '@/cursor/internal';
+import type { AsyncStreamReader, StreamReader as PublicStreamReader } from '@/cursor/readers';
+import { isReader, StreamReader } from '@/cursor/stream-reader';
+import type { ErrorHandler } from '@/errors/xml-error';
+import { AsyncEventReader, EventReader } from '@/events/event-reader';
+import type { XMLEvent } from '@/events/events';
+import type { StreamReaderDelegate } from '@/filters/delegate';
+import { DecoderRegistry } from '@/input/decoders';
+import { openAsyncSource, openSource, type Source } from '@/input/source';
 import { type InputOptions, type ResolvedOptions, resolveOptions } from './options.ts';
 
 /**
@@ -26,6 +28,8 @@ export class XMLInputFactory {
   readonly #givenOptions: InputOptions;
   /** The built-in decoders and any the options add. */
   readonly #decoders: DecoderRegistry;
+  /** The options with each set of overrides the other reading APIs give, merged once for each. */
+  readonly #withOverrides = new WeakMap<Partial<ResolvedOptions>, ResolvedOptions>();
 
   constructor(options: InputOptions = {}) {
     this.#givenOptions = options;
@@ -38,9 +42,24 @@ export class XMLInputFactory {
     return new XMLInputFactory({ ...this.#givenOptions, ...overrides });
   }
 
-  /** Creates a cursor with some resolved options replaced, for the other reading APIs. @internal */
-  [CREATE_READER](source: Source | undefined, overrides: Partial<ResolvedOptions>, async: boolean): StreamReader {
-    return this.#openReader(source, { ...this.options, ...overrides }, async);
+  /**
+   * Creates a cursor with some resolved options replaced, for the other reading APIs. The merge is cached by the
+   * identity of `overrides`, so pass a module-level constant; a per-call `errorHandler` is applied after it.
+   * @internal
+   */
+  [CREATE_READER](
+    source: Source | undefined,
+    overrides: Partial<ResolvedOptions>,
+    async: boolean,
+    errorHandler?: ErrorHandler
+  ): StreamReader {
+    let options = this.#withOverrides.get(overrides);
+    if (options === undefined) {
+      options = { ...this.options, ...overrides };
+      this.#withOverrides.set(overrides, options);
+    }
+    if (errorHandler !== undefined) options = { ...options, errorHandler };
+    return this.#openReader(source, options, async);
   }
 
   /** Opens a source and returns a cursor over it, or with XInclude on, the XInclude processor's reader. */
@@ -61,18 +80,24 @@ export class XMLInputFactory {
     return this.#openReader(source, this.options, true);
   }
 
-  /** Creates an event reader over a document, or over a cursor. */
-  createEventReader(source: Source | PublicStreamReader): EventReader {
-    return new EventReader(isReader(source) ? source : this.createStreamReader(source));
+  /** Creates an event reader over a document, or over a reader: a cursor or a delegate. */
+  createEventReader(source: Source | PublicStreamReader | StreamReaderDelegate): EventReader {
+    return new EventReader(isReader(source) ? (source as PublicStreamReader) : this.createStreamReader(source));
   }
 
-  /** Creates an asynchronous event reader over a stream, any other source or a cursor; without one, it is fed. */
-  createAsyncEventReader(source?: Source | PublicStreamReader | AsyncStreamReader): AsyncEventReader {
-    return new AsyncEventReader(isReader(source) ? source : this.createAsyncStreamReader(source));
+  /** Creates an asynchronous event reader over a stream, any other source or a reader; without one, it is fed. */
+  createAsyncEventReader(
+    source?: Source | PublicStreamReader | AsyncStreamReader | StreamReaderDelegate
+  ): AsyncEventReader {
+    return new AsyncEventReader(
+      isReader(source) ? (source as AsyncStreamReader) : this.createAsyncStreamReader(source)
+    );
   }
 
   /** Creates a web stream of a document's events. */
-  createEventStream(source: Source | PublicStreamReader | AsyncStreamReader): ReadableStream<XMLEvent> {
+  createEventStream(
+    source: Source | PublicStreamReader | AsyncStreamReader | StreamReaderDelegate
+  ): ReadableStream<XMLEvent> {
     return this.createAsyncEventReader(source).stream();
   }
 }
@@ -80,5 +105,5 @@ export class XMLInputFactory {
 /** Readers kept for the module's lifetime, so that V8 keeps the hidden classes the optimized parsing code checks for. */
 export const RESIDENT_READERS: readonly PublicStreamReader[] = [
   new XMLInputFactory().createStreamReader('<a/>'),
-  new XMLInputFactory().createStreamReader(new Uint8Array([0x3c, 0x61, 0x2f, 0x3e])),
+  new XMLInputFactory().createStreamReader(new TextEncoder().encode('<a/>')),
 ];

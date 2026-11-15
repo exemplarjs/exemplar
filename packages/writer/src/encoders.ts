@@ -1,6 +1,15 @@
-import { ErrorCode } from '@exemplarjs/xml';
-import { SINGLE_BYTE_TABLES, canonicalEncoding, codePointLabel } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
+import { ErrorCode, InvalidArgumentError } from '@exemplarjs/xml';
+import {
+  BYTE_VALUES,
+  CODE_UNIT_HEX_DIGITS,
+  canonicalEncoding,
+  codePointLabel,
+  ErrorFactory,
+  Radix,
+  SINGLE_BYTE_TABLES,
+  UNDEFINED_CHARACTER,
+  UTF16_UNIT_BYTES,
+} from '@exemplarjs/xml/internal';
 import { WriterError } from './error.ts';
 
 /** Turns written text into bytes in one encoding. */
@@ -9,7 +18,9 @@ export interface Encoder {
   readonly name: string;
   /** The byte order mark the output starts with, if the encoding has one. */
   readonly byteOrderMark: Uint8Array | undefined;
+
   encode(text: string): Uint8Array;
+
   /** Matches the first character the encoding cannot hold, if it cannot hold every character. */
   readonly unencodable: RegExp | undefined;
 }
@@ -19,21 +30,12 @@ const utf8 = new TextEncoder();
 /** U+FEFF, which UTF-16 output starts with as its byte order mark. */
 const BYTE_ORDER_MARK = '\uFEFF';
 
-/** The bytes in a UTF-16 code unit. */
-const UNIT_BYTES = 2;
-
-/** The values a byte can take. */
-const BYTE_VALUES = 256;
-
-/** U+FFFF marks a byte a single-byte table leaves undefined. */
-const UNDEFINED = 0xff_ff;
-
 /** Text as UTF-16 code units in one byte order. */
 function utf16Bytes(text: string, littleEndian: boolean): Uint8Array {
-  const bytes = new Uint8Array(text.length * UNIT_BYTES);
+  const bytes = new Uint8Array(text.length * UTF16_UNIT_BYTES);
   const view = new DataView(bytes.buffer);
   // eslint-disable-next-line prefer-code-point -- UTF-16 is written in code units
-  for (let i = 0; i < text.length; i++) view.setUint16(i * UNIT_BYTES, text.charCodeAt(i), littleEndian);
+  for (let i = 0; i < text.length; i++) view.setUint16(i * UTF16_UNIT_BYTES, text.charCodeAt(i), littleEndian);
   return bytes;
 }
 
@@ -60,14 +62,14 @@ function reverseTable(table: string): Map<number, number> {
   for (let byte = 0; byte < BYTE_VALUES; byte++) {
     // eslint-disable-next-line prefer-code-point -- table entries are 16-bit units
     const unit = byte < tableStart ? byte : table.charCodeAt(byte - tableStart);
-    if (unit !== UNDEFINED && !bytes.has(unit)) bytes.set(unit, byte);
+    if (unit !== UNDEFINED_CHARACTER && !bytes.has(unit)) bytes.set(unit, byte);
   }
   return bytes;
 }
 
 /** A code unit as a regular expression escape, `\uXXXX`. */
-function unicodeEscape(unit: number): string {
-  return String.raw`\u` + unit.toString(16).padStart(4, '0');
+export function unicodeEscape(unit: number): string {
+  return String.raw`\u` + unit.toString(Radix.HEXADECIMAL).padStart(CODE_UNIT_HEX_DIGITS, '0');
 }
 
 /** Encodes one byte per character through a decoding table reversed. */
@@ -118,6 +120,8 @@ const ENCODERS: Readonly<Record<string, () => Encoder>> = {
 /** The encoder for an encoding name; throws when none is built in. */
 export function encoderFor(name: string): Encoder {
   const createEncoder = ENCODERS[canonicalEncoding(name)];
-  if (createEncoder === undefined) throw ErrorFactory.create(RangeError, `There is no encoder for ${name}`);
+  if (createEncoder === undefined) {
+    throw ErrorFactory.create(InvalidArgumentError, `The encoding ${name} is not one the writer has an encoder for`);
+  }
   return createEncoder();
 }

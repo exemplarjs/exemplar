@@ -1,8 +1,9 @@
-import { recorder } from '@test/helpers/recorder.ts';
+import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
-import { type EntityResolver, type ResolveRequest, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { type Validator, accessAllows, accessRefusedError } from '@exemplarjs/xml/internal';
-import { type Attributes, SAXParser, type SAXHandler } from '@/index.ts';
+import { type EntityResolver, EventType, type ResolveRequest, XMLError, XMLInputFactory } from '@exemplarjs/xml';
+import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
+import { accessAllows, accessRefusedError, type Validator } from '@exemplarjs/xml/internal';
+import { type Attributes, type SAXHandler, SAXParser } from '@/index';
 
 const BASE = 'http://example.org/docs/';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -402,5 +403,91 @@ describe('SAXParser.parseAsync', () => {
       expect.objectContaining({ code: 'WF_END_TAG_MISMATCH', line: 2, column: 6 })
     );
     await expect(new SAXParser().parseAsync(bytewise('<a>'), handler)).rejects.toBeInstanceOf(XMLError);
+  });
+});
+
+describe('SAXParser: reading a reader', () => {
+  /** A delegate that upper-cases text. */
+  class Upper extends StreamReaderDelegate {
+    override text(): string {
+      return super.text().toUpperCase();
+    }
+  }
+
+  it('reads a whole document from a reader at its start, through its filters and delegates, with the reader’s options', () => {
+    const factory = new XMLInputFactory({ namespacePrefixes: true });
+    const reader = createFilteredReader(
+      new Upper(factory.createStreamReader('<!DOCTYPE a><a xmlns:p="urn:p">x<!--c--></a>')),
+      (r) => r.eventType() !== EventType.COMMENT
+    );
+    const { handler, calls: out } = recorder();
+    new SAXParser().parse(reader, handler);
+    expect(out).toEqual([
+      'startDocument()',
+      'startDTD(a, undefined, undefined)',
+      'endDTD()',
+      'startPrefixMapping(p, urn:p)',
+      'startElement(, a, a, [xmlns:p=urn:p])',
+      'characters(X)',
+      'endElement(, a, a)',
+      'endPrefixMapping(p)',
+      'endDocument()',
+    ]);
+  });
+
+  it('reads an element from a reader at its start tag, with the mappings it inherits around it, leaving the reader at its end', () => {
+    const reader = new XMLInputFactory().createStreamReader(
+      '<feed xmlns="urn:f" xmlns:p="urn:p"><p:entry xmlns:q="urn:q">one</p:entry></feed>'
+    );
+    reader.nextTag();
+    reader.nextTag();
+    const { handler, calls: out } = recorder();
+    new SAXParser().parse(reader, handler);
+    expect(out).toEqual([
+      'startDocument()',
+      'startPrefixMapping(, urn:f)',
+      'startPrefixMapping(p, urn:p)',
+      'startPrefixMapping(q, urn:q)',
+      'startElement(urn:p, entry, p:entry, [])',
+      'characters(one)',
+      'endElement(urn:p, entry, p:entry)',
+      'endPrefixMapping(q)',
+      'endPrefixMapping()',
+      'endPrefixMapping(p)',
+      'endDocument()',
+    ]);
+    expect([reader.eventType(), reader.localName()]).toEqual([EventType.END_ELEMENT, 'entry']);
+  });
+
+  it('reads an asynchronous reader, awaiting input as it arrives, telling the handler of entities', async () => {
+    const bytes = new TextEncoder().encode('<!DOCTYPE a [<!ENTITY e "x">]><a>&e;</a>');
+    const reader = new XMLInputFactory().createAsyncStreamReader(bytes);
+    const { handler, calls: out } = recorder(['characters', 'startEntity', 'endEntity']);
+    await new SAXParser().parseAsync(new Upper(reader), handler);
+    expect(out).toEqual(['startEntity(e)', 'characters(X)', 'endEntity(e)']);
+  });
+
+  it('reads an asynchronous reader at a start tag, with the mappings it inherits', async () => {
+    const reader = new XMLInputFactory().createAsyncStreamReader(
+      new TextEncoder().encode('<a xmlns:p="urn:p"><b/></a>')
+    );
+    while ((await reader.nextTagAsync()) !== EventType.START_ELEMENT || reader.localName() !== 'b');
+    const { handler, calls: out } = recorder(['startPrefixMapping', 'endPrefixMapping', 'startElement']);
+    await new SAXParser().parseAsync(reader, handler);
+    expect(out).toEqual(['startPrefixMapping(p, urn:p)', 'startElement(, b, b, [])', 'endPrefixMapping(p)']);
+  });
+
+  it('makes no call for an event SAX has none for, such as an attribute a delegate reports on its own', () => {
+    /** A delegate that reports each comment as an ATTRIBUTE event. */
+    class CommentsAsAttributes extends StreamReaderDelegate {
+      override next(): EventType {
+        const type = super.next();
+        return type === EventType.COMMENT ? EventType.ATTRIBUTE : type;
+      }
+    }
+    const reader = new CommentsAsAttributes(new XMLInputFactory().createStreamReader('<a><!--c--></a>'));
+    const { handler, calls: out } = recorder(['startElement', 'comment', 'endElement', 'endDocument']);
+    new SAXParser().parse(reader, handler);
+    expect(out).toEqual(['startElement(, a, a, [])', 'endElement(, a, a)', 'endDocument()']);
   });
 });

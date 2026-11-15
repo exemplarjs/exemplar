@@ -1,12 +1,14 @@
-import { reader } from '@test/helpers/parse.ts';
+import { reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 import {
-  XMLNS_NAMESPACE,
-  XML_NAMESPACE,
+  declarationName,
+  declaredPrefixOf,
   declaredPrefixes,
-  reservedBindingProblem,
   namespacesInScope,
-} from '@/util/namespaces.ts';
+  reservedBindingProblem,
+  XML_NAMESPACE,
+  XMLNS_NAMESPACE,
+} from '@/util/namespaces';
 
 describe('the reserved namespaces (Namespaces §3)', () => {
   it('names the namespaces of the xml and xmlns prefixes', () => {
@@ -46,5 +48,22 @@ describe('namespace scopes', () => {
     r.nextTag();
     expect(declaredPrefixes(r)).toEqual([]);
     expect(namespacesInScope(scope, r)).toBe(scope);
+  });
+});
+
+describe('declaredPrefixOf', () => {
+  it('gives the prefix a declaration declares, and undefined for any other attribute', () => {
+    expect([declaredPrefixOf('xmlns'), declaredPrefixOf('xmlns:p'), declaredPrefixOf('p:a')]).toEqual([
+      '',
+      'p',
+      undefined,
+    ]);
+  });
+});
+
+describe('declarationName', () => {
+  it('names the attribute that declares a prefix, or the default namespace', () => {
+    expect(declarationName('')).toBe('xmlns');
+    expect(declarationName('p')).toBe('xmlns:p');
   });
 });

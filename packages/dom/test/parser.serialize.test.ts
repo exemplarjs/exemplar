@@ -1,7 +1,7 @@
-import { build, newDocument, serialize } from '@test/helpers/dom.ts';
+import { build, newDocument, serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { DOMParser, type Element } from '@/index.ts';
+import { DOMParser, type Element } from '@/index';
 
 /** Parses a string without namespaces, as DOM Level 1 nodes. */
 function parseUnaware(text: string): Element {

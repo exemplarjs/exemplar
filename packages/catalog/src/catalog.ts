@@ -4,13 +4,12 @@ import {
   type EntityResolver,
   ErrorCode,
   ResolutionError,
-  type ResolveRequest,
   type ResolvedSource,
+  type ResolveRequest,
   type URIResolver,
 } from '@exemplarjs/xml';
-import { hasScheme, resolveURI, unmatchedByCatalog } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
-import { type CatalogFile, type Delegate, type Rewrite, type Suffix, readCatalogFile } from './file.ts';
+import { ErrorFactory, hasScheme, resolveTargetURI, resolveURI, unmatchedByCatalog } from '@exemplarjs/xml/internal';
+import { type CatalogFile, type Delegate, readCatalogFile, type Rewrite, type Suffix } from './file.ts';
 import { normalizePublicId, normalizeURI, unwrapURN } from './normalize.ts';
 
 /** Reads a catalog file, or a resource a catalog maps to; undefined when it cannot. */
@@ -162,7 +161,7 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
     }
   }
 
-  /** Supplies what an entity maps to, as an entity resolver; what nothing matches follows `resolve`. */
+  /** Supplies what an entity maps to, as an entity resolver; what nothing matches follows `resolution`. */
   resolveEntity(request: ResolveRequest): ResolvedSource | undefined {
     const { publicId, systemId, baseURI } = request;
     const mapped = this.matchEntity(publicId, systemId, baseURI);
@@ -174,13 +173,15 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
   resolve(href: string, base: string | undefined): ResolvedSource | undefined {
     const mapped = this.matchURI(href, base);
     if (mapped !== undefined) return this.read(mapped);
-    if (this.resolution === 'strict') unmatchedByCatalog(this, undefined, resolveURI(href, base) ?? href);
+    if (this.resolution === 'strict') unmatchedByCatalog(this, undefined, resolveTargetURI(href, base));
     return undefined;
   }
 
   /** Normalizes an external identifier (§7.1.1) and resolves it through the catalog files. */
   #resolveExternalId(publicId: string | undefined, systemId: string | undefined): string | undefined {
-    let normalizedPublicId = publicId === undefined ? undefined : (unwrapURN(publicId) ?? normalizePublicId(publicId));
+    // A publicid URN holds a public identifier; any other is normalized (§6.2).
+    let normalizedPublicId: string | undefined;
+    if (publicId !== undefined) normalizedPublicId = unwrapURN(publicId) ?? normalizePublicId(publicId);
     let normalizedSystemId = systemId === undefined ? undefined : normalizeURI(systemId);
     const unwrapped = normalizedSystemId === undefined ? undefined : unwrapURN(normalizedSystemId);
     if (unwrapped !== undefined) {
@@ -285,16 +286,25 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
     }
     let file = this.#files.get(link.uri);
     if (file === undefined) {
-      file = this.#readFile(link.uri) ?? null;
+      file = this.#readFile(link) ?? null;
       this.#files.set(link.uri, file);
     }
     return file ?? undefined;
   }
 
-  /** Reads and parses a catalog file; undefined when it cannot be read or is no catalog. */
-  #readFile(uri: string): CatalogFile | undefined {
-    const source = this.read(uri);
-    return source === undefined ? undefined : readCatalogFile(source, uri, this.#settings.preferPublic);
+  /**
+   * Reads and parses a catalog file; undefined when it is no catalog, or is one another catalog
+   * leads to that cannot be read. One the resolver was given that cannot be read fails.
+   */
+  #readFile(link: CatalogLink): CatalogFile | undefined {
+    const source = this.read(link.uri);
+    if (source !== undefined) return readCatalogFile(source, link.uri, this.#settings.preferPublic);
+    if (link.reachedFrom !== undefined) return undefined;
+    throw ErrorFactory.create(
+      ResolutionError,
+      ErrorCode.CATALOG_UNREADABLE,
+      `The catalog file ${link.uri} cannot be read`
+    );
   }
 
   /** Reads a catalog file and every one it leads to, for `defer: false`. */

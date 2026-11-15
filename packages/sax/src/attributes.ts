@@ -1,4 +1,4 @@
-import { type StreamReader, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
+import { attributeIndex, type StreamReader, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
 import type { Attributes } from './handler.ts';
 
 /** The cursor's current start tag's attributes, read through SAX's `Attributes`; each method asks the cursor, so nothing is copied. */
@@ -47,15 +47,9 @@ export class ReaderAttributes implements Attributes {
   index(qName: string): number;
   index(uri: string, localName: string): number;
   index(qNameOrURI: string, localName?: string): number {
-    const reader = this.#reader;
-    for (let i = 0; i < reader.attributeCount(); i++) {
-      const found =
-        localName === undefined
-          ? reader.attributeName(i) === qNameOrURI
-          : reader.attributeLocalName(i) === localName && reader.attributeNamespace(i) === qNameOrURI;
-      if (found) return i;
-    }
-    return -1;
+    if (localName === undefined || this.#namespaceAware) return attributeIndex(this, qNameOrURI, localName);
+    // Without namespaces, an attribute's whole name is its local name, in no namespace.
+    return qNameOrURI === '' ? attributeIndex(this, localName) : -1;
   }
 }
 
@@ -70,16 +64,5 @@ export class NoXmlnsURIAttributes extends ReaderAttributes {
   /** An attribute's local name; empty for `xmlns` attributes, as in the JDK. */
   override localName(index: number): string {
     return super.uri(index) === XMLNS_NAMESPACE ? '' : super.localName(index);
-  }
-
-  /** The index of an attribute, by qualified name or by namespace URI and local name; -1 when absent. */
-  override index(qName: string): number;
-  override index(uri: string, localName: string): number;
-  override index(qNameOrURI: string, localName?: string): number {
-    if (localName === undefined) return super.index(qNameOrURI);
-    for (let i = 0; i < this.length; i++) {
-      if (this.localName(i) === localName && this.uri(i) === qNameOrURI) return i;
-    }
-    return -1;
   }
 }

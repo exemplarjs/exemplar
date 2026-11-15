@@ -1,6 +1,7 @@
-import { memoryReader } from '@test/helpers/catalog.ts';
+import { memoryReader } from '@test/helpers/catalog';
 import { describe, expect, it } from 'vitest';
-import { CATALOG_NAMESPACE, CatalogResolver, catalogResolver } from '@/index.ts';
+import { InvalidArgumentError } from '@exemplarjs/xml';
+import { CATALOG_NAMESPACE, CatalogResolver, catalogResolver } from '@/index';
 
 const NS = 'xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog"';
 const FILES = {
@@ -20,16 +21,16 @@ describe('catalogResolver', () => {
   it.each(['catalog.xml', '/etc/xml/catalog', './c.xml', ''])(
     'rejects the catalog file %j, which is not an absolute URI',
     (uri) => {
-      expect(() => catalogResolver({ files: ['file:///c/catalog.xml', uri] })).toThrow(TypeError);
+      expect(() => catalogResolver({ files: ['file:///c/catalog.xml', uri] })).toThrow(InvalidArgumentError);
     }
   );
 
   it('rejects a prefer setting other than public or system', () => {
-    expect(() => catalogResolver({ files: [], prefer: 'both' as 'public' })).toThrow(TypeError);
+    expect(() => catalogResolver({ files: [], prefer: 'both' as 'public' })).toThrow(InvalidArgumentError);
   });
 
   it('rejects a resolve setting other than strict, continue or ignore', () => {
-    expect(() => catalogResolver({ files: [], resolve: 'lenient' as 'strict' })).toThrow(TypeError);
+    expect(() => catalogResolver({ files: [], resolution: 'lenient' as 'strict' })).toThrow(InvalidArgumentError);
   });
 
   it('fails when nothing matches by default, as resolve is strict', () => {
@@ -40,8 +41,8 @@ describe('catalogResolver', () => {
     );
   });
 
-  it.each(['strict', 'continue', 'ignore'] as const)('takes resolve: %s', (resolve) => {
-    expect(catalogResolver({ files: [], resolve }).resolution).toBe(resolve);
+  it.each(['strict', 'continue', 'ignore'] as const)('takes resolution: %s', (resolution) => {
+    expect(catalogResolver({ files: [], resolution }).resolution).toBe(resolution);
   });
 
   it('prefers public identifiers by default, and system ones when told to', () => {
@@ -67,7 +68,8 @@ describe('catalogResolver', () => {
   });
 
   it('accepts catalog files in any scheme', () => {
-    const { read, asked } = memoryReader({});
+    const empty = '<catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog"/>';
+    const { read, asked } = memoryReader({ 'http://example.com/catalog.xml': empty, 'urn:x:catalog': empty });
     catalogResolver({ files: ['http://example.com/catalog.xml', 'urn:x:catalog'], read, defer: false });
     expect(asked).toEqual(['http://example.com/catalog.xml', 'urn:x:catalog']);
   });

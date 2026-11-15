@@ -4,16 +4,25 @@ The XML reader at the heart of exemplar: fast, W3C-conformant, and DTD-aware.
 
 ## Why exemplar
 
-exemplar is a complete XML stack for JavaScript and TypeScript: the pull, push, tree and writer APIs Java developers know from StAX, SAX, DOM and JAXP, with the DTDs, entities, resolvers, catalogs and standards that real-world XML depends on. It has no dependencies and runs on Node, Deno, Bun and every modern browser.
+The complete XML stack for JavaScript and TypeScript, and the best one. Everything Java developers rely on in StAX, SAX,
+DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Deno, Bun and every modern browser.
 
-- **Conformant, and proven.** 6,813 of the 6,816 applicable tests of the [W3C XML Conformance Test Suite](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md) pass, non-validating and validating, with external entities read and without. On that suite exemplar rejects 99.7% of malformed documents and produces 100% of the expected output.
-- **Full DTD support.** exemplar is the only pure-JavaScript XML library with full DTD support: internal and external subsets, parameter entities, conditional sections, entity expansion, attribute defaults and types, and validation against every validity constraint, with external DTDs and entities read through your resolvers and OASIS XML Catalogs.
-- **Every standard around XML.** Namespaces 1.0 and 1.1, XML 1.1, XML Base, `xml:id`, XInclude with XPointer, Canonical XML 1.0 and 1.1 and Exclusive Canonicalization, and a DOM Level 3 Core tree that passes 1,405 of the 1,532 pages of the W3C DOM Test Suite.
-- **The fastest pure-JavaScript XML reader.** It tops [exemplar's benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md) while checking everything XML asks of a parser: on an Apple M3 Max it reads at up to 542 MB/s, builds DOM trees at up to 314 MB/s and writes at up to 551 MB/s.
-- **Streams of any shape.** Strings, bytes, iterables, async iterables and web streams, in chunks of any size, down to one byte, with identical events. Async readers pay for a promise per chunk, not per event.
-- **Safe by default.** External reads happen only where you allow them, entity expansion is bounded by the JDK 24 limits, and untrusted input can be read with DOCTYPEs refused outright.
-- **Every encoding.** UTF-8, UTF-16 and UTF-32, GB18030, the ISO-8859 family, the Windows code pages, KOI8, Macintosh and EBCDIC are built in, and Japanese, Chinese and Korean are one import away.
-- **Typed and tested.** Written in TypeScript, with over 6,000 unit and property tests at full line coverage, the W3C suites on every change, and nightly differential tests against libxml2 and Xerces.
+- **The most conformant.** Nothing in JavaScript passes more of the
+  [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
+  XPath.
+- **The fastest.** Ahead of every other JavaScript XML library in
+  [the benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
+  trees, querying and writing, with every check left on.
+- **The best XPath in JavaScript.** A complete XPath 3.1 processor, compiled for speed, with typed variables your editor
+  checks.
+- **Every standard that matters.** Full DTD support and validation, namespaces, XML 1.1, XInclude, catalogs, Canonical
+  XML and DOM Level 3 Core, where other libraries stop at the basics.
+- **Built for real-world data.** Any stream, any chunk size, any encoding, synchronous or asynchronous, from a string in
+  memory to gigabytes over the network.
+- **Safe by default.** Nothing external is read unless you allow it, and hostile documents hit hard limits.
+- **Small where it counts.** Import only what you use; everything else stays out of your bundle.
+- **Typed and tested.** Written in TypeScript, with thousands of tests at full coverage and extensive testing against
+  the W3C conformance suites.
 
 ## The packages
 
@@ -24,6 +33,8 @@ Every package builds on `@exemplarjs/xml` and is released at the same version, s
 | `@exemplarjs/xml`                                         | The reader: pull cursor, event objects, async streams, DTDs, entities, resolvers and filters |
 | [`@exemplarjs/sax`](../sax/README.md)                     | SAX: push handlers, lexical and declaration events, and filter chains                        |
 | [`@exemplarjs/dom`](../dom/README.md)                     | A DOM Level 3 Core tree, with browser-style `DOMParser` and `XMLSerializer`                  |
+| [`@exemplarjs/xdm`](../xdm/README.md)                     | An XDM 3.1 tree, the data model of XPath, XQuery and XSLT                                    |
+| [`@exemplarjs/xpath`](../xpath/README.md)                 | An XPath 3.1 processor over XDM trees                                                        |
 | [`@exemplarjs/writer`](../writer/README.md)               | Stream and event writers, to strings, bytes and web streams                                  |
 | [`@exemplarjs/validation`](../validation/README.md)       | Validation against a DTD                                                                     |
 | [`@exemplarjs/catalog`](../catalog/README.md)             | OASIS XML Catalogs 1.1                                                                       |
@@ -33,7 +44,10 @@ Every package builds on `@exemplarjs/xml` and is released at the same version, s
 
 ## This package
 
-`@exemplarjs/xml` reads XML in the three styles Java offers: a pull cursor like StAX's `XMLStreamReader`, event objects like StAX's `XMLEventReader`, and the foundation the push, tree and writer packages build on. It reads DTDs, expands entities, resolves external DTDs and entities through resolvers you control, and checks everything the XML recommendation asks a parser to check.
+`@exemplarjs/xml` reads XML in the three styles Java offers: a pull cursor like StAX's `XMLStreamReader`, event objects
+like StAX's `XMLEventReader`, and the foundation the push, tree and writer packages build on. It reads DTDs, expands
+entities, resolves external DTDs and entities through resolvers you control, and checks everything the XML
+recommendation asks a parser to check.
 
 ```bash
 npm install @exemplarjs/xml
@@ -48,27 +62,35 @@ const xml = new XMLInputFactory();
 const reader = xml.createStreamReader('<book id="b1"><title>Dune</title></book>');
 
 for (let type = reader.next(); type !== EventType.END_DOCUMENT; type = reader.next()) {
-  if (type === EventType.START_ELEMENT) console.log(reader.localName(), reader.attributeValue('', 'id'));
+  if (type === EventType.START_ELEMENT) console.log(reader.localName(), reader.attribute('id'));
   else if (type === EventType.CHARACTERS) console.log(reader.text());
 }
 ```
 
-A source can be a string, a `Uint8Array`, an iterable or async iterable of chunks, a `ReadableStream`, or an object that adds a `systemId`, `publicId`, `baseURI` or `encoding`. Bytes are decoded as the XML specification says: byte-order mark, outside encoding, then the XML declaration.
+`attribute(localName)` finds an attribute by name, and `attribute(localName, namespaceURI)` one in a namespace, where
+StAX has `getAttributeValue(namespaceURI, localName)`. `attributeCount()` and `attributeName(i)`, `attributeValue(i)`
+and the like walk them all by position.
+
+A source can be a string, a `Uint8Array`, an iterable or async iterable of chunks, a `ReadableStream`, or an object that
+adds a `systemId`, `publicId`, `baseURI` or `encoding`. Bytes are decoded as the XML specification says: byte-order
+mark, outside encoding, then the XML declaration.
 
 ### Read large files and streams
 
-The async reader returns events at once while input is buffered and waits only between chunks, so a stream costs a promise per chunk, not per event:
+The async reader returns events at once while input is buffered and waits only between chunks, so a stream costs a
+promise per chunk, not per event:
 
 ```ts
 const stream = new Blob(['<log>', '<entry level="warn">disk</entry>'.repeat(3), '</log>']).stream();
 const levels: string[] = [];
 
 await xml.createAsyncStreamReader(stream).forEachEvent((type, r) => {
-  if (type === EventType.START_ELEMENT && r.localName() === 'entry') levels.push(r.attributeValue('', 'level') ?? '');
+  if (type === EventType.START_ELEMENT && r.localName() === 'entry') levels.push(r.attribute('level') ?? '');
 });
 ```
 
-For data that arrives in pieces you don't control, such as socket messages, create the reader without a source and `feed()` it.
+For data that arrives in pieces you don't control, such as socket messages, create the reader without a source and
+`feed()` it.
 
 ### Read events as objects
 
@@ -80,7 +102,8 @@ for (const event of xml.createEventReader('<a><b>text</b></a>')) {
 
 ### DTDs, entities and resolvers
 
-Internal subsets are read and applied: entities expand, attribute defaults appear, and declared types normalize values. External DTDs and entities come through a resolver, and only for the protocols the access lists allow:
+Internal subsets are read and applied: entities expand, attribute defaults appear, and declared types normalize values.
+External DTDs and entities come through a resolver, and only for the protocols the access lists allow:
 
 ```ts
 const dtds: Record<string, string> = {
@@ -92,20 +115,35 @@ const factory = new XMLInputFactory({
 const book = factory.createStreamReader('<!DOCTYPE book SYSTEM "http://example.com/book.dtd"><book>&publisher;</book>');
 
 for (let type = book.next(); type !== EventType.END_DOCUMENT; type = book.next()) {
-  if (type === EventType.START_ELEMENT) console.log(book.attributeValue('', 'lang')); // en, defaulted by the DTD
+  if (type === EventType.START_ELEMENT) console.log(book.attribute('lang')); // en, defaulted by the DTD
   else if (type === EventType.CHARACTERS) console.log(book.text()); // ACME, from the DTD's entity
 }
 ```
 
-`fileResolver({ root })` from `@exemplarjs/xml/resolvers/file` reads files below a root on Node, Deno and Bun, and `fetchResolver()` from `@exemplarjs/xml/resolvers` reads over HTTP in async readers.
+`fileResolver({ root })` from `@exemplarjs/xml/resolvers/file` reads files below a root on Node, Deno and Bun, and
+`fetchResolver()` from `@exemplarjs/xml/resolvers` reads over HTTP in async readers.
 
 ### Filters
 
-`createFilteredReader` from `@exemplarjs/xml/filters` passes on only the events a function accepts. It runs inside the reader's own `next()`, so filtering costs almost nothing.
+`createFilteredReader` from `@exemplarjs/xml/filters` passes on only the events a function accepts. It runs inside the
+reader's own `next()`, so filtering costs almost nothing. Give it several filters and they run in order, each seeing
+only what those before it accepted:
+
+```ts
+const reader = createFilteredReader(factory.createStreamReader(xml), withoutDrafts, withoutComments);
+```
+
+To change what a reader reports rather than drop it, subclass `StreamReaderDelegate` and override the calls to change.
+`createDelegatedReader` stacks delegates on a reader, each reading through the one before it:
+
+```ts
+const reader = createDelegatedReader(factory.createStreamReader(xml), new MaskedCards(), new RenamedCustomers());
+```
 
 ### Untrusted and trusted input
 
-The defaults are safe: no external access, and the entity-expansion limits of JDK 24. Refuse DTDs outright, or tighten a limit, for input from strangers:
+The defaults are safe: no external access, and the entity-expansion limits of JDK 24. Refuse DTDs outright, or tighten a
+limit, for input from strangers:
 
 ```ts
 const untrusted = new XMLInputFactory({ disallowDoctype: true, limits: { elementDepth: 64 } });
@@ -137,12 +175,15 @@ On an Apple M3 Max with Node 24, reading every name, attribute and text, buildin
 | OpenStack manuals                        | 190 MB/s | 114 MB/s, 46 MB held  | 139 MB/s |
 | XMark, factors 0.1 and 1                 | 273 MB/s | 126 MB/s, 715 MB held | 237 MB/s |
 
-The [benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md) also run nightly on a fixed Linux machine, on documents as published: internal subsets, entity references, eight encodings and all.
+The [benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md) also run nightly on a
+fixed Linux machine, on documents as published: internal subsets, entity references, eight encodings and all.
 
 ## See also
 
 - [`@exemplarjs/sax`](../sax/README.md): SAX: push handlers, lexical and declaration events, and filter chains
 - [`@exemplarjs/dom`](../dom/README.md): A DOM Level 3 Core tree, with browser-style `DOMParser` and `XMLSerializer`
+- [`@exemplarjs/xdm`](../xdm/README.md): An XDM 3.1 tree, the data model of XPath, XQuery and XSLT
+- [`@exemplarjs/xpath`](../xpath/README.md): An XPath 3.1 processor over XDM trees
 - [`@exemplarjs/writer`](../writer/README.md): Stream and event writers, to strings, bytes and web streams
 - [`@exemplarjs/validation`](../validation/README.md): Validation against a DTD
 - [`@exemplarjs/catalog`](../catalog/README.md): OASIS XML Catalogs 1.1
@@ -150,8 +191,10 @@ The [benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/ben
 - [`@exemplarjs/canonical`](../canonical/README.md): Canonical XML 1.0 and 1.1, and Exclusive Canonicalization
 - [`@exemplarjs/encodings-cjk`](../encodings-cjk/README.md): Japanese, Chinese and Korean encodings
 
-The [guide](../../docs/guide.md) shows every part at work through common tasks, and the [design](../../docs/design.md) explains how it works inside.
+The [documentation](https://github.com/io-timeout/exemplar-docs) shows every part at work through common tasks, with a
+reference for the details.
 
 ## License
 
-Apache License 2.0. The decoding tables derive from Unicode, ICU and WHATWG data, whose licences and attributions ship in `THIRD_PARTY_LICENSES`.
+Apache License 2.0. The decoding tables derive from Unicode, ICU and WHATWG data, whose licences and attributions ship
+in `THIRD_PARTY_LICENSES`.

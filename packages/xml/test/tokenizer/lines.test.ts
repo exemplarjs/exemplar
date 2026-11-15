@@ -1,8 +1,8 @@
-import { split, textSource, utf8 } from '@test/helpers/lexical.ts';
+import { split, textSource, utf8 } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
-import { EventType, type Location, type Source, XMLInputFactory } from '@/index.ts';
-import { LineSegment } from '@/tokenizer/lines.ts';
-import { Token, Tokenizer } from '@/tokenizer/tokenizer.ts';
+import { EventType, type Location, type Source, XMLInputFactory } from '@/index';
+import { LineSegment } from '@/tokenizer/lines';
+import { Token, Tokenizer } from '@/tokenizer/tokenizer';
 
 /** A line counter still recording a segment: it has counted up to offset 40, which is on line 9, starting at 38. */
 const counting = {

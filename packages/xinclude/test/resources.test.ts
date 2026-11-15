@@ -5,12 +5,12 @@ import {
   EventType,
   type InputOptions,
   ResolutionError,
-  type ResolveRequest,
   type ResolvedSource,
+  type ResolveRequest,
   XMLInputFactory,
 } from '@exemplarjs/xml';
 import type { ResolvedOptions } from '@exemplarjs/xml/internal';
-import { Pending, ResourceError, contentOf, findResource, isStreamOnly, waitFor } from '@/resources.ts';
+import { contentOf, findResource, isStreamOnly, Pending, ResourceError, waitFor } from '@/resources';
 
 const BASE = 'file:///doc/main.xml';
 

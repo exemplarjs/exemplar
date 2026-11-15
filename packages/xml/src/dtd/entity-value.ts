@@ -1,7 +1,7 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { Char, isChar } from '../util/chars.ts';
-import { isXmlName } from '../util/names.ts';
-import { codePointOfReference } from '../util/references.ts';
+import { ErrorCode } from '@/errors/codes';
+import { Char, isChar } from '@/util/chars';
+import { isXmlName } from '@/util/names';
+import { codePointOfReference } from '@/util/references';
 import { type DtdInput, type Frame, PE_IN_INTERNAL_SUBSET } from './input.ts';
 
 // Module-level constants, so V8 can inline them.

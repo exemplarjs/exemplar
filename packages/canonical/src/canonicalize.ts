@@ -1,27 +1,33 @@
 import {
+  type AsyncStreamReader,
   ErrorCode,
   EventType,
-  type StreamReader as PublicStreamReader,
+  InvalidArgumentError,
   type Source,
+  type StreamReader as PublicStreamReader,
   XMLError,
   XMLInputFactory,
 } from '@exemplarjs/xml';
+import type { StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import {
-  CREATE_READER,
-  Char,
-  DTD_COMPLETE,
-  type StreamReader,
-  XMLNS_NAMESPACE,
+  ANCESTOR_XML_ATTRIBUTES,
   byCodeUnit,
+  Char,
+  CREATE_READER,
+  cursorOf,
   declaredPrefixes,
+  DTD_COMPLETE,
+  ErrorFactory,
   hasScheme,
   isReader,
   isRestrictedChar,
   namespacesInScope,
+  ReaderInput,
+  type StreamReader,
+  XMLNS_NAMESPACE,
 } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
-import { Canonicalizer, type CanonicalAttribute, sortAttributes } from './render.ts';
-import { type CanonicalNode, TreeCanonicalizer, isNode } from './tree.ts';
+import { type CanonicalAttribute, Canonicalizer, type CanonicalXMLMethod } from './render.ts';
+import { type CanonicalNode, isNode, TreeCanonicalizer } from './tree.ts';
 
 /** The canonical forms: Canonical XML 1.0 and 1.1, Exclusive Canonicalization, and the XML suite's first and second forms. */
 export type CanonicalMethod = 'c14n' | 'c14n11' | 'exc-c14n' | 'suite-first' | 'suite-second';
@@ -61,43 +67,111 @@ function byName([a]: [string, string], [b]: [string, string]): number {
   return byCodeUnit(a, b);
 }
 
-/** What canonicalize reads: a source, a cursor, or a DOM node. */
-export type CanonicalInput = Source | PublicStreamReader | CanonicalNode;
+/** What canonicalize reads: a source, a cursor or a delegate over one, or a DOM node. */
+export type CanonicalInput = Source | PublicStreamReader | StreamReaderDelegate | CanonicalNode;
 
-/** Canonicalizes a document read from a source or a cursor, or a DOM node as a document subset. */
+/**
+ * Canonicalizes a document read from a source; a reader from where it stands, the whole document or,
+ * at a start tag, that element as a document subset; or a DOM node as a document subset.
+ */
 export function canonicalize(input: CanonicalInput, options: CanonicalizeOptions & { output: 'bytes' }): Uint8Array;
 export function canonicalize(input: CanonicalInput, options?: CanonicalizeOptions): string;
 export function canonicalize(input: CanonicalInput, options: CanonicalizeOptions = {}): string | Uint8Array {
   const method = options.method ?? 'c14n';
-  const isSuiteForm = method === 'suite-first' || method === 'suite-second';
   let text: string;
   if (isNode(input)) {
-    if (isSuiteForm)
-      throw ErrorFactory.create(TypeError, `${method} is a form of documents read from a source, not of DOM nodes`);
-    text = new TreeCanonicalizer(input, method, options).write(input);
+    text = treeForm(input, method, options);
   } else {
-    const reader = isReader(input) ? (input as StreamReader) : readerFor(input, options.factory, isSuiteForm);
-    text = isSuiteForm
-      ? new SuiteForm(reader, method === 'suite-second').write()
-      : new CanonicalXML(reader, method === 'exc-c14n', options).write();
+    const reader = isReader(input) ? (input as StreamReader) : readerFor(input, options, 'sync');
+    text = formOf(reader, method, options, 'sync').write();
   }
   return options.output === 'bytes' ? new TextEncoder().encode(text) : text;
 }
 
+/**
+ * Canonicalizes as `canonicalize` does, reading a stream, or an asynchronous reader, as its input
+ * arrives.
+ *
+ * ```ts
+ * const canonical = await canonicalizeAsync(createReadStream('order.xml'));
+ * ```
+ */
+export function canonicalizeAsync(
+  input: CanonicalInput | AsyncStreamReader,
+  options: CanonicalizeOptions & { output: 'bytes' }
+): Promise<Uint8Array>;
+export function canonicalizeAsync(
+  input: CanonicalInput | AsyncStreamReader,
+  options?: CanonicalizeOptions
+): Promise<string>;
+export async function canonicalizeAsync(
+  input: CanonicalInput | AsyncStreamReader,
+  options: CanonicalizeOptions = {}
+): Promise<string | Uint8Array> {
+  const method = options.method ?? 'c14n';
+  let text: string;
+  if (isNode(input)) {
+    text = treeForm(input, method, options);
+  } else {
+    const reader = isReader(input) ? (input as StreamReader) : readerFor(input, options, 'async');
+    // The form needs the document's encoding and version, known once its start is read.
+    // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
+    for (; reader.eventType() === EventType.NEED_INPUT; reader.next()) await reader.fill();
+    text = await formOf(reader, method, options, 'async').writeAsync();
+  }
+  return options.output === 'bytes' ? new TextEncoder().encode(text) : text;
+}
+
+/** Whether a method is one of the XML suite's forms. */
+function isSuiteForm(method: CanonicalMethod): method is 'suite-first' | 'suite-second' {
+  return method === 'suite-first' || method === 'suite-second';
+}
+
+/** The canonical form of a DOM node; the suite's forms are of documents read from a source only. */
+function treeForm(node: CanonicalNode, method: CanonicalMethod, options: CanonicalizeOptions): string {
+  if (isSuiteForm(method))
+    throw ErrorFactory.create(
+      InvalidArgumentError,
+      `${method} is a form of documents read from a source, not of DOM nodes`
+    );
+  return new TreeCanonicalizer(node, method, options).write(node);
+}
+
+/** What writes a method's form of what a reader reads. */
+function formOf(
+  reader: StreamReader,
+  method: CanonicalMethod,
+  options: CanonicalizeOptions,
+  mode: ReadingMode
+): CanonicalXML | SuiteForm {
+  return isSuiteForm(method)
+    ? new SuiteForm(reader, method === 'suite-second', mode)
+    : new CanonicalXML(reader, method, options, mode);
+}
+
+/** Whether a form's input is all there, or arrives over time. */
+type ReadingMode = 'sync' | 'async';
+
+/** The reader options the Canonical XML forms need of a reader they are given. */
+const CANONICAL_NEEDS = { namespaceAware: true, replaceEntityReferences: true };
+
+/** The cursor options canonicalization reads with. */
+const READER_OVERRIDES = {
+  namespaceAware: true,
+  namespacePrefixes: false,
+  replaceEntityReferences: true,
+  supportExternalEntities: true,
+  coalescing: false,
+  reportEntityBoundaries: false,
+};
+
+/** The cursor options the suite's forms read with, which report namespace declarations as attributes. */
+const SUITE_READER_OVERRIDES = { ...READER_OVERRIDES, namespacePrefixes: true };
+
 /** A cursor that expands entities and applies defaults; the suite's forms also report namespace declarations as attributes. */
-function readerFor(source: Source, factory: XMLInputFactory | undefined, isSuiteForm: boolean): StreamReader {
-  return (factory ?? new XMLInputFactory())[CREATE_READER](
-    source,
-    {
-      namespaceAware: true,
-      namespacePrefixes: isSuiteForm,
-      replaceEntityReferences: true,
-      supportExternalEntities: true,
-      coalescing: false,
-      reportEntityBoundaries: false,
-    },
-    false
-  );
+function readerFor(source: Source, options: CanonicalizeOptions, mode: ReadingMode): StreamReader {
+  const overrides = isSuiteForm(options.method ?? 'c14n') ? SUITE_READER_OVERRIDES : READER_OVERRIDES;
+  return (options.factory ?? new XMLInputFactory())[CREATE_READER](source, overrides, mode === 'async');
 }
 
 /** Fails canonicalization at the cursor's location. */
@@ -106,31 +180,51 @@ function fail(reader: StreamReader, code: ErrorCode, message: string): never {
 }
 
 /**
- * Canonical XML 1.0 and 1.1, and Exclusive Canonicalization, of a whole document read through a
- * cursor. The two inclusive forms differ only for document subsets, so they agree here.
+ * Canonical XML 1.0 and 1.1, and Exclusive Canonicalization, of what a cursor reads from where it
+ * stands: a whole document, or one element as a document subset. The element is then the apex,
+ * which declares every namespace in scope and, for the inclusive forms, takes on its ancestors'
+ * `xml:` attributes, as a DOM element canonicalized on its own does.
  */
 class CanonicalXML extends Canonicalizer {
+  readonly #input: ReaderInput;
   readonly #reader: StreamReader;
-  /** The namespaces in scope, per open element, innermost last. */
+  /** The namespaces in scope, per open element, innermost last; first, those around the apex. */
   readonly #namespacesInScope: ReadonlyMap<string, string>[] = [new Map([['', '']])];
   /** The namespaces declared in the output, per open element, innermost last. */
   readonly #namespacesRendered: ReadonlyMap<string, string>[] = [new Map([['', '']])];
   #sawRoot = false;
-  /** The number of open elements. */
-  #elementDepth = 0;
 
-  constructor(reader: StreamReader, exclusive: boolean, options: CanonicalizeOptions) {
-    super(exclusive, options, reader.encoding());
+  constructor(reader: StreamReader, method: CanonicalXMLMethod, options: CanonicalizeOptions, mode: ReadingMode) {
+    super(method, options, reader.declaredEncoding() ?? reader.encoding());
+    this.#input = new ReaderInput(reader, { consumer: 'canonicalize', mode, needs: CANONICAL_NEEDS });
     this.#reader = reader;
   }
 
-  /** Reads the document to its end and returns its canonical form. */
+  /** Reads the document, or the element, to its end and returns its canonical form. */
   write(): string {
+    const input = this.#input;
+    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) this.#writeEvent(event);
+    return this.output;
+  }
+
+  /** As `write`, waiting for input as it is needed. */
+  async writeAsync(): Promise<string> {
+    const input = this.#input;
+    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) {
+      // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
+      if (event === EventType.NEED_INPUT) await this.#reader.fill();
+      else this.#writeEvent(event);
+    }
+    return this.output;
+  }
+
+  /** The first event, with the namespaces an element read on its own sits in; XML 1.1 has no canonical form. */
+  #first(): EventType {
     const reader = this.#reader;
     if (reader.version() === '1.1') fail(reader, ErrorCode.C14N_VERSION, 'Canonical XML is not defined for XML 1.1');
-    for (let event = reader.eventType(); event !== EventType.END_DOCUMENT; event = reader.next())
-      this.#writeEvent(event);
-    return this.output;
+    const event = this.#input.first();
+    this.#namespacesInScope[0] = new Map([['', ''], ...this.#input.inherited]);
+    return event;
   }
 
   /** Writes one event's canonical form, and refuses what cannot be canonicalized. */
@@ -148,7 +242,8 @@ class CanonicalXML extends Canonicalizer {
       case EventType.CHARACTERS:
       case EventType.CDATA:
       case EventType.SPACE: {
-        if (this.#elementDepth > 0) this.writeCharacters(reader.text());
+        // Only inside the root: the input passes over whitespace outside it.
+        this.writeCharacters(reader.text());
         break;
       }
       case EventType.COMMENT: {
@@ -160,15 +255,12 @@ class CanonicalXML extends Canonicalizer {
         break;
       }
       case EventType.DTD: {
-        if (!reader[DTD_COMPLETE]) fail(reader, ErrorCode.C14N_UNREAD, 'Part of the DTD could not be read');
+        if (!cursorOf(reader)[DTD_COMPLETE]) fail(reader, ErrorCode.C14N_UNREAD, 'Part of the DTD could not be read');
         break;
       }
       case EventType.ENTITY_REFERENCE: {
         fail(reader, ErrorCode.C14N_UNREAD, `The entity ${reader.name()} could not be read`);
         break;
-      }
-      case EventType.NEED_INPUT: {
-        throw ErrorFactory.create(TypeError, 'canonicalize needs a synchronous reader');
       }
       default:
     }
@@ -176,22 +268,23 @@ class CanonicalXML extends Canonicalizer {
 
   /** Writes a comment or PI; outside the root element it gets a line of its own. */
   #writeCommentOrPI(markup: string): void {
-    if (this.#elementDepth > 0) this.output += markup;
+    if (this.#input.depth > 0) this.output += markup;
     else if (this.#sawRoot) this.output += `\n${markup}`;
     else this.output += `${markup}\n`;
   }
 
-  /** Writes a start tag and opens its element's namespace scope. */
+  /** Writes a start tag and opens its element's namespace scope; the apex renders every namespace in scope. */
   #startElement(): void {
     const reader = this.#reader;
     this.#sawRoot = true;
-    this.#elementDepth++;
-    const scope = this.#startTagScope();
+    const isApex = this.#input.depth === 1;
+    const scope = this.#startTagScope(isApex);
     this.#namespacesInScope.push(scope);
-    const attributes = this.#sortedAttributes();
-    const candidates = this.isExclusive
-      ? this.usedPrefixes(reader.prefix(), attributes, scope)
-      : declaredPrefixes(reader);
+    const ancestors = isApex ? cursorOf(reader)[ANCESTOR_XML_ATTRIBUTES]() : undefined;
+    const attributes = this.sortedAttributes(this.#attributes(), ancestors);
+    const candidates = this.candidatePrefixes(isApex, scope, reader.prefix(), attributes, () =>
+      declaredPrefixes(reader)
+    );
     const parentRendered = this.#namespacesRendered.at(-1) as ReadonlyMap<string, string>;
     this.#namespacesRendered.push(this.writeStartTag(reader.name(), candidates, scope, parentRendered, attributes));
   }
@@ -201,23 +294,26 @@ class CanonicalXML extends Canonicalizer {
     this.output += `</${this.#reader.name()}>`;
     this.#namespacesInScope.pop();
     this.#namespacesRendered.pop();
-    this.#elementDepth--;
   }
 
-  /** The namespaces in scope on the start tag: the parent's, with the tag's declarations, which must be absolute. */
-  #startTagScope(): ReadonlyMap<string, string> {
+  /** The namespaces in scope on the start tag: the parent's, with the tag's declarations; the apex's must all be absolute. */
+  #startTagScope(isApex: boolean): ReadonlyMap<string, string> {
     const reader = this.#reader;
-    for (let i = 0; i < reader.namespaceCount(); i++) {
-      const uri = reader.namespaceURI(i);
-      if (uri !== '' && !hasScheme(uri)) {
-        fail(reader, ErrorCode.C14N_RELATIVE_NAMESPACE, `The namespace URI ${uri} is relative`);
-      }
-    }
-    return namespacesInScope(this.#namespacesInScope.at(-1) as ReadonlyMap<string, string>, reader);
+    const parentScope = this.#namespacesInScope.at(-1) as ReadonlyMap<string, string>;
+    if (isApex) for (const uri of parentScope.values()) this.#requireAbsolute(uri);
+    for (let i = 0; i < reader.namespaceCount(); i++) this.#requireAbsolute(reader.namespaceURI(i));
+    return namespacesInScope(parentScope, reader);
   }
 
-  /** The start tag's attributes, without namespace declarations, sorted. */
-  #sortedAttributes(): CanonicalAttribute[] {
+  /** Refuses a relative namespace URI, as canonicalization must. */
+  #requireAbsolute(uri: string): void {
+    if (uri !== '' && !hasScheme(uri)) {
+      fail(this.#reader, ErrorCode.C14N_RELATIVE_NAMESPACE, `The namespace URI ${uri} is relative`);
+    }
+  }
+
+  /** The start tag's attributes, without namespace declarations. */
+  #attributes(): CanonicalAttribute[] {
     const reader = this.#reader;
     const attributes: CanonicalAttribute[] = [];
     for (let i = 0; i < reader.attributeCount(); i++) {
@@ -225,7 +321,7 @@ class CanonicalXML extends Canonicalizer {
       if (uri !== XMLNS_NAMESPACE)
         attributes.push([uri, reader.attributeLocalName(i), reader.attributeName(i), reader.attributeValue(i)]);
     }
-    return sortAttributes(attributes);
+    return attributes;
   }
 }
 
@@ -237,6 +333,7 @@ class CanonicalXML extends Canonicalizer {
  */
 class SuiteForm {
   readonly #reader: StreamReader;
+  readonly #input: ReaderInput;
   readonly #isSecondForm: boolean;
   readonly #version11: boolean;
   /** The DTD's notations, written in the second form's DOCTYPE. */
@@ -246,24 +343,45 @@ class SuiteForm {
   /** What was written before the root element, where the DOCTYPE goes; undefined until the root starts. */
   #outputBeforeRoot: string | undefined;
   #rootName = '';
-  /** The number of open elements. */
-  #elementDepth = 0;
 
-  constructor(reader: StreamReader, isSecondForm: boolean) {
+  constructor(reader: StreamReader, isSecondForm: boolean, mode: ReadingMode) {
     this.#reader = reader;
+    this.#input = new ReaderInput(reader, { consumer: 'canonicalize', mode });
     this.#isSecondForm = isSecondForm;
     this.#version11 = reader.version() === '1.1';
   }
 
-  /** Reads the document to its end and returns its form. */
+  /** Reads the document to its end and returns its form; the forms are of whole documents only. */
   write(): string {
-    const reader = this.#reader;
-    for (let event = reader.eventType(); event !== EventType.END_DOCUMENT; event = reader.next())
-      this.#writeEvent(event);
+    const input = this.#input;
+    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) this.#writeEvent(event);
+    return this.#form();
+  }
+
+  /** As `write`, waiting for input as it is needed. */
+  async writeAsync(): Promise<string> {
+    const input = this.#input;
+    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) {
+      // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
+      if (event === EventType.NEED_INPUT) await this.#reader.fill();
+      else this.#writeEvent(event);
+    }
+    return this.#form();
+  }
+
+  /** The first event; the forms are of whole documents only. */
+  #first(): EventType {
+    const event = this.#input.first();
+    if (this.#input.isElement)
+      throw ErrorFactory.create(InvalidArgumentError, 'The suite forms are of whole documents, not of elements');
+    return event;
+  }
+
+  /** The form, once the document is read. */
+  #form(): string {
     const declaration = this.#version11 ? '<?xml version="1.1"?>' : '';
-    return this.#outputBeforeRoot === undefined
-      ? declaration + this.#output
-      : declaration + this.#outputBeforeRoot + this.#notationDoctype() + this.#output;
+    // The input has checked that the document has a root, which set what goes before it.
+    return declaration + (this.#outputBeforeRoot as string) + this.#notationDoctype() + this.#output;
   }
 
   /** Writes one event's form; the DTD's processing instructions are written, and its notations kept for the DOCTYPE. */
@@ -276,13 +394,13 @@ class SuiteForm {
       }
       case EventType.END_ELEMENT: {
         this.#output += `</${reader.name()}>`;
-        this.#elementDepth--;
         break;
       }
       case EventType.CHARACTERS:
       case EventType.CDATA:
       case EventType.SPACE: {
-        if (this.#elementDepth > 0) this.#output += this.#escape(reader.text());
+        // Only inside the root: the input passes over whitespace outside it.
+        this.#output += this.#escape(reader.text());
         break;
       }
       case EventType.PROCESSING_INSTRUCTION: {
@@ -314,7 +432,6 @@ class SuiteForm {
     let tag = `<${reader.name()}`;
     for (const [name, value] of attributes) tag += ` ${name}="${this.#escape(value)}"`;
     this.#output += `${tag}>`;
-    this.#elementDepth++;
   }
 
   /** Text with markup characters and whitespace, and in XML 1.1 control characters, written as references. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { joinURIReferences, removeDotSegments } from '@/base.ts';
+import { joinURIReferences, removeDotSegments } from '@/base';
 
 describe('removeDotSegments, as Canonical XML 1.1 modifies it (C14N 1.1 §2.4, Appendix A)', () => {
   it.each([

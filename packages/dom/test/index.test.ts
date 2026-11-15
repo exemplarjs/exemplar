@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DocumentBuilder } from '@/builder.ts';
-import { DOMConfiguration, DOMError, DOMLocator, DOMStringList } from '@/config.ts';
-import * as dom from '@/index.ts';
-import * as nodes from '@/nodes/index.ts';
-import { DOMParser, PARSER_ERROR_NAMESPACE, XMLSerializer } from '@/parser.ts';
+import { DocumentBuilder } from '@/builder';
+import { DOMConfiguration, DOMError, DOMLocator, DOMStringList } from '@/config';
+import * as dom from '@/index';
+import * as nodes from '@/nodes/index';
+import { DOMParser, PARSER_ERROR_NAMESPACE, XMLSerializer } from '@/parser';
 
 describe('the package entry point', () => {
   it('exports the builder, the browser-style entry points and the configuration classes', () => {

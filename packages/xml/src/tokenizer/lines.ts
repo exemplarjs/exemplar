@@ -1,6 +1,6 @@
-import type { Location } from '../errors/xml-error.ts';
-import { lastIndexAtOrBefore } from '../util/arrays.ts';
-import { Char } from '../util/chars.ts';
+import type { Location } from '@/errors/xml-error';
+import { lastIndexAtOrBefore } from '@/util/arrays';
+import { Char } from '@/util/chars';
 import { Needle, type SearchCache } from './search.ts';
 import type { Tokenizer } from './tokenizer.ts';
 

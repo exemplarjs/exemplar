@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { StreamReaderDelegate } from '@/filters/delegate.ts';
-import { EventType, XMLInputFactory } from '@/index.ts';
-import type { AsyncStreamReader as StreamReader } from '@/index.ts';
+import type { StreamReader as Cursor } from '@/cursor/stream-reader';
+import { cursorOf, StreamReaderDelegate } from '@/filters/delegate';
+import { IllegalStateError } from '@/index';
+import type { AsyncStreamReader as StreamReader } from '@/index';
+import { EventType, XMLInputFactory } from '@/index';
 
 /** Every method a delegate forwards, with the arguments to call it with. */
 const CALLS: readonly (readonly [keyof StreamReaderDelegate & keyof StreamReader, ...unknown[]])[] = [
@@ -24,7 +26,6 @@ const CALLS: readonly (readonly [keyof StreamReaderDelegate & keyof StreamReader
   ['attributeType', 0],
   ['isAttributeSpecified', 0],
   ['attributeValue', 0],
-  ['attributeValue', 'urn:p', 'x'],
   ['text'],
   ['isWhitespace'],
   ['piTarget'],
@@ -34,14 +35,9 @@ const CALLS: readonly (readonly [keyof StreamReaderDelegate & keyof StreamReader
   ['encoding'],
   ['standalone'],
   ['location'],
-  ['nextTag'],
-  ['elementText'],
   ['fill'],
   ['feed', new Uint8Array(0)],
   ['endOfInput'],
-  ['nextTagAsync'],
-  ['elementTextAsync'],
-  ['forEachEvent', () => undefined],
 ];
 
 /** A parent that records each call and returns its name. */
@@ -71,6 +67,85 @@ describe('StreamReaderDelegate (StAX StreamReaderDelegate)', () => {
     expect(result).toBe(`result of ${method}`);
   });
 
+  it('moves between tags and reads element text through its own next(), so an override of next() applies', () => {
+    class NoComments extends StreamReaderDelegate {
+      override next(): EventType {
+        let type = super.next();
+        while (type === EventType.COMMENT) type = super.next();
+        return type;
+      }
+    }
+
+    const reader = new NoComments(new XMLInputFactory().createStreamReader('<a><b>x<!--c-->y</b><!--d--><c/></a>'));
+    expect([reader.nextTag(), reader.nextTag(), reader.elementText()]).toEqual([
+      EventType.START_ELEMENT,
+      EventType.START_ELEMENT,
+      'xy',
+    ]);
+    expect([reader.nextTag(), reader.localName()]).toEqual([EventType.START_ELEMENT, 'c']);
+  });
+
+  it('skips an element through its own next, from a whole document or an asynchronous parent', async () => {
+    const factory = new XMLInputFactory();
+    const reader = new StreamReaderDelegate(factory.createStreamReader('<a><b><c/></b><d/></a>'));
+    reader.nextTag();
+    reader.nextTag();
+    reader.skipElement();
+    expect([reader.eventType(), reader.localName()]).toEqual([EventType.END_ELEMENT, 'b']);
+    const waiting = new StreamReaderDelegate(
+      factory.createAsyncStreamReader(new TextEncoder().encode('<a><b><c/></b><d/></a>'))
+    );
+    await waiting.nextTagAsync();
+    await waiting.skipElementAsync();
+    expect([waiting.eventType(), waiting.localName()]).toEqual([EventType.END_ELEMENT, 'a']);
+  });
+
+  it('moves between tags, reads element text and visits every event of an asynchronous parent', async () => {
+    const factory = new XMLInputFactory();
+    const reader = new StreamReaderDelegate(
+      factory.createAsyncStreamReader(new TextEncoder().encode('<a><b>x</b></a>'))
+    );
+    expect([await reader.nextTagAsync(), await reader.nextTagAsync(), await reader.elementTextAsync()]).toEqual([
+      EventType.START_ELEMENT,
+      EventType.START_ELEMENT,
+      'x',
+    ]);
+    const visited: [EventType, StreamReaderDelegate][] = [];
+    await reader.forEachEvent((type, at) => visited.push([type, at]));
+    expect(visited).toEqual([
+      [EventType.END_ELEMENT, reader],
+      [EventType.END_DOCUMENT, reader],
+    ]);
+  });
+
+  it('forwards to another delegate', () => {
+    class Upper extends StreamReaderDelegate {
+      override text(): string {
+        return super.text().toUpperCase();
+      }
+    }
+
+    const reader = new StreamReaderDelegate(new Upper(new XMLInputFactory().createStreamReader('<a>x</a>')));
+    expect([reader.next(), reader.next(), reader.text()]).toEqual([EventType.START_ELEMENT, EventType.CHARACTERS, 'X']);
+  });
+
+  it('gives consumers the cursor at the bottom of a chain of delegates, for its internal hooks', () => {
+    const cursor = new XMLInputFactory().createStreamReader('<a/>') as Cursor;
+    const delegate = new StreamReaderDelegate(new StreamReaderDelegate(cursor));
+    expect(cursorOf(delegate)).toBe(cursor);
+    expect(cursorOf(cursor)).toBe(cursor);
+  });
+
+  it('refuses to read before it has a parent, and reads once it is given one', () => {
+    const delegate = new StreamReaderDelegate();
+    expect(() => delegate.next()).toThrow(
+      new IllegalStateError('The delegate has no parent to read yet: set its parent first')
+    );
+    expect(() => cursorOf(delegate).next()).toThrow(IllegalStateError);
+    delegate.parent = new XMLInputFactory().createStreamReader('<a/>');
+    expect(delegate.next()).toBe(EventType.START_ELEMENT);
+  });
+
   it('forwards to a new parent once it is replaced', () => {
     const delegate = new StreamReaderDelegate(new XMLInputFactory().createStreamReader('<a/>'));
     delegate.parent = new XMLInputFactory().createStreamReader('<b/>');
@@ -83,7 +158,7 @@ describe('StreamReaderDelegate (StAX StreamReaderDelegate)', () => {
         '<?xml version="1.0"?><!DOCTYPE p:a><p:a xmlns:p="urn:p" p:x="1"><?t d?> <b>text</b></p:a>'
       )
     );
-    expect([reader.version(), reader.encoding(), reader.standalone(), reader.hasNext()]).toEqual([
+    expect([reader.version(), reader.declaredEncoding(), reader.standalone(), reader.hasNext()]).toEqual([
       '1.0',
       undefined,
       undefined,
@@ -109,7 +184,7 @@ describe('StreamReaderDelegate (StAX StreamReaderDelegate)', () => {
       'CDATA',
       true,
     ]);
-    expect([reader.attributeValue(0), reader.attributeValue('urn:p', 'x')]).toEqual(['1', '1']);
+    expect([reader.attributeValue(0), reader.attribute('x', 'urn:p')]).toEqual(['1', '1']);
     expect([reader.next(), reader.piTarget(), reader.piData()]).toEqual([EventType.PROCESSING_INSTRUCTION, 't', 'd']);
     expect([reader.next(), reader.isWhitespace(), reader.text()]).toEqual([EventType.CHARACTERS, true, ' ']);
     expect([reader.nextTag(), reader.elementText(), reader.eventType()]).toEqual([
@@ -132,14 +207,32 @@ describe('StreamReaderDelegate (StAX StreamReaderDelegate)', () => {
         return super.localName().toUpperCase();
       }
     }
+
     const reader = new Upper(new XMLInputFactory().createStreamReader('<a x="1">t</a>'));
-    expect([reader.next(), reader.localName(), reader.attributeValue(0), reader.attributeValue('', 'x')]).toEqual([
+    expect([reader.next(), reader.localName(), reader.attributeValue(0), reader.attribute('x')]).toEqual([
       EventType.START_ELEMENT,
       'A',
       '1',
       '1',
     ]);
     expect([reader.next(), reader.text()]).toEqual([EventType.CHARACTERS, 't']);
+  });
+
+  it('finds an attribute by name through its own accessors, so the lookup gives what an override gives', () => {
+    class Doubled extends StreamReaderDelegate {
+      override attributeValue(index: number): string {
+        return super.attributeValue(index).repeat(2);
+      }
+    }
+
+    const reader = new Doubled(new XMLInputFactory().createStreamReader('<a x="1" p:y="2" xmlns:p="urn:p"/>'));
+    reader.next();
+    expect([
+      reader.attribute('x'),
+      reader.attribute('y', 'urn:p'),
+      reader.attribute('y'),
+      reader.attribute('z'),
+    ]).toEqual(['11', '22', undefined, undefined]);
   });
 
   it('forwards feeding and waiting to an asynchronous parent', async () => {

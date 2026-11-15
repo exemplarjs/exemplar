@@ -1,9 +1,9 @@
-import { canonical } from '@test/helpers/parse.ts';
-import { SINGLE_BYTE_TABLES } from '@/encodings/tables.ts';
-import { type InputOptions, type Source, XMLError } from '@/index.ts';
-import { PENDING, type TextSource } from '@/input/source.ts';
-import { ScanError } from '@/scan/scanner.ts';
-import { Token, Tokenizer, type TokenizerOptions } from '@/tokenizer/tokenizer.ts';
+import { canonical } from '@test/helpers/parse';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
+import { type InputOptions, type Source, XMLError } from '@/index';
+import { PENDING, type TextSource } from '@/input/source';
+import { ScanError } from '@/scan/scanner';
+import { Token, Tokenizer, type TokenizerOptions } from '@/tokenizer/tokenizer';
 
 /** Bytes from their values. */
 export function bytes(...values: number[]): Uint8Array {

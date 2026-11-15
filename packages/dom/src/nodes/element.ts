@@ -1,6 +1,6 @@
-import { XML_NAMESPACE, escapeAndResolveURI } from '@exemplarjs/xml/internal';
-import { checkName, checkQualifiedName, fail, orNull } from '../names.ts';
-import { NodeType } from '../node-type.ts';
+import { escapeAndResolveURI, XML_NAMESPACE } from '@exemplarjs/xml/internal';
+import { checkName, checkQualifiedName, fail, orNull } from '@/names';
+import { NodeType } from '@/node-type';
 import { Attr } from './attr.ts';
 import type { Document } from './document.ts';
 import { NamedNodeMap, type NodeList } from './lists.ts';
@@ -93,12 +93,19 @@ export class Element extends NamedNode {
     return elementBase(this);
   }
 
-  getAttribute(name: string): string {
-    return this.getAttributeNode(name)?.value ?? '';
+  /** The value of an attribute; null when there is none, or `''` under `missingAttribute: 'empty'`. */
+  getAttribute(name: string): string | null {
+    return this.getAttributeNode(name)?.value ?? this.#missingAttribute();
   }
 
-  getAttributeNS(namespaceURI: string | null, localName: string): string {
-    return this.getAttributeNodeNS(namespaceURI, localName)?.value ?? '';
+  /** The value of an attribute by namespace and local name, as `getAttribute` gives it. */
+  getAttributeNS(namespaceURI: string | null, localName: string): string | null {
+    return this.getAttributeNodeNS(namespaceURI, localName)?.value ?? this.#missingAttribute();
+  }
+
+  /** What the document's implementation gives for a missing attribute. */
+  #missingAttribute(): string | null {
+    return (this._owner as Document).implementation._missingAttribute;
   }
 
   hasAttribute(name: string): boolean {

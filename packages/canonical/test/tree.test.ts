@@ -1,9 +1,9 @@
-import { element, failure, fakeTree, present, tree } from '@test/helpers/c14n.ts';
+import { element, failure, fakeTree, present, tree } from '@test/helpers/c14n';
 import { describe, expect, it } from 'vitest';
 import { DocumentBuilder } from '@exemplarjs/dom';
 import { ErrorCode, XMLInputFactory } from '@exemplarjs/xml';
-import { type CanonicalMethod, canonicalize } from '@/index.ts';
-import { isNode } from '@/tree.ts';
+import { canonicalize, type CanonicalMethod } from '@/index';
+import { isNode } from '@/tree';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -234,11 +234,7 @@ describe('canonicalize: plain node-like trees', () => {
   });
 
   it('takes a declaration without a value as undeclaring', () => {
-    const node = fakeTree({
-      type: 1,
-      name: 'e',
-      attributes: [{ type: 2, name: 'xmlns', value: null }],
-    });
+    const node = fakeTree({ type: 1, name: 'e', attributes: [{ type: 2, name: 'xmlns', value: null }] });
     expect(canonicalize(node)).toBe('<e></e>');
   });
 

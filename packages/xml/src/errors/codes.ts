@@ -13,8 +13,6 @@ export const ErrorCode = {
   ENCODING_UTF16_WITHOUT_BOM: 'ENCODING_UTF16_WITHOUT_BOM',
   /** An encoding supplied from outside, such as an HTTP charset, overrides a different declared one (a warning). */
   ENCODING_CONFLICT: 'ENCODING_CONFLICT',
-  /** A text declaration, `<?xml encoding="…"?>`, that isn't at the start of its entity. */
-  TEXT_DECLARATION_MISPLACED: 'TEXT_DECLARATION_MISPLACED',
 
   // Characters and line ends (§2.2, §2.11)
   /** A character the XML version doesn't allow in the document, such as a C0 control in XML 1.0. */
@@ -136,11 +134,19 @@ export const ErrorCode = {
   /** XML 1.1 text that is not fully normalized, with `checkNormalization` on (a warning). */
   NOT_FULLY_NORMALIZED: 'NOT_FULLY_NORMALIZED',
 
+  // DTD declarations that are ignored (warnings)
+  /** A second declaration of an entity, which is ignored (a warning). */
+  DTD_DUPLICATE_ENTITY: 'DTD_DUPLICATE_ENTITY',
+  /** A second declaration of an element's attribute, which is ignored (a warning). */
+  DTD_DUPLICATE_ATTRIBUTE: 'DTD_DUPLICATE_ATTRIBUTE',
+
   // Configuration and external access
   /** A DOCTYPE, with `disallowDoctype` on. */
   DOCTYPE_DISALLOWED: 'DOCTYPE_DISALLOWED',
   /** For a resolver to throw, in a ResolutionError, when it fails to supply what it was asked for. */
   RESOLVER_FAILED: 'RESOLVER_FAILED',
+  /** A read the access lists allow, with no resolver or catalog to do it. */
+  RESOLVER_MISSING: 'RESOLVER_MISSING',
   /** A read the access lists do not allow: `accessExternalDTD` or `accessExternalEntities` must name its protocol. */
   ACCESS_REFUSED: 'ACCESS_REFUSED',
 
@@ -243,8 +249,10 @@ export const ErrorCode = {
   XINCLUDE_TEXT: 'XINCLUDE_TEXT',
   /** XInclude: unparsed entities or notations of one name declared differently. */
   XINCLUDE_DECLARATION: 'XINCLUDE_DECLARATION',
-  /** Catalogs: nothing matches a reference, under `resolve: 'strict'`. */
+  /** Catalogs: nothing matches a reference, under `resolution: 'strict'`. */
   CATALOG_NO_MATCH: 'CATALOG_NO_MATCH',
+  /** Catalogs: one of the catalog files the resolver was given cannot be read. */
+  CATALOG_UNREADABLE: 'CATALOG_UNREADABLE',
   /** Catalogs: a catalog file leads back to itself through nextCatalog or delegation. */
   CATALOG_CIRCULAR: 'CATALOG_CIRCULAR',
 } as const;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { type Locator, SAXParser, type SAXHandler } from '@/index.ts';
+import { type Locator, type SAXHandler, SAXParser } from '@/index';
 
 /** A handler that notes, at each element start and end, the locator's line and column. */
 function positions(): { handler: SAXHandler; seen: string[] } {
@@ -173,10 +173,12 @@ describe('the SAX locator during an error', () => {
     const factory = new XMLInputFactory();
     const ways: string[][] = [];
     const bytes = new TextEncoder().encode(xml);
+
     // eslint-disable-next-line require-await -- an async source, so the parser takes its asynchronous path
     async function* chunks(): AsyncGenerator<Uint8Array> {
       for (let i = 0; i < bytes.length; i++) yield bytes.subarray(i, i + 1);
     }
+
     for (const parse of [
       (h: SAXHandler) =>
         new Promise<void>((resolve) => {

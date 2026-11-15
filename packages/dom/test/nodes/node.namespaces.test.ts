@@ -1,14 +1,14 @@
-import { build, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
 import {
   type Attr,
-  DOMImplementation,
   type Document,
   type DocumentType,
+  DOMImplementation,
   type Element,
   type Node,
   type Text,
-} from '@/index.ts';
+} from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 

@@ -1,12 +1,12 @@
-import type { ResolvedOptions } from '../config/options.ts';
-import { DeclarationStore } from '../dtd/store.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import { checkDeclaredEncoding } from '../input/detect.ts';
-import type { OpenedSource } from '../input/source.ts';
-import { scanError, ScanFlag } from '../scan/scanner.ts';
-import { Token, type Tokenizer } from '../tokenizer/tokenizer.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { isWhitespaceSpan } from '../util/whitespace.ts';
+import type { ResolvedOptions } from '@/config/options';
+import { DeclarationStore } from '@/dtd/store';
+import { ErrorCode } from '@/errors/codes';
+import { checkDeclaredEncoding } from '@/input/detect';
+import type { OpenedSource } from '@/input/source';
+import { scanError, ScanFlag } from '@/scan/scanner';
+import { Token, type Tokenizer } from '@/tokenizer/tokenizer';
+import { ErrorFactory, IllegalStateError } from '@/util/errors';
+import { isWhitespaceSpan } from '@/util/whitespace';
 import type { AsyncInput } from './async-input.ts';
 import type { AttributeCollector } from './attribute-collector.ts';
 import type { DtdLoader } from './dtd-loader.ts';
@@ -173,7 +173,7 @@ export class EventCore {
   /** Moves on from the end of the document, an entity's text, or a token that waited for a resolver. */
   private [ADVANCE_AFTER](): EventType {
     if (this.#resumeToken === RESUME_FAILED) throw this.#endedBy;
-    if (this.event === EventType.END_DOCUMENT) throw ErrorFactory.create(Error, 'There are no more events');
+    if (this.event === EventType.END_DOCUMENT) throw ErrorFactory.create(IllegalStateError, 'There are no more events');
     if (this.literalText !== undefined) this[END_LITERAL]();
     if (this.#resumeToken !== 0) {
       const event = this[RESUME_OR_START]();
@@ -185,6 +185,11 @@ export class EventCore {
   /** As in StAX, a call that fails leaves the reader at its last event, so an element whose end it was comes back. */
   recover(): void {
     if (this.event === EventType.END_ELEMENT && !this.#leavePending && this.#elements.justLeft) this[REENTER_ELEMENT]();
+  }
+
+  /** Whether an error has ended the document. */
+  get failed(): boolean {
+    return this.#resumeToken === RESUME_FAILED;
   }
 
   /** Ends the document at an error: no more events, and every later call throws it again (§1.2). */

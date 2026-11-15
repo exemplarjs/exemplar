@@ -1,7 +1,7 @@
-import { build, children, newDocument, serialize } from '@test/helpers/dom.ts';
+import { build, children, newDocument, serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { DOMError } from '@/config.ts';
-import { type Document, Element } from '@/index.ts';
+import { DOMError } from '@/config';
+import { type Document, Element } from '@/index';
 
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
 

@@ -2,23 +2,25 @@ import {
   type CatalogProcessor,
   ErrorCode,
   EventType,
+  IllegalStateError,
   type Resolution,
   ResolutionError,
   type ResolvedSource,
   type Source,
 } from '@exemplarjs/xml';
 import {
-  type ByteStream,
-  type ResolvedOptions,
-  resolveURI,
   accessAllows,
+  accessRefusedError,
+  type ByteStream,
+  ErrorFactory,
   escapeURI,
   orElse,
   readStream,
-  accessRefusedError,
+  type ResolvedOptions,
+  resolverMissingError,
+  resolveURI,
   unmatchedByCatalog,
 } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
 
 /** A resource that cannot be included, which a fallback may stand in for. */
 export class ResourceError extends Error {
@@ -79,7 +81,13 @@ export function findResource(options: ResolvedOptions, href: string, base: strin
     catalog === undefined
       ? fromResolvers
       : orElse(fromResolvers, () => askCatalog(options, catalog, escaped, base, headers));
-  if (source === undefined) throw ErrorFactory.create(ResourceError, `No resolver supplies ${uri}`);
+  if (source === undefined) {
+    // With nothing to read it, an include the access list allows is a mistake in the setup, not in the document.
+    const hasNoResolver = options.uriResolver === undefined && options.entityResolver === undefined;
+    if (hasNoResolver && catalog === undefined && accessAllows(options.accessExternalEntities, uri))
+      throw resolverMissingError(uri);
+    throw ErrorFactory.create(ResourceError, `No resolver supplies ${uri}`);
+  }
   return { uri, source };
 }
 
@@ -184,7 +192,10 @@ export class Pending {
   /** NEED_INPUT; asked again before `fill()`, it throws rather than return it for ever. */
   #needInput(): number {
     if (this.#returnedNeedInput)
-      throw ErrorFactory.create(Error, 'The reader needs more input: await fill() before calling next() again');
+      throw ErrorFactory.create(
+        IllegalStateError,
+        'The reader needs more input: await fill() before calling next() again'
+      );
     this.#returnedNeedInput = true;
     return EventType.NEED_INPUT;
   }

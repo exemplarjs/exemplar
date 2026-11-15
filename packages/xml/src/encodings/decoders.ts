@@ -1,24 +1,28 @@
-import type { Decoder } from '../input/decoders.ts';
-import { NO_BYTES, concatBytes, isAscii } from '../util/bytes.ts';
-import { Char, Unicode, highSurrogateOf, isHighSurrogate, isLowSurrogate, lowSurrogateOf } from '../util/chars.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { SINGLE_BYTE_TABLES } from './tables.ts';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
+import type { Decoder } from '@/input/decoders';
+import { BYTE_BITS, BYTE_VALUES, concatBytes, isAscii, NO_BYTES } from '@/util/bytes';
+import {
+  Char,
+  highSurrogateOf,
+  isHighSurrogate,
+  isLowSurrogate,
+  isSurrogate,
+  lowSurrogateOf,
+  SURROGATE_PAIR_LENGTH,
+  Unicode,
+} from '@/util/chars';
+import { ErrorFactory } from '@/util/errors';
 
 // Module-level constants, so V8 can inline them.
-const { HIGH_SURROGATE_FIRST, LOW_SURROGATE_LAST, SUPPLEMENTARY_FIRST, LAST_CODE_POINT } = Unicode;
+const { SUPPLEMENTARY_FIRST, LAST_CODE_POINT } = Unicode;
 const { NON_ASCII } = Char;
 
-/** How many values a byte takes, and so how many entries a table for every byte holds. */
-const BYTE_VALUES = 256;
-/** How many bits a byte holds. */
-const BYTE_BITS = 8;
-
-/** The value a single-byte table gives a byte the encoding leaves undefined: U+FFFF, which no encoding maps to. */
-const UNDEFINED_BYTE = 0xff_ff;
+/** The value an encoding table gives a byte sequence the encoding leaves undefined: U+FFFF, which no encoding maps to. */
+export const UNDEFINED_CHARACTER = 0xff_ff;
 
 /** How many bytes a code unit takes in UTF-32 and in UTF-16. */
-const UTF32_UNIT_BYTES = 4;
-const UTF16_UNIT_BYTES = 2;
+export const UTF32_UNIT_BYTES = 4;
+export const UTF16_UNIT_BYTES = 2;
 
 /** Thrown by exemplar's own decoders at bytes their encoding doesn't allow. */
 export class DecodeError extends TypeError {
@@ -76,7 +80,7 @@ class SingleByteDecoder implements Decoder {
     const units = new Uint16Array(bytes.length);
     for (let i = 0; i < bytes.length; i++) {
       const unit = table[bytes[i] as number] as number;
-      if (unit === UNDEFINED_BYTE) throw ErrorFactory.create(DecodeError, this.#name, unitsToString(units, i));
+      if (unit === UNDEFINED_CHARACTER) throw ErrorFactory.create(DecodeError, this.#name, unitsToString(units, i));
       units[i] = unit;
     }
     return unitsToString(units, bytes.length);
@@ -113,17 +117,17 @@ export class Utf32Decoder implements Decoder {
   #decodeWholeUnits(input: Uint8Array, end: number): string {
     const [shift1, shift2, shift3, shift4] = this.#shifts as [number, number, number, number];
     // Room for two UTF-16 code units per character, as a surrogate pair needs.
-    const units = new Uint16Array((end / UTF32_UNIT_BYTES) * 2);
+    const units = new Uint16Array((end / UTF32_UNIT_BYTES) * SURROGATE_PAIR_LENGTH);
     let length = 0;
-    for (let i = 0; i < end; i += UTF32_UNIT_BYTES) {
-      // Read unsigned, so a top byte of 0x80 or more makes the value too large rather than negative.
+    for (let pos = 0; pos < end;) {
+      // Reads the unit's four bytes in turn, unsigned, so a top byte of 0x80 or more makes the value too large.
       const codePoint =
-        (((input[i] as number) << shift1) |
-          ((input[i + 1] as number) << shift2) |
-          ((input[i + 2] as number) << shift3) |
-          ((input[i + 3] as number) << shift4)) >>>
+        (((input[pos++] as number) << shift1) |
+          ((input[pos++] as number) << shift2) |
+          ((input[pos++] as number) << shift3) |
+          ((input[pos++] as number) << shift4)) >>>
         0;
-      if (codePoint > LAST_CODE_POINT || (codePoint >= HIGH_SURROGATE_FIRST && codePoint <= LOW_SURROGATE_LAST)) {
+      if (codePoint > LAST_CODE_POINT || isSurrogate(codePoint)) {
         throw ErrorFactory.create(DecodeError, this.#name, unitsToString(units, length));
       }
       if (codePoint >= SUPPLEMENTARY_FIRST) {
@@ -194,7 +198,7 @@ export class Utf16Decoder implements Decoder {
     if (!isHighSurrogate(unit)) return UTF16_UNIT_BYTES;
     const low = pos + UTF16_UNIT_BYTES;
     const paired = low + UTF16_UNIT_BYTES <= bytes.length && isLowSurrogate(this.#codeUnitAt(bytes, low));
-    return paired ? 2 * UTF16_UNIT_BYTES : 0;
+    return paired ? SURROGATE_PAIR_LENGTH * UTF16_UNIT_BYTES : 0;
   }
 }
 

@@ -1,11 +1,11 @@
-import { DecodeError, withCarry } from '../encodings/decoders.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import { grown } from '../util/arrays.ts';
-import { NO_BYTES } from '../util/bytes.ts';
-import { Char, Unicode, isSurrogate } from '../util/chars.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { type Decoder, type DecoderRegistry, canonicalEncoding } from './decoders.ts';
-import { type Detection, detect } from './detect.ts';
+import { DecodeError, withCarry } from '@/encodings/decoders';
+import { ErrorCode } from '@/errors/codes';
+import { canonicalEncoding, type Decoder, type DecoderRegistry } from '@/input/decoders';
+import { detect, type Detection } from '@/input/detect';
+import { grown } from '@/util/arrays';
+import { NO_BYTES } from '@/util/bytes';
+import { Char, isSurrogate, Unicode } from '@/util/chars';
+import { AsyncReaderRequiredError, ErrorFactory, IllegalStateError, InvalidArgumentError } from '@/util/errors';
 
 /** A document given with where it came from. Give its content in exactly one of `text`, `bytes`, `chunks` or `stream`. */
 export interface SourceObject {
@@ -45,6 +45,7 @@ export type Chunk<T> = T | undefined | typeof PENDING;
 export interface TextSource {
   /** Returns the next chunk, undefined at the end, or PENDING when more input has yet to arrive. */
   read(): Chunk<string>;
+
   /** What detection found; undefined for text given as a string. */
   readonly detection: Detection | undefined;
 }
@@ -112,13 +113,10 @@ class StringSource implements TextSource {
   }
 }
 
-/** U+FEFF, the byte-order mark. */
-const BYTE_ORDER_MARK = 0xfe_ff;
-
 /** A document given as a string, whose leading U+FEFF is skipped as a byte-order mark is. */
 function stringDocument(text: string): StringSource {
   // eslint-disable-next-line prefer-code-point -- U+FEFF is one code unit
-  return new StringSource(text.charCodeAt(0) === BYTE_ORDER_MARK ? text.slice(1) : text);
+  return new StringSource(text.charCodeAt(0) === Char.BYTE_ORDER_MARK ? text.slice(1) : text);
 }
 
 /**
@@ -133,6 +131,9 @@ const Utf8 = {
   CONTINUATION_MASK: 0xc0,
   PAYLOAD_MASK: 0x3f,
   PAYLOAD_BITS: 6,
+  /** How many bytes a two-, three- and four-byte sequence takes; four is the longest. */
+  TWO_BYTES: 2,
+  THREE_BYTES: 3,
   LONGEST: 4,
 } as const;
 
@@ -141,9 +142,15 @@ const MAX_HELD_BYTES = Utf8.LONGEST - 1;
 
 /** UTF-8's well-formed multi-byte sequences (Unicode Table 3-7): the lead bytes and code points of each length. */
 const UTF8_SEQUENCES = [
-  { length: 2, leadFirst: 0xc2, leadLast: 0xdf, first: Char.NON_ASCII, last: 0x7_ff },
-  { length: 3, leadFirst: 0xe0, leadLast: 0xef, first: 0x8_00, last: 0xff_ff },
-  { length: 4, leadFirst: 0xf0, leadLast: 0xf4, first: Unicode.SUPPLEMENTARY_FIRST, last: Unicode.LAST_CODE_POINT },
+  { length: Utf8.TWO_BYTES, leadFirst: 0xc2, leadLast: 0xdf, first: Char.NON_ASCII, last: 0x7_ff },
+  { length: Utf8.THREE_BYTES, leadFirst: 0xe0, leadLast: 0xef, first: 0x8_00, last: 0xff_ff },
+  {
+    length: Utf8.LONGEST,
+    leadFirst: 0xf0,
+    leadLast: 0xf4,
+    first: Unicode.SUPPLEMENTARY_FIRST,
+    last: Unicode.LAST_CODE_POINT,
+  },
 ] as const;
 
 /** Whether a byte continues a UTF-8 sequence rather than starting one. */
@@ -159,7 +166,8 @@ function sequenceLength(bytes: Uint8Array, pos: number): number {
   if (sequence === undefined) return 0;
   const codePoint = sequenceValue(bytes, pos, sequence.length);
   // Below its first code point, a sequence is an overlong form of a shorter one.
-  return codePoint >= sequence.first && codePoint <= sequence.last && !isSurrogate(codePoint) ? sequence.length : 0;
+  if (codePoint < sequence.first || codePoint > sequence.last || isSurrogate(codePoint)) return 0;
+  return sequence.length;
 }
 
 /** The code point the `length` bytes at `pos` encode, or -1 where a continuation byte is missing or wrong. */
@@ -187,9 +195,10 @@ function utf8ValidLength(bytes: Uint8Array): number {
 
 /** How many bytes the UTF-8 character that a lead byte starts takes. */
 function utf8CharLength(lead: number): number {
-  if (lead >= Utf8.FOUR_BYTE_LEAD) return 4;
-  if (lead >= Utf8.THREE_BYTE_LEAD) return 3;
-  return lead >= Utf8.TWO_BYTE_LEAD ? 2 : 1;
+  if (lead >= Utf8.FOUR_BYTE_LEAD) return Utf8.LONGEST;
+  if (lead >= Utf8.THREE_BYTE_LEAD) return Utf8.THREE_BYTES;
+  if (lead >= Utf8.TWO_BYTE_LEAD) return Utf8.TWO_BYTES;
+  return 1;
 }
 
 /** The bytes ending well-formed UTF-8 that start a character not yet complete, which a streaming decoder holds back. */
@@ -230,7 +239,7 @@ export class ChunkQueue implements ByteChunks {
 
   /** Adds a chunk. */
   push(chunk: Uint8Array): void {
-    if (this.#ended) throw ErrorFactory.create(Error, 'Input has already ended');
+    if (this.#ended) throw ErrorFactory.create(IllegalStateError, 'Input has already ended');
     this.#chunks.push(chunk);
     this.#wake();
   }
@@ -393,6 +402,16 @@ function originOf(object: SourceObject): { systemId?: string; publicId?: string;
   };
 }
 
+/** Refuses a source object that gives its content more than once. */
+function checkOneContent(object: SourceObject): void {
+  const given = [object.text, object.bytes, object.chunks, object.stream].filter((content) => content !== undefined);
+  if (given.length > 1)
+    throw ErrorFactory.create(
+      InvalidArgumentError,
+      'A source object has one of text, bytes, chunks or a stream, not several'
+    );
+}
+
 /** The encoding a source object names, in canonical form. */
 function externalEncoding(object: SourceObject): string | undefined {
   return object.encoding === undefined ? undefined : canonicalEncoding(object.encoding);
@@ -421,16 +440,18 @@ export function openSource(source: Source, registry: DecoderRegistry): OpenedSou
   if (typeof source === 'string') return { text: stringDocument(source) };
   if (source instanceof Uint8Array) return { text: byteSource([source], registry) };
   if (hasMethod(source, Symbol.iterator)) return { text: byteSource(source as Iterable<Uint8Array>, registry) };
-  if (isStream(source)) throw ErrorFactory.create(TypeError, 'An asynchronous source needs an asynchronous reader');
+  if (isStream(source))
+    throw ErrorFactory.create(AsyncReaderRequiredError, 'An asynchronous source needs an asynchronous reader');
   const object = source as SourceObject;
+  checkOneContent(object);
   const origin = originOf(object);
   const external = externalEncoding(object);
   if (object.text !== undefined) return { ...origin, text: stringDocument(object.text) };
   if (object.bytes !== undefined) return { ...origin, text: byteSource([object.bytes], registry, external) };
   if (object.chunks !== undefined) return { ...origin, text: byteSource(object.chunks, registry, external) };
   if (object.stream !== undefined)
-    throw ErrorFactory.create(TypeError, 'An asynchronous source needs an asynchronous reader');
-  throw ErrorFactory.create(TypeError, 'A source object needs text, bytes, chunks or a stream');
+    throw ErrorFactory.create(AsyncReaderRequiredError, 'An asynchronous source needs an asynchronous reader');
+  throw ErrorFactory.create(InvalidArgumentError, 'A source object needs text, bytes, chunks or a stream');
 }
 
 /** An asynchronous stream of bytes. */
@@ -485,6 +506,7 @@ export async function readStream(stream: ByteStream): Promise<Uint8Array> {
   const read = chunkReaderOf(stream);
   const chunks: Uint8Array[] = [];
   let length = 0;
+  // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
   for (let chunk = await read(); chunk !== undefined; chunk = await read()) {
     chunks.push(chunk);
     length += chunk.length;
@@ -507,6 +529,7 @@ export function openAsyncSource(source: Source | undefined, registry: DecoderReg
   }
   if (!isSourceObject(source) || source.stream === undefined)
     return { opened: openSource(source, registry), queue: undefined, pump: undefined };
+  checkOneContent(source);
   const queue = new ChunkQueue();
   const text = new ByteSource(queue, registry, externalEncoding(source));
   return { opened: { ...originOf(source), text }, queue, pump: streamPump(source.stream, queue) };

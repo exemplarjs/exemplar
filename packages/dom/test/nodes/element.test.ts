@@ -1,6 +1,7 @@
-import { build, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { Attr, type Document, type Element } from '@/index.ts';
+import { XMLInputFactory } from '@exemplarjs/xml';
+import { Attr, type Document, DocumentBuilder, DOMImplementation, type Element } from '@/index';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 
@@ -45,16 +46,29 @@ describe('Element', () => {
 describe('Element.getAttribute and friends (DOM Level 2)', () => {
   const r = build('<r a="1" xmlns:p="urn:p" p:b="2"/>').documentElement as Element;
 
-  it('gives an attribute value by name, the empty string when there is none', () => {
-    expect([r.getAttribute('a'), r.getAttribute('p:b'), r.getAttribute('missing')]).toEqual(['1', '2', '']);
+  it('gives an attribute value by name, null when there is none', () => {
+    expect([r.getAttribute('a'), r.getAttribute('p:b'), r.getAttribute('missing')]).toEqual(['1', '2', null]);
   });
 
-  it('gives an attribute value by namespace and local name, the empty string when there is none', () => {
+  it('gives an attribute value by namespace and local name, null when there is none', () => {
     expect([r.getAttributeNS('urn:p', 'b'), r.getAttributeNS(null, 'a'), r.getAttributeNS('urn:p', 'a')]).toEqual([
       '2',
       '1',
+      null,
+    ]);
+  });
+
+  it('gives the empty string for a missing attribute when its builder or implementation says so', () => {
+    const builder = new DocumentBuilder(new XMLInputFactory(), { missingAttribute: 'empty' });
+    const built = builder.parse('<r a=""/>').documentElement as Element;
+    expect([built.getAttribute('a'), built.getAttribute('b'), built.getAttributeNS('urn:p', 'b')]).toEqual([
+      '',
+      '',
       '',
     ]);
+    const made = new DOMImplementation({ missingAttribute: 'empty' }).createDocument(null, 'r', null);
+    expect(made.documentElement?.getAttribute('b')).toBe('');
+    expect(new DOMImplementation().createDocument(null, 'r', null).documentElement?.getAttribute('b')).toBeNull();
   });
 
   it('says whether it has an attribute by name or by namespace', () => {

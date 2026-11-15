@@ -1,4 +1,4 @@
-import type { Location } from '../errors/xml-error.ts';
+import type { Location } from '@/errors/xml-error';
 import type { EntityStack } from './entity-stack.ts';
 import type { EventCore } from './event-core.ts';
 import { EventType } from './event-type.ts';
@@ -236,7 +236,9 @@ export class EventProcessing {
     const validation = this.validation as DocumentValidator;
     this.#core.event = event;
     if (event === EventType.CHARACTERS || event === EventType.CDATA) {
-      return validation.text(event) && event === EventType.CHARACTERS ? EventType.SPACE : event;
+      // The validator sees every text event; character data it calls ignorable becomes SPACE.
+      if (validation.text(event) && event === EventType.CHARACTERS) return EventType.SPACE;
+      return event;
     }
     if (event === EventType.START_ELEMENT) validation.startElement();
     else if (event === EventType.END_ELEMENT) validation.endElement();

@@ -1,13 +1,14 @@
-import { expandAttributeValue, normalizeTokens } from '../entities/attribute-value.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import { Char, isPubidText } from '../util/chars.ts';
-import { PREDEFINED_ENTITIES } from '../util/references.ts';
-import { isWhitespaceChar, normalizePublicId } from '../util/whitespace.ts';
-import { readContentModel } from './content-model.ts';
-import type { AttributeDeclaration, AttributeType, DefaultMode, EntityDeclaration } from './declarations.ts';
-import { expandEntityValue } from './entity-value.ts';
-import { type DtdContext, DtdInput, type Frame } from './input.ts';
-import type { DeclarationStore } from './store.ts';
+import { readContentModel } from '@/dtd/content-model';
+import type { AttributeDeclaration, AttributeType, DefaultMode, EntityDeclaration } from '@/dtd/declarations';
+import { expandEntityValue } from '@/dtd/entity-value';
+import { type DtdContext, DtdInput, type Frame } from '@/dtd/input';
+import type { DeclarationStore } from '@/dtd/store';
+import { expandAttributeValue, normalizeTokens } from '@/entities/attribute-value';
+import { ErrorCode } from '@/errors/codes';
+import { DECLARATION_OPEN_LENGTH, PI_CLOSE_LENGTH, PI_OPEN_LENGTH } from '@/tokenizer/syntax';
+import { Char, isPubidText } from '@/util/chars';
+import { PREDEFINED_ENTITIES } from '@/util/references';
+import { isWhitespaceChar, normalizePublicId } from '@/util/whitespace';
 
 // Module-level constants, so V8 can inline them.
 const { APOSTROPHE, DOUBLE_QUOTE, GREATER_THAN, LEFT_BRACKET, LEFT_PAREN, PERCENT, RIGHT_PAREN, VERTICAL_BAR } = Char;
@@ -84,7 +85,7 @@ export class DtdParser {
   /** Reads one markup declaration, comment, PI or conditional section, chosen by its third character. */
   #readMarkupDeclaration(): void {
     const input = this.#input;
-    switch (input.startsWith('<!') ? input.charAhead(2) : -1) {
+    switch (input.startsWith('<!') ? input.charAhead(DECLARATION_OPEN_LENGTH) : -1) {
       case UPPER_E: {
         if (input.startsWith('<!ENTITY')) return this.#readDeclaration('<!ENTITY', () => this.#readEntityDeclaration());
         if (input.startsWith('<!ELEMENT'))
@@ -161,7 +162,12 @@ export class DtdParser {
       const [type, values] = this.#readAttributeType();
       this.#input.requireWhitespace();
       const declaration = this.#readDefaultDeclaration(element, name, type, values);
-      if (!this.#store.stoppedApplying) this.#store.declareAttribute(declaration);
+      if (!this.#store.stoppedApplying && !this.#store.declareAttribute(declaration)) {
+        this.#input.reportWarning(
+          ErrorCode.DTD_DUPLICATE_ATTRIBUTE,
+          `The attribute ${name} of ${element} is declared more than once; the first declaration is used`
+        );
+      }
     }
   }
 
@@ -203,7 +209,7 @@ export class DtdParser {
   ): AttributeDeclaration {
     const input = this.#input;
     const declaredExternally = input.isInExternal();
-    // In AttributeDeclaration's property order, which reads faster (design.md, DTD).
+    // In AttributeDeclaration's property order, so that every declaration shares one hidden class.
     const declared = { element, name, type, ...(values !== undefined && { values }) };
     if (input.readKeyword('#REQUIRED')) return { ...declared, mode: 'REQUIRED', declaredExternally };
     if (input.readKeyword('#IMPLIED')) return { ...declared, mode: 'IMPLIED', declaredExternally };
@@ -212,12 +218,7 @@ export class DtdParser {
     const mode: DefaultMode = fixed ? 'FIXED' : 'DEFAULT';
     const literal = input.readLiteral('default value');
     const value = this.#normalizeDefaultValue(literal.value, literal.frame, literal.start);
-    return {
-      ...declared,
-      mode,
-      value: type === 'CDATA' ? value : normalizeTokens(value),
-      declaredExternally,
-    };
+    return { ...declared, mode, value: type === 'CDATA' ? value : normalizeTokens(value), declaredExternally };
   }
 
   /** Normalizes a default value as an attribute value is, failing at the literal. */
@@ -250,12 +251,7 @@ export class DtdParser {
     const char = this.#input.currentChar();
     let declaration: EntityDeclaration;
     if (char === DOUBLE_QUOTE || char === APOSTROPHE) {
-      declaration = {
-        name,
-        isParameterEntity,
-        value: this.#readEntityValue(),
-        declaredExternally,
-      };
+      declaration = { name, isParameterEntity, value: this.#readEntityValue(), declaredExternally };
     } else {
       const id = this.#readExternalId(false);
       const notation = isParameterEntity ? undefined : this.#readNdata();
@@ -268,8 +264,12 @@ export class DtdParser {
         declaredExternally,
       };
     }
-    if (!this.#store.stoppedApplying && !(declaration.isParameterEntity === false && PREDEFINED_ENTITIES.has(name))) {
-      this.#store.declareEntity(declaration);
+    const isPredefined = declaration.isParameterEntity === false && PREDEFINED_ENTITIES.has(name);
+    if (!this.#store.stoppedApplying && !isPredefined && !this.#store.declareEntity(declaration)) {
+      this.#input.reportWarning(
+        ErrorCode.DTD_DUPLICATE_ENTITY,
+        `The entity ${name} is declared more than once; the first declaration is used`
+      );
     }
   }
 
@@ -348,7 +348,7 @@ export class DtdParser {
   /** `<?target …?>`, in one frame; the target must not be xml. */
   #readPi(): void {
     const frame = this.#input.currentFrame();
-    frame.pos += 2;
+    frame.pos += PI_OPEN_LENGTH;
     const target = this.#input.readName('a processing instruction target');
     if (target.toLowerCase() === 'xml') {
       const code = target === 'xml' ? ErrorCode.WF_XML_DECLARATION_MISPLACED : ErrorCode.WF_PI_TARGET_XML;
@@ -365,7 +365,7 @@ export class DtdParser {
     this.#input.skipWhitespace();
     const data = frame.text.slice(frame.pos, end);
     this.#store.addProcessingInstruction(target, this.#input.normalizeLineEndsOf(frame, data));
-    frame.pos = end + 2;
+    frame.pos = end + PI_CLOSE_LENGTH;
   }
 
   /** `<![INCLUDE[ … ]]>` or `<![IGNORE[ … ]]>`, allowed only outside the internal subset (§3.4). */

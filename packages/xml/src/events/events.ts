@@ -1,8 +1,8 @@
-import { EventType } from '../cursor/event-type.ts';
-import { EVENT_OFFSET, EVENT_POSITION, copyString } from '../cursor/internal.ts';
-import type { Doctype, StreamReader } from '../cursor/stream-reader.ts';
-import type { Location } from '../errors/xml-error.ts';
-import { LineSegment } from '../tokenizer/lines.ts';
+import { EventType } from '@/cursor/event-type';
+import { copyString, EVENT_OFFSET, EVENT_POSITION } from '@/cursor/internal';
+import type { Doctype, StreamReader } from '@/cursor/stream-reader';
+import type { Location } from '@/errors/xml-error';
+import { LineSegment } from '@/tokenizer/lines';
 
 /** A namespace-qualified name, as StAX's `QName` is: `xs:element` in the namespace `xs` is bound to. */
 export class QName {
@@ -72,7 +72,7 @@ export interface StartDocumentEvent extends EventBase {
   readonly type: typeof EventType.START_DOCUMENT;
   /** The version the XML declaration names, if there is one. */
   readonly version: string | undefined;
-  /** The encoding the XML declaration names, or else the one detection chose. */
+  /** The encoding the XML declaration names, or else the one detected from its bytes; undefined for text that names none. */
   readonly encoding: string | undefined;
   /** The XML declaration's `standalone`, if it has one. */
   readonly standalone: boolean | undefined;
@@ -91,6 +91,7 @@ export interface StartElementEvent extends EventBase {
   readonly attributes: readonly Attribute[];
   /** The namespaces the start tag declares. */
   readonly namespaces: readonly Namespace[];
+
   /** The attribute with a local name and namespace URI, `''` for none. */
   attribute(localName: string, namespaceURI?: string): Attribute | undefined;
 }
@@ -166,20 +167,21 @@ export type XMLEvent =
 const QNAME_CACHE_SIZE = 4096;
 
 /** No attributes and no namespaces, shared so that events without them allocate nothing. */
-const NO_ATTRIBUTES: readonly Attribute[] = Object.freeze([]);
-const NO_NAMESPACES: readonly Namespace[] = Object.freeze([]);
+export const NO_ATTRIBUTES: readonly Attribute[] = Object.freeze([]);
+export const NO_NAMESPACES: readonly Namespace[] = Object.freeze([]);
 
 /** An element's name, or a PI's target or an entity's name. */
-type EventName = QName | string | undefined;
+export type EventName = QName | string | undefined;
 
 /** The DOCTYPE for DTD events, or the XML declaration's values for START_DOCUMENT. */
-type EventDetails = Doctype | DocumentDetails | undefined;
+export type EventDetails = Doctype | DocumentDetails | undefined;
 
 /**
  * Every kind of event, as one class. Code that handles events then sees one object shape, which V8
- * optimizes better than a class per kind; the getters give each kind's own properties.
+ * optimizes better than a class per kind; the getters give each kind's own properties. The event
+ * builder and `XMLEventFactory` make them. @internal
  */
-class Event {
+export class Event {
   readonly type: EventType;
   readonly name: EventName;
   readonly attributes: readonly Attribute[];
@@ -240,7 +242,7 @@ class Event {
     return this.type === EventType.START_DOCUMENT ? (this.details as DocumentDetails).version : undefined;
   }
 
-  /** For START_DOCUMENT, the encoding the XML declaration names, or else the one detection chose. */
+  /** For START_DOCUMENT, the encoding the XML declaration names, or else the one detected from its bytes; undefined for text that names none. */
   get encoding(): string | undefined {
     return this.type === EventType.START_DOCUMENT ? (this.details as DocumentDetails).encoding : undefined;
   }
@@ -278,10 +280,10 @@ export class EventBuilder {
   /** Element names seen so far, by qualified name, up to QNAME_CACHE_SIZE. */
   readonly #qnames = new Map<string, QName>();
 
-  /** The event the cursor is at, as an object; `type` is the cursor's current event type. */
-  build(reader: StreamReader, type: EventType): XMLEvent {
-    const where = reader[EVENT_POSITION]();
-    const offset = reader[EVENT_OFFSET];
+  /** The event `reader` is at, as an object; `cursor` is the one it reads with, which says where the event is. */
+  build(reader: StreamReader, cursor: StreamReader, type: EventType): XMLEvent {
+    const where = cursor[EVENT_POSITION]();
+    const offset = cursor[EVENT_OFFSET];
     let name: EventName;
     let attributes = NO_ATTRIBUTES;
     let namespaces = NO_NAMESPACES;
@@ -324,7 +326,11 @@ export class EventBuilder {
         break;
       }
       case EventType.START_DOCUMENT: {
-        details = { version: reader.version(), encoding: reader.encoding(), standalone: reader.standalone() };
+        details = {
+          version: reader.version(),
+          encoding: reader.declaredEncoding() ?? reader.encoding(),
+          standalone: reader.standalone(),
+        };
         break;
       }
       default:

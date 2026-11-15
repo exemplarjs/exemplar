@@ -1,5 +1,5 @@
 import type { AsyncStreamReader, StreamReader } from '@exemplarjs/xml';
-import { XML_NAMESPACE, escapeAndResolveURI, namespacesInScope } from '@exemplarjs/xml/internal';
+import { resolveEscapedTargetURI, namespacesInScope, XML_NAMESPACE } from '@exemplarjs/xml/internal';
 
 /** The namespace bindings in scope, by prefix. */
 export type Namespaces = ReadonlyMap<string, string>;
@@ -82,5 +82,6 @@ export class ScopeStack {
 
 /** An element's base URI: its xml:base made absolute against its parent's, or else the parent's. */
 function baseOf(base: string | undefined, parentBase: string): string {
-  return base === undefined ? parentBase : (escapeAndResolveURI(base, parentBase || undefined) ?? base);
+  if (base === undefined) return parentBase;
+  return resolveEscapedTargetURI(base, parentBase || undefined);
 }

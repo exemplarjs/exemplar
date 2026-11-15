@@ -1,6 +1,6 @@
-import { build } from '@test/helpers/dom.ts';
+import { build } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { DOMImplementation, type Document, type DocumentType } from '@/index.ts';
+import { type Document, type DocumentType, DOMImplementation } from '@/index';
 
 const DTD = `<!DOCTYPE r PUBLIC "-//P//EN" "r.dtd" [
 <!ENTITY t "text">

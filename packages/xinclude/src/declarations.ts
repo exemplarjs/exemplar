@@ -6,7 +6,7 @@ import type {
   NotationDeclaration,
   StreamReader,
 } from '@exemplarjs/xml';
-import { escapeAndResolveURI } from '@exemplarjs/xml/internal';
+import { resolveEscapedTargetURI } from '@exemplarjs/xml/internal';
 
 /** A document's unparsed entities and notations: those it declares, and those included content has brought in. */
 export class Declarations {
@@ -100,5 +100,5 @@ function sameExternalId(
 function resolvedSystemId(declaration: EntityDeclaration | NotationDeclaration): string | undefined {
   const { systemId, baseURI } = declaration;
   if (systemId === undefined) return undefined;
-  return escapeAndResolveURI(systemId, baseURI) ?? systemId;
+  return resolveEscapedTargetURI(systemId, baseURI);
 }

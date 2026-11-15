@@ -1,20 +1,22 @@
-import { errorOf, parseEveryWay } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 import {
-  Char,
-  Unicode,
+  byCodePoint,
   byCodeUnit,
+  Char,
   codePointLabel,
   codePointOf,
   highSurrogateOf,
   holdsNonChar,
+  isAsciiDigit,
   isChar,
   isHighSurrogate,
   isLowSurrogate,
   isRestrictedChar,
   isSurrogate,
   lowSurrogateOf,
-} from '@/util/chars.ts';
+  Unicode,
+} from '@/util/chars';
 
 /** The character each named code unit stands for. */
 const CHARACTERS: Record<keyof typeof Char, string> = {
@@ -57,10 +59,13 @@ const CHARACTERS: Record<keyof typeof Char, string> = {
   LOWER_X: 'x',
   LOWER_Z: 'z',
   VERTICAL_BAR: '|',
+  TILDE: '~',
   DELETE: '\u007F',
   NON_ASCII: '\u0080',
   NEXT_LINE: '\u0085',
+  C1_LAST: '\u009F',
   LINE_SEPARATOR: '\u2028',
+  BYTE_ORDER_MARK: '\uFEFF',
   NONCHARACTER_FFFE: '\uFFFE',
   NONCHARACTER_FFFF: '\uFFFF',
 };
@@ -93,6 +98,19 @@ describe('surrogates', () => {
 
   it('names the ends of the code point ranges', () => {
     expect([Unicode.SUPPLEMENTARY_FIRST, Unicode.LAST_CODE_POINT]).toEqual([0x1_00_00, 0x10_ff_ff]);
+  });
+});
+
+describe('isAsciiDigit', () => {
+  it('accepts 0 to 9 only, not other decimal digits or an absent character', () => {
+    expect(['0', '9', '/', ':', '\u0660', undefined].map((character) => isAsciiDigit(character))).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });
 
@@ -177,5 +195,17 @@ describe('holdsNonChar', () => {
 
   it('allows the C0 controls but NUL only in XML 1.1', () => {
     expect([holdsNonChar(soh, false), holdsNonChar(soh, true)]).toEqual([true, false]);
+  });
+});
+
+describe('byCodePoint', () => {
+  it('orders by code point, so a character beyond the BMP sorts after U+FFFF', () => {
+    expect(byCodePoint('a', 'a')).toBe(0);
+    expect(byCodePoint('\u{10000}', '\uFFFF')).toBe(1);
+    const [beyond, privateUse] = ['\u{1F600}', '\uE000'];
+    expect(beyond < privateUse).toBe(true);
+    expect(byCodePoint(beyond, privateUse)).toBe(1);
+    expect(byCodePoint('a\u{10000}b', 'a\u{10000}c')).toBe(-1);
+    expect(byCodePoint('ab', 'a')).toBe(1);
   });
 });

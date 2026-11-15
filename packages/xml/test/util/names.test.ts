@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isNcName, isNmtoken, isXmlName, localPartOf, prefixOf, splitQName } from '@/util/names.ts';
+import { isNcName, isNmtoken, isXmlName, lexicalQNameParts, localPartOf, prefixOf, splitQName } from '@/util/names';
 
 describe('names (§2.3 [5], [7], Namespaces [4])', () => {
   it.each([
@@ -73,5 +73,17 @@ describe('qualified names (Namespaces [7])', () => {
   it("gives a name's prefix and local part, the whole name being local when it has no colon", () => {
     expect([prefixOf('p:a'), localPartOf('p:a')]).toEqual(['p', 'a']);
     expect([prefixOf('a'), localPartOf('a')]).toEqual(['', 'a']);
+  });
+});
+
+describe('lexicalQNameParts', () => {
+  it.each([
+    ['xs:element', ['xs', 'element']],
+    ['element', ['', 'element']],
+    ['1x:element', undefined],
+    ['xs:1element', undefined],
+    [':element', undefined],
+  ])('splits %j into %j', (text, parts) => {
+    expect(lexicalQNameParts(text)).toEqual(parts);
   });
 });

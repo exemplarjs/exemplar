@@ -1,6 +1,6 @@
-import { errorOf, reader } from '@test/helpers/parse.ts';
+import { errorOf, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, type Source, XMLInputFactory } from '@/index.ts';
+import { EventType, type InputOptions, type Source, XMLInputFactory } from '@/index';
 
 const encoder = new TextEncoder();
 

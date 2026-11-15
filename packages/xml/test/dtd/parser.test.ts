@@ -1,18 +1,18 @@
-import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 import type {
   AttributeDeclaration,
   ElementDeclaration,
   EntityDeclaration,
   NotationDeclaration,
-} from '@/dtd/declarations.ts';
-import type { DtdContext, Frame } from '@/dtd/input.ts';
-import { DtdParser } from '@/dtd/parser.ts';
-import { DeclarationStore, type DtdItem } from '@/dtd/store.ts';
-import { EntityCounter } from '@/entities/limits.ts';
-import type { Location } from '@/errors/xml-error.ts';
-import { DEFAULT_LIMITS, EventType, type InputOptions, ResolutionError, type Source, XMLError } from '@/index.ts';
-import { DTD_ITEMS, accessRefusedError } from '@/internal.ts';
+} from '@/dtd/declarations';
+import type { DtdContext, Frame } from '@/dtd/input';
+import { DtdParser } from '@/dtd/parser';
+import { DeclarationStore, type DtdItem } from '@/dtd/store';
+import { EntityCounter } from '@/entities/limits';
+import type { Location } from '@/errors/xml-error';
+import { DEFAULT_LIMITS, EventType, type InputOptions, ResolutionError, type Source, XMLError } from '@/index';
+import { accessRefusedError, DTD_ITEMS } from '@/internal';
 
 /** Reads to the DTD event and returns what it reports. */
 function doctype(xml: Source, options: InputOptions = {}) {
@@ -220,7 +220,10 @@ describe('element type declarations (§3.2)', () => {
     ['<!ELEMENT a (b) *>', 'Expected > to end the declaration'],
     ['<!ELEMENT a (b ?)>', 'Expected |, , or ) in the content model'],
   ])('rejects %s', (declaration, message) => {
-    expect(errorOf(`<!DOCTYPE a [${declaration}]><a/>`)).toMatchObject({ code: 'WF_DECLARATION', message });
+    expect(errorOf(`<!DOCTYPE a [${declaration}]><a/>`)).toMatchObject({
+      code: 'WF_DECLARATION',
+      description: message,
+    });
   });
 
   it('requires QNames in content models when namespace-aware', () => {
@@ -287,7 +290,10 @@ describe('attribute-list declarations (§3.3)', () => {
     ['<!ATTLIST a b:c:d CDATA #IMPLIED>', 'NS_QNAME', undefined],
     ['<!ATTLIST b:c:d x CDATA #IMPLIED>', 'NS_QNAME', undefined],
   ])('rejects %s', (declaration, code, message) => {
-    expect(errorOf(`<!DOCTYPE a [${declaration}]><a/>`)).toMatchObject({ code, ...(message && { message }) });
+    expect(errorOf(`<!DOCTYPE a [${declaration}]><a/>`)).toMatchObject({
+      code,
+      ...(message && { description: message }),
+    });
   });
 
   it('reports a default value referring to an entity not declared before it as a validity error (§4.1)', () => {
@@ -355,7 +361,10 @@ describe('entity declarations (§4.2)', () => {
     ['<!ENTITY %e "x">', 'WF_PE_IN_INTERNAL_SUBSET', undefined],
     ['<!ENTITY 1e "x">', 'WF_DECLARATION', 'Expected an entity name'],
   ])('rejects %s', (declaration, code, message) => {
-    expect(errorOf(`<!DOCTYPE a [${declaration}]><a/>`)).toMatchObject({ code, ...(message && { message }) });
+    expect(errorOf(`<!DOCTYPE a [${declaration}]><a/>`)).toMatchObject({
+      code,
+      ...(message && { description: message }),
+    });
   });
 });
 

@@ -1,8 +1,8 @@
-import { holdsAt, sameSpan } from '../scan/scanner.ts';
-import { XML_NAMESPACE } from '../util/namespaces.ts';
+import { holdsAt, sameSpan } from '@/scan/scanner';
+import { XML_NAMESPACE } from '@/util/namespaces';
 
 /** The binding of the `xml` prefix, which is always in scope. */
-const XML_BINDING = 0;
+export const XML_BINDING = 0;
 /** The first binding of the empty prefix, to no namespace, which is in scope until a default namespace is declared. */
 const NO_DEFAULT_NAMESPACE = 1;
 /** The first binding a document declares. */
@@ -30,7 +30,7 @@ export class NamespaceBindings {
   /** Each URI once sliced, or as given when it had to be normalized; undefined until then. */
   readonly #uris: (string | undefined)[] = [XML_NAMESPACE, ''];
   /** How many bindings are in scope. */
-  count = 2;
+  count = FIRST_DECLARED;
   /** The innermost binding of the empty prefix: the default namespace. */
   defaultIndex = NO_DEFAULT_NAMESPACE;
 

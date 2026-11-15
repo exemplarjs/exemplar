@@ -4,6 +4,20 @@ export const XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
 /** The namespace of `xmlns` attributes. */
 export const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
 
+/** How the name of an attribute that declares a prefix starts, as in `xmlns:p="…"`. */
+export const XMLNS_COLON = 'xmlns:';
+
+/** The attribute name that declares a prefix: `xmlns` for the default namespace, else `xmlns:prefix`. */
+export function declarationName(prefix: string): string {
+  return prefix === '' ? 'xmlns' : `${XMLNS_COLON}${prefix}`;
+}
+
+/** The prefix an attribute with a qualified name declares, `''` for the default namespace; undefined for any other attribute. */
+export function declaredPrefixOf(qName: string): string | undefined {
+  if (qName === 'xmlns') return '';
+  return qName.startsWith(XMLNS_COLON) ? qName.slice(XMLNS_COLON.length) : undefined;
+}
+
 /**
  * The message for the namespace rule (Namespaces §3) that binding `prefix` to `uri` breaks, or
  * undefined when it breaks none. The `xml` prefix and its namespace belong only to each other, and
@@ -21,7 +35,9 @@ export function reservedBindingProblem(prefix: string, uri: string | undefined):
 /** A start tag's namespace declarations, as a reader reports them: `xmlns="…"` and `xmlns:p="…"`. */
 interface NamespaceDeclarations {
   namespaceCount(): number;
+
   namespacePrefix(index: number): string;
+
   namespaceURI(index: number): string;
 }
 

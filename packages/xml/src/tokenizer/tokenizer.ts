@@ -1,27 +1,27 @@
-import { ErrorCode } from '../errors/codes.ts';
-import type { ChunkSource } from '../input/source.ts';
-import { TABLES_XML_10, TABLES_XML_11, TABLES_REPLACEMENT_TEXT } from '../scan/classes.ts';
+import { ErrorCode } from '@/errors/codes';
+import type { ChunkSource } from '@/input/source';
+import { TABLES_REPLACEMENT_TEXT, TABLES_XML_10, TABLES_XML_11 } from '@/scan/classes';
 import {
   MORE,
+  scanAttributeValue,
   scanError,
   ScanFlag,
+  scanName,
   type ScanState,
+  scanText,
+  scanTo,
+  skipSpacesTabsAndLineFeeds,
   Terminator,
   type TerminatorKind,
-  scanAttributeValue,
-  scanName,
-  scanText,
-  skipSpacesTabsAndLineFeeds,
-  scanTo,
-} from '../scan/scanner.ts';
-import { grown } from '../util/arrays.ts';
-import { Char, isChar } from '../util/chars.ts';
+} from '@/scan/scanner';
+import { grown } from '@/util/arrays';
+import { Char, isChar } from '@/util/chars';
 import {
   CHARACTER_REFERENCE_OPEN_LENGTH,
   HEX_REFERENCE_OPEN_LENGTH,
   PREDEFINED_ENTITIES,
   readDigits,
-} from '../util/references.ts';
+} from '@/util/references';
 import { ChunkReader } from './chunk-reader.ts';
 import {
   couldStartDeclaration,
@@ -130,7 +130,7 @@ const COMMENT_CDATA_DOCTYPE_OPENERS = ['<!--', '<![CDATA[', '<!DOCTYPE'];
 const FORBIDDEN_OR_SURROGATE_XML_10 = /[\0-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/;
 /** A run of ordinary XML 1.0 character data, which needs no handling: no `<`, `&`, `]`, CR, nor what FORBIDDEN_OR_SURROGATE_XML_10 finds. */
 // oxlint-disable-next-line no-control-regex -- finding control characters is the point
-const ORDINARY_TEXT_RUN_XML_10 = /[^<&\]\r\0-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]*/y;
+const ORDINARY_TEXT_RUN_XML_10 = /[^<&\]\r\0-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]+/y;
 /** What FORBIDDEN_OR_SURROGATE_XML_10 finds, or a CR. */
 // oxlint-disable-next-line no-control-regex -- finding control characters is the point
 const FORBIDDEN_SURROGATE_OR_CR_XML_10 = /[\0-\u0008\u000B-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/;
@@ -141,9 +141,9 @@ const ABOVE_LATIN_1 = /[\u0100-\uFFFF]/;
  * whitespace to normalize, nor what FORBIDDEN_OR_SURROGATE_XML_10 finds.
  */
 // oxlint-disable-next-line no-control-regex -- finding control characters is the point
-const ORDINARY_DOUBLE_QUOTED_RUN_XML_10 = /[^"&<\0-\u001F\uD800-\uDFFF\uFFFE\uFFFF]*/y;
+const ORDINARY_DOUBLE_QUOTED_RUN_XML_10 = /[^"&<\0-\u001F\uD800-\uDFFF\uFFFE\uFFFF]+/y;
 // oxlint-disable-next-line no-control-regex -- finding control characters is the point
-const ORDINARY_SINGLE_QUOTED_RUN_XML_10 = /[^'&<\0-\u001F\uD800-\uDFFF\uFFFE\uFFFF]*/y;
+const ORDINARY_SINGLE_QUOTED_RUN_XML_10 = /[^'&<\0-\u001F\uD800-\uDFFF\uFFFE\uFFFF]+/y;
 
 /** The capacity an attribute array starts at when it first grows. */
 const FIRST_CAPACITY = 16;
@@ -656,7 +656,8 @@ export class Tokenizer implements ScanState {
     const first = text.charCodeAt(start);
     // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
     if (first === SPACE && text.charCodeAt(start + 1) > SPACE) return start + 1;
-    return first <= SPACE || first === NEXT_LINE || first === LINE_SEPARATOR ? skipWhitespace(this, start) : start;
+    if (first <= SPACE || first === NEXT_LINE || first === LINE_SEPARATOR) return skipWhitespace(this, start);
+    return start;
   }
 
   /** Scans the `>` or `/>` at `pos` that ends a start tag; `char` is the code unit there. */
@@ -692,7 +693,8 @@ export class Tokenizer implements ScanState {
     }
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
     const afterEquals = text.charCodeAt(pos + 1);
-    pos = afterEquals === DOUBLE_QUOTE || afterEquals === APOSTROPHE ? pos + 1 : skipWhitespace(this, pos + 1);
+    if (afterEquals === DOUBLE_QUOTE || afterEquals === APOSTROPHE) pos++;
+    else pos = skipWhitespace(this, pos + 1);
     if (pos === MORE) return MORE;
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
     const quote = text.charCodeAt(pos);

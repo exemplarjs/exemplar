@@ -1,4 +1,4 @@
-import { errorOf, parseEveryWay } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 
 describe('attributes (§3.1)', () => {

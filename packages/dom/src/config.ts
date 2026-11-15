@@ -1,8 +1,14 @@
-import { XMLNS_NAMESPACE, XML_NAMESPACE, holdsNonChar, isXmlName } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
+import {
+  declarationName,
+  ErrorFactory,
+  holdsNonChar,
+  isXmlName,
+  XML_NAMESPACE,
+  XMLNS_NAMESPACE,
+} from '@exemplarjs/xml/internal';
+import type { Attr, Document, Element, Node, Text } from '@/nodes';
 import { DTD_TYPES, fail, orNull } from './names.ts';
 import { NodeType } from './node-type.ts';
-import type { Attr, Document, Element, Node, Text } from './nodes/index.ts';
 
 /** A live, read-only list of strings, following DOM Level 3's DOMStringList. */
 export class DOMStringList {
@@ -141,7 +147,8 @@ export class DOMConfiguration {
     this.#checkValue(key, value);
     // Null resets a boolean parameter to its default.
     const boolean = BOOLEANS[key];
-    const set = boolean !== undefined && value === null ? boolean.initial : value;
+    const resetsBoolean = boolean !== undefined && value === null;
+    const set = resetsBoolean ? boolean.initial : value;
     if (key === 'infoset') {
       if (set === true)
         for (const [parameter, infosetValue] of Object.entries(INFOSET)) this.#values.set(parameter, infosetValue);
@@ -451,8 +458,7 @@ class Normalizer {
 
   /** Declares a namespace on an element and binds it. */
   #declare(element: Element, prefix: string, uri: string): void {
-    const name = prefix === '' ? 'xmlns' : `xmlns:${prefix}`;
-    element.setAttributeNS(XMLNS_NAMESPACE, name, uri);
+    element.setAttributeNS(XMLNS_NAMESPACE, declarationName(prefix), uri);
     this.#bindings.push({ prefix, uri: orNull(uri) });
   }
 
@@ -496,7 +502,8 @@ class Normalizer {
     let chosen = this.#prefixFor(uri);
     if (chosen === undefined) {
       // The attribute's own prefix, unless it is missing or bound to another namespace.
-      chosen = prefix === null || this.#lookup(prefix) !== undefined ? this.#generatePrefix() : prefix;
+      const keepsOwnPrefix = prefix !== null && this.#lookup(prefix) === undefined;
+      chosen = keepsOwnPrefix ? prefix : this.#generatePrefix();
       this.#declare(element, chosen, uri);
     }
     attr._name = `${chosen}:${attr._localName as string}`;

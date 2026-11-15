@@ -1,5 +1,5 @@
 import type { XMLError } from '@exemplarjs/xml';
-import type { Attributes, SAXHandler } from '@/index.ts';
+import type { Attributes, SAXHandler } from '@/index';
 
 /** Every handler method but `setDocumentLocator` and `startElement`, which the recorder writes its own way. */
 export const HANDLER_METHODS = [
@@ -38,7 +38,7 @@ function argument(a: unknown): string {
 }
 
 /** Writes a start tag's attributes as `qName=value` pairs. */
-export function attributeList(attributes: Attributes): string {
+function attributeList(attributes: Attributes): string {
   return Array.from({ length: attributes.length }, (_, i) => `${attributes.qName(i)}=${attributes.value(i)}`).join(' ');
 }
 

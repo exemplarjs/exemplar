@@ -1,8 +1,8 @@
-import { parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { AttributeList } from '@/cursor/attributes.ts';
-import { EventType, XMLError, XMLInputFactory } from '@/index.ts';
-import { NamespaceBindings } from '@/namespaces/namespaces.ts';
+import { AttributeList } from '@/cursor/attributes';
+import { EventType, XMLInputFactory } from '@/index';
+import { NamespaceBindings } from '@/namespaces/namespaces';
 
 /** Reads to the first start tag. */
 function start(xml: string, options = {}) {
@@ -87,7 +87,7 @@ describe('start tags whose attributes are listed as strings', () => {
 
   it('list a start tag whose values refer to entities, with no DTD to declare its attributes', () => {
     const r = start('<!DOCTYPE a [<!ENTITY e "v">]><a xmlns:p="u" p:x="&e;" y="&amp;"/>');
-    expect([r.attributeCount(), r.attributeValue('u', 'x'), r.attributeValue('', 'y'), r.attributeType(0)]).toEqual([
+    expect([r.attributeCount(), r.attribute('x', 'u'), r.attribute('y'), r.attributeType(0)]).toEqual([
       2,
       'v',
       '&',
@@ -97,19 +97,17 @@ describe('start tags whose attributes are listed as strings', () => {
 
   it('find attributes by namespace and local name', () => {
     const r = start(`${DTD}<a xmlns:p="u" p:d="2"/>`);
-    expect([r.attributeValue('u', 'd'), r.attributeValue('', 'd'), r.attributeValue('', 'z')]).toEqual([
-      '2',
-      '1',
-      undefined,
-    ]);
+    expect([r.attribute('d', 'u'), r.attribute('d'), r.attribute('z')]).toEqual(['2', '1', undefined]);
   });
 });
 
 describe('xml:id', () => {
-  /** The xml:id errors a document reports, with a handler that lets parsing go on. */
+  /** The xml:id warnings a document gives its handler. */
   const errors = (xml: string): string[] => {
     const codes: string[] = [];
-    const reader = new XMLInputFactory({ errorHandler: { error: (e) => codes.push(e.code) } }).createStreamReader(xml);
+    const reader = new XMLInputFactory({ errorHandler: { warning: (e) => codes.push(e.code) } }).createStreamReader(
+      xml
+    );
     while (reader.next() !== EventType.END_DOCUMENT);
     return codes;
   };
@@ -127,16 +125,18 @@ describe('xml:id', () => {
     expect(errors('<a xml:id="x"><b xml:id="y"/></a>')).toEqual([]);
   });
 
-  it('throws by default, as a validity error does', () => {
+  it('reads on by default, as after any warning', () => {
     const reader = new XMLInputFactory().createStreamReader('<a xml:id="1"/>');
-    expect(() => reader.next()).toThrow(XMLError);
+    expect(reader.next()).toBe(EventType.START_ELEMENT);
   });
 });
 
 describe('xml:id and declared IDs', () => {
   const errors = (xml: string): string[] => {
     const codes: string[] = [];
-    const reader = new XMLInputFactory({ errorHandler: { error: (e) => codes.push(e.code) } }).createStreamReader(xml);
+    const reader = new XMLInputFactory({ errorHandler: { warning: (e) => codes.push(e.code) } }).createStreamReader(
+      xml
+    );
     while (reader.next() !== EventType.END_DOCUMENT);
     return codes;
   };
@@ -153,10 +153,12 @@ describe('xml:id and declared IDs', () => {
 });
 
 describe('xml:id in listed start tags', () => {
-  /** The xml:id errors a document reports, with a handler that lets parsing go on. */
+  /** The xml:id warnings a document gives its handler. */
   const errors = (xml: string): string[] => {
     const codes: string[] = [];
-    const reader = new XMLInputFactory({ errorHandler: { error: (e) => codes.push(e.code) } }).createStreamReader(xml);
+    const reader = new XMLInputFactory({ errorHandler: { warning: (e) => codes.push(e.code) } }).createStreamReader(
+      xml
+    );
     while (reader.next() !== EventType.END_DOCUMENT);
     return codes;
   };

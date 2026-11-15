@@ -1,10 +1,10 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { type ErrorHandler, type Location, XMLError } from '../errors/xml-error.ts';
-import { DecodingFailureError, UnsupportedEncodingError } from '../input/source.ts';
-import { ResolutionError } from '../resolvers/resolver.ts';
-import { ScanError } from '../scan/scanner.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
-import { ErrorFactory } from '../util/errors.ts';
+import { ErrorCode } from '@/errors/codes';
+import { type ErrorHandler, type Location, XMLError } from '@/errors/xml-error';
+import { DecodingFailureError, UnsupportedEncodingError } from '@/input/source';
+import { ResolutionError } from '@/resolvers/resolver';
+import { ScanError } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
+import { ErrorFactory } from '@/util/errors';
 import type { EntityStack } from './entity-stack.ts';
 
 /**
@@ -19,7 +19,7 @@ export class ErrorReporter {
   readonly #handler: ErrorHandler;
   readonly #entities: EntityStack;
   /** Recoverable errors held back while an asynchronous reader may still have to read the DTD again. */
-  #deferred: XMLError[] | undefined;
+  #deferred: (() => void)[] | undefined;
   /** The error that ended the document, once there is one: a fatal error, or a recoverable one no handler took. */
   endedBy: XMLError | undefined;
 
@@ -35,7 +35,11 @@ export class ErrorReporter {
 
   /** Tells the error handler of a warning. */
   warn(code: ErrorCode, message: string, location: Location): void {
-    this.#handler.warning?.(this.#xmlError(code, message, location));
+    const handler = this.#handler;
+    if (handler.warning === undefined) return;
+    const error = this.#xmlError(code, message, location);
+    if (this.#deferred === undefined) handler.warning(error);
+    else this.#deferred.push(() => handler.warning?.(error));
   }
 
   /** Reports a recoverable error; without an error handler it is thrown, ending the document. */
@@ -45,8 +49,9 @@ export class ErrorReporter {
       this.endedBy = error;
       throw error;
     }
-    if (this.#deferred === undefined) this.#handler.error(error);
-    else this.#deferred.push(error);
+    const handler = this.#handler;
+    if (this.#deferred === undefined) handler.error?.(error);
+    else this.#deferred.push(() => handler.error?.(error));
   }
 
   /** Throws a fatal error at a location, inside the entities given too, telling the error handler first. */
@@ -73,7 +78,7 @@ export class ErrorReporter {
   releaseHeldErrors(): void {
     const errors = this.#deferred;
     this.#deferred = undefined;
-    for (const error of errors ?? []) this.#handler.error?.(error);
+    for (const report of errors ?? []) report();
   }
 
   /** Drops the errors held back, which reading the DTD again will find again. */

@@ -1,9 +1,14 @@
-import { factoryFor, failure, tree } from '@test/helpers/c14n.ts';
+import { factoryFor, failure, tree } from '@test/helpers/c14n';
 import { describe, expect, it } from 'vitest';
-import { ErrorCode, EventType, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { type CanonicalMethod, canonicalize } from '@/index.ts';
+import { ErrorCode, EventType, InvalidArgumentError, XMLError, XMLInputFactory } from '@exemplarjs/xml';
+import { StreamReaderDelegate } from '@exemplarjs/xml/filters';
+import { canonicalize, canonicalizeAsync, type CanonicalMethod } from '@/index';
 
 const INCLUSIVE: CanonicalMethod[] = ['c14n', 'c14n11'];
+/** A document whose innermost element inherits namespaces and `xml:` attributes from its ancestors. */
+const SUBSET_DOCUMENT =
+  '<a xmlns:p="urn:p" xml:lang="en" xml:base="http://e.org/x/"><b xml:space="preserve" xmlns="urn:d">' +
+  '<p:c xml:base="y/">t</p:c></b><d/></a>';
 const ALL: CanonicalMethod[] = ['c14n', 'c14n11', 'exc-c14n'];
 
 describe('canonicalize: the canonical form of a document (C14N 1.0 §1.1, C14N 1.1 §1.1)', () => {
@@ -167,6 +172,27 @@ describe('canonicalize: input', () => {
     expect(reader.eventType()).toBe(EventType.END_DOCUMENT);
   });
 
+  it('canonicalizes through a delegate, writing what its accessors answer', () => {
+    /** Upper-cases every text node. */
+    class UpperCase extends StreamReaderDelegate {
+      override text(): string {
+        return super.text().toUpperCase();
+      }
+    }
+    const reader = new XMLInputFactory().createStreamReader('<a><b>signed</b></a>');
+    expect(canonicalize(new UpperCase(reader))).toBe('<a><b>SIGNED</b></a>');
+  });
+
+  it('reads a DTD through a delegate, applying its defaults', () => {
+    const reader = new XMLInputFactory().createStreamReader('<!DOCTYPE a [<!ATTLIST a b CDATA "1">]><a/>');
+    expect(canonicalize(new StreamReaderDelegate(reader))).toBe('<a b="1"></a>');
+  });
+
+  it('fails with C14N_UNREAD through a delegate on a DTD its reader could not read', () => {
+    const reader = new XMLInputFactory().createStreamReader('<!DOCTYPE a SYSTEM "a.dtd"><a/>');
+    expect(failure(new StreamReaderDelegate(reader))).toBe(ErrorCode.C14N_UNREAD);
+  });
+
   it('drops whitespace outside the root even from a cursor that reports it', () => {
     const factory = new XMLInputFactory({ reportPrologWhitespace: true });
     expect(canonicalize(factory.createStreamReader('\n<a> </a>\n'))).toBe('<a> </a>');
@@ -178,16 +204,46 @@ describe('canonicalize: input', () => {
     expect(canonicalize(reader)).toBe('<a xmlns:p="urn:p" p:b="1"></a>');
   });
 
-  it('refuses an asynchronous cursor with a TypeError', () => {
+  it('refuses an asynchronous cursor with an InvalidArgumentError', () => {
     // @ts-expect-error -- canonicalize takes a synchronous cursor, and refuses an asynchronous one
-    expect(() => canonicalize(new XMLInputFactory().createAsyncStreamReader('<a/>'))).toThrow(TypeError);
+    expect(() => canonicalize(new XMLInputFactory().createAsyncStreamReader('<a/>'))).toThrow(InvalidArgumentError);
     // @ts-expect-error -- canonicalize takes a synchronous cursor, and refuses an asynchronous one
     expect(() => canonicalize(new XMLInputFactory().createAsyncStreamReader())).toThrow(/synchronous/);
   });
 
-  it('refuses the suite forms of a DOM node with a TypeError', () => {
+  it('canonicalizes the element a cursor stands at as a document subset, leaving the cursor at its end tag', () => {
+    const reader = new XMLInputFactory().createStreamReader(SUBSET_DOCUMENT);
+    while (reader.next() !== EventType.START_ELEMENT || reader.localName() !== 'c');
+    expect(canonicalize(reader)).toBe(
+      '<p:c xmlns="urn:d" xmlns:p="urn:p" xml:base="y/" xml:lang="en" xml:space="preserve">t</p:c>'
+    );
+    expect([reader.eventType(), reader.localName()]).toEqual([EventType.END_ELEMENT, 'c']);
+  });
+
+  it.each([
+    [
+      'c14n11',
+      '<p:c xmlns="urn:d" xmlns:p="urn:p" xml:base="http://e.org/x/y/" xml:lang="en" xml:space="preserve">t</p:c>',
+    ],
+    ['exc-c14n', '<p:c xmlns:p="urn:p" xml:base="y/">t</p:c>'],
+  ] as const)('%s canonicalizes the element a cursor stands at by its own rules', (method, expected) => {
+    const reader = new XMLInputFactory().createStreamReader(SUBSET_DOCUMENT);
+    while (reader.next() !== EventType.START_ELEMENT || reader.localName() !== 'c');
+    expect(canonicalize(reader, { method })).toBe(expected);
+  });
+
+  it('refuses the suite forms of an element a cursor stands at, and a cursor without namespaces, with an InvalidArgumentError', () => {
+    const reader = new XMLInputFactory().createStreamReader('<a><b/></a>');
+    reader.nextTag();
+    reader.nextTag();
+    expect(() => canonicalize(reader, { method: 'suite-first' })).toThrow(InvalidArgumentError);
+    const plain = new XMLInputFactory({ namespaceAware: false }).createStreamReader('<a/>');
+    expect(() => canonicalize(plain)).toThrow(InvalidArgumentError);
+  });
+
+  it('refuses the suite forms of a DOM node with an InvalidArgumentError', () => {
     for (const method of ['suite-first', 'suite-second'] as const) {
-      expect(() => canonicalize(tree('<a/>'), { method })).toThrow(TypeError);
+      expect(() => canonicalize(tree('<a/>'), { method })).toThrow(InvalidArgumentError);
     }
   });
 });
@@ -229,5 +285,45 @@ describe('canonicalize: what it refuses', () => {
   it('fails with the well-formedness error of a document that is not well-formed', () => {
     expect(() => canonicalize('<a></b>')).toThrow(XMLError);
     expect(failure('<a></b>')).not.toMatch(/^C14N/);
+  });
+});
+
+describe('canonicalizeAsync: the same forms, of input that arrives over time', () => {
+  const XML = '<?xml version="1.0"?><!--c--><a xmlns:p="urn:p" p:z="1" b="2"><p:c>t &amp; u</p:c><d/></a>\n';
+  const METHODS: CanonicalMethod[] = ['c14n', 'c14n11', 'exc-c14n', 'suite-first', 'suite-second'];
+
+  /** A document as a stream of small chunks. */
+  async function* trickle(xml: string): AsyncGenerator<Uint8Array> {
+    const bytes = new TextEncoder().encode(xml);
+    const CHUNK = 5;
+    for (let start = 0; start < bytes.length; start += CHUNK) yield bytes.subarray(start, start + CHUNK);
+  }
+
+  it.each(METHODS)('%s gives a stream the form of the whole document, as a string or as bytes', async (method) => {
+    const whole = canonicalize(XML, { method });
+    expect(await canonicalizeAsync(trickle(XML), { method })).toBe(whole);
+    expect(await canonicalizeAsync(XML, { method })).toBe(whole);
+    const bytes = await canonicalizeAsync(trickle(XML), { method, output: 'bytes' });
+    expect(new TextDecoder().decode(bytes)).toBe(whole);
+  });
+
+  it('reads an asynchronous reader from where it stands, and a DOM node as canonicalize does', async () => {
+    const reader = factoryFor().createAsyncStreamReader(trickle(XML));
+    await reader.nextTagAsync();
+    await reader.nextTagAsync();
+    expect(await canonicalizeAsync(reader)).toBe('<p:c xmlns:p="urn:p">t &amp; u</p:c>');
+    const node = tree('<a><b/></a>');
+    expect(await canonicalizeAsync(node)).toBe(canonicalize(node));
+  });
+
+  it('fails as canonicalize does: on XML 1.1, an element in a suite form, and a DOM node in one', async () => {
+    await expect(canonicalizeAsync(trickle('<?xml version="1.1"?><a/>'))).rejects.toMatchObject({
+      code: ErrorCode.C14N_VERSION,
+    });
+    const reader = factoryFor().createAsyncStreamReader(trickle('<a><b/></a>'));
+    await reader.nextTagAsync();
+    await reader.nextTagAsync();
+    await expect(canonicalizeAsync(reader, { method: 'suite-first' })).rejects.toThrow(InvalidArgumentError);
+    await expect(canonicalizeAsync(tree('<a/>'), { method: 'suite-second' })).rejects.toThrow(InvalidArgumentError);
   });
 });

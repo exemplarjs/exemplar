@@ -1,10 +1,10 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { NamespaceBindings } from '../namespaces/namespaces.ts';
-import { NAME_CLASSES, NameClass, isNameStartCharBmp } from '../scan/classes.ts';
-import { holdsAt } from '../scan/scanner.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
-import { Char, isHighSurrogate } from '../util/chars.ts';
-import { XML_NAMESPACE, XMLNS_NAMESPACE } from '../util/namespaces.ts';
+import { ErrorCode } from '@/errors/codes';
+import { NamespaceBindings } from '@/namespaces/namespaces';
+import { isNameStartCharBmp, NAME_CLASSES, NameClass } from '@/scan/classes';
+import { holdsAt } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
+import { Char, isHighSurrogate } from '@/util/chars';
+import { XML_NAMESPACE, XMLNS_NAMESPACE } from '@/util/namespaces';
 import { fail, isIndex, outOfRange } from './internal.ts';
 
 // Module-level constants, so V8 can inline them.
@@ -168,6 +168,17 @@ export class NamespaceScopes {
       );
     }
     return binding;
+  }
+
+  /** The bindings the open elements declare, prefix to URI, the innermost of each prefix winning; `''` is the default namespace. */
+  inScope(tokenizer: Tokenizer): Map<string, string> {
+    const scope = new Map<string, string>();
+    for (let i = 0; i < this.declarationCount; i++) {
+      const binding = this.declarations[i] as number;
+      const prefix = this.bindings.prefix(binding, tokenizer.buffer, tokenizer.bufferOffset);
+      scope.set(prefix, this.bindings.uri(binding, tokenizer.buffer, tokenizer.bufferOffset));
+    }
+    return scope;
   }
 
   /** How many namespaces the innermost open element, at depth `elementDepth`, declares; 0 for -1, no element. */

@@ -1,7 +1,12 @@
-import { Char, Unicode } from './chars.ts';
+import { Char, Unicode } from '@/util/chars';
+import { Radix } from '@/util/numbers';
 
 // Module-level constants, so V8 can inline them.
 const { DIGIT_ZERO, DIGIT_NINE, LOWER_A, LOWER_F, UPPER_A, UPPER_F } = Char;
+const { DECIMAL, HEXADECIMAL } = Radix;
+
+/** The value of the hexadecimal digit `a` or `A`, the first letter digit. */
+const HEX_LETTER_FIRST_VALUE = 10;
 
 /** The five predefined entities (§4.6), which every document has without declaring them, and their characters. */
 export const PREDEFINED_ENTITIES: ReadonlyMap<string, string> = new Map([
@@ -26,11 +31,12 @@ const BEYOND_CODE_POINTS = Unicode.LAST_CODE_POINT + 1;
 export function readDigits(text: string, start: number, isHex: boolean): [number, number] {
   let value = 0;
   let pos = start;
+  const radix = isHex ? HEXADECIMAL : DECIMAL;
   for (; pos < text.length; pos++) {
     // eslint-disable-next-line prefer-code-point -- digits are ASCII
     const digit = digitValue(text.charCodeAt(pos), isHex);
     if (digit < 0) break;
-    value = Math.min(value * (isHex ? 16 : 10) + digit, BEYOND_CODE_POINTS);
+    value = Math.min(value * radix + digit, BEYOND_CODE_POINTS);
   }
   return [pos, value];
 }
@@ -39,8 +45,8 @@ export function readDigits(text: string, start: number, isHex: boolean): [number
 function digitValue(char: number, isHex: boolean): number {
   if (char >= DIGIT_ZERO && char <= DIGIT_NINE) return char - DIGIT_ZERO;
   if (!isHex) return -1;
-  if (char >= LOWER_A && char <= LOWER_F) return char - LOWER_A + 10;
-  if (char >= UPPER_A && char <= UPPER_F) return char - UPPER_A + 10;
+  if (char >= LOWER_A && char <= LOWER_F) return char - LOWER_A + HEX_LETTER_FIRST_VALUE;
+  if (char >= UPPER_A && char <= UPPER_F) return char - UPPER_A + HEX_LETTER_FIRST_VALUE;
   return -1;
 }
 
@@ -52,5 +58,6 @@ export function codePointOfReference(body: string): number {
   const isHex = body.startsWith('#x');
   const start = isHex ? '#x'.length : '#'.length;
   const [end, value] = readDigits(body, start, isHex);
-  return end === start || end !== body.length ? -1 : value;
+  if (end === start || end !== body.length) return -1;
+  return value;
 }

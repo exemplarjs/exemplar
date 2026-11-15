@@ -9,5 +9,6 @@ export type {
   SAXErrorHandler,
   SAXHandler,
 } from './handler.ts';
+export { AttributesImpl } from './attributes-impl.ts';
 export { XMLFilterImpl } from './filter.ts';
 export { type SAXOptions, SAXParser } from './parser.ts';

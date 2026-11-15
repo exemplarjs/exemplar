@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+  <product sku="B-101">
+    <name>The Lighthouse Keeper</name>
+    <price>8.99</price>
+  </product>
+  <product sku="B-310">
+    <name>Winter Harbour</name>
+    <price>11.25</price>
+  </product>
+</products>

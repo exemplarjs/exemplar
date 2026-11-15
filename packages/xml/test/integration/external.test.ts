@@ -1,7 +1,7 @@
-import { canonicalOfAsync } from '@test/helpers/canonical.ts';
-import { canonical, cursor, errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { canonicalOfAsync } from '@test/helpers/canonical';
+import { canonical, cursor, errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import type { CatalogProcessor } from '@/config/options.ts';
+import type { CatalogProcessor } from '@/config/options';
 import {
   type EntityResolver,
   EventType,
@@ -9,8 +9,8 @@ import {
   type ResolveRequest,
   type XMLError,
   XMLInputFactory,
-} from '@/index.ts';
-import { DTD_COMPLETE, accessAllows, accessRefusedError } from '@/internal.ts';
+} from '@/index';
+import { accessAllows, accessRefusedError, DTD_COMPLETE } from '@/internal';
 
 /** A resolver serving texts by absolute URI, recording what it was asked; a reading one keeps to the access list, as the bundled ones do. */
 function memory(files: Record<string, string>, asked: ResolveRequest[] = [], reading = true): EntityResolver {
@@ -50,7 +50,7 @@ describe('external DTDs and entities through resolvers (§4.2.2, §5.1)', () => 
     expect(() => canonical(xml, { entityResolver: memory(FILES) })).toThrow(
       expect.objectContaining({
         code: 'ACCESS_REFUSED',
-        message: `Reading ${BASE}a.dtd is not allowed: the access list does not name 'http'`,
+        description: `Reading ${BASE}a.dtd is not allowed: the access list does not name 'http'`,
         line: 1,
         column: 1,
       })

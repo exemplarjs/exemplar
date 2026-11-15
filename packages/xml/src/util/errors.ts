@@ -25,3 +25,18 @@ export const ErrorFactory = {
     throw error;
   },
 };
+
+/** Raised by a synchronous reader for what only an asynchronous one can read: a stream, or a resolver's promise. */
+export class AsyncReaderRequiredError extends TypeError {
+  override name = 'AsyncReaderRequiredError';
+}
+
+/** Raised for a value in options or arguments that the API does not take, such as an encoding the writer has no encoder for. */
+export class InvalidArgumentError extends Error {
+  override name = 'InvalidArgumentError';
+}
+
+/** Raised for a call made at the wrong moment, such as `elementText()` away from a start tag. */
+export class IllegalStateError extends Error {
+  override name = 'IllegalStateError';
+}

@@ -1,5 +1,5 @@
-import { fail } from '../names.ts';
-import { NodeType } from '../node-type.ts';
+import { fail } from '@/names';
+import { NodeType } from '@/node-type';
 import { CharacterData } from './character-data.ts';
 import type { Document } from './document.ts';
 import { type Node, NodeFlag } from './node.ts';

@@ -1,4 +1,4 @@
-import { readEveryWay, utf16 } from '@test/helpers/agreement.ts';
+import { readEveryWay, utf16 } from '@test/helpers/agreement';
 import { describe, expect, it } from 'vitest';
 import type { EntityResolver, InputOptions } from '@exemplarjs/xml';
 import { accessAllows, accessRefusedError } from '@exemplarjs/xml/internal';

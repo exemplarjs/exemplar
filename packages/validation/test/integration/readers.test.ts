@@ -1,4 +1,4 @@
-import { validating, validity, validityErrors, withFiles, withSubset } from '@test/helpers/validity.ts';
+import { validating, validity, validityErrors, withFiles, withSubset } from '@test/helpers/validity';
 import { describe, expect, it } from 'vitest';
 import { ErrorCode, EventType, type InputOptions, type XMLError } from '@exemplarjs/xml';
 
@@ -70,11 +70,7 @@ describe('validating through every reader', () => {
 });
 
 describe('validating against external declarations', () => {
-  const files = {
-    'r.dtd': SUBSET,
-    'items.xml': '<s id="x">from an entity</s><s id="y"/>',
-    'bad.xml': '<t/>',
-  };
+  const files = { 'r.dtd': SUBSET, 'items.xml': '<s id="x">from an entity</s><s id="y"/>', 'bad.xml': '<t/>' };
   const options = withFiles(files);
 
   it('reads the external subset through the resolver', () => {

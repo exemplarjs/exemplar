@@ -1,8 +1,8 @@
-import { validity, withSubset } from '@test/helpers/validity.ts';
+import { validity, withSubset } from '@test/helpers/validity';
 import { describe, expect, it } from 'vitest';
 import { SAXParser } from '@exemplarjs/sax';
 import { ErrorCode, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { dtdValidator } from '@/index.ts';
+import { dtdValidator } from '@/index';
 
 const SUBSET =
   '<!ELEMENT r (s+)><!ELEMENT s (#PCDATA|t)*><!ELEMENT t EMPTY><!ATTLIST s id ID #REQUIRED ref IDREF #IMPLIED>';

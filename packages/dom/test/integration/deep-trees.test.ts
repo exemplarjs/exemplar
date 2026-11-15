@@ -1,6 +1,6 @@
-import { build, newDocument } from '@test/helpers/dom.ts';
+import { build, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { type Document, DocumentPosition, type Element, type Text, XMLSerializer } from '@/index.ts';
+import { type Document, DocumentPosition, type Element, type Text, XMLSerializer } from '@/index';
 
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
 

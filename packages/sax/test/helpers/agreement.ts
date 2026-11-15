@@ -1,6 +1,6 @@
-import { canonicalHandler, canonicalOf, namesHandler, namesOf } from '@test/helpers/canonical.ts';
+import { canonicalHandler, canonicalOf, namesHandler, namesOf } from '@test/helpers/canonical';
 import { type InputOptions, type Source, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { SAXParser } from '@/index.ts';
+import { SAXParser } from '@/index';
 
 /** A document as text or bytes, with an optional system id, and an encoding given from outside as HTTP gives one. */
 export interface Document {
@@ -95,13 +95,13 @@ function saxWays(doc: Document, options: InputOptions): [string, () => Promise<s
 }
 
 /** Reads a document with the cursor and every way with SAX; all must agree. Returns the cursor's outcome. */
-export async function agreed(doc: Document | string, options: InputOptions = {}): Promise<string> {
+async function agreed(doc: Document | string, options: InputOptions = {}): Promise<string> {
   const d = typeof doc === 'string' ? { xml: doc } : doc;
   const cursor = outcome(() => canonicalOf(new XMLInputFactory(options).createStreamReader(sourceOf(d))));
-  for (const [way, read] of saxWays(d, options)) {
-    const result = await read();
-    if (result !== cursor) throw new Error(`${way} gave ${result}, but the cursor ${cursor}`);
-  }
+  const ways = saxWays(d, options);
+  const results = await Promise.all(ways.map(async ([, read]) => read()));
+  for (const [index, [way]] of ways.entries())
+    if (results[index] !== cursor) throw new Error(`${way} gave ${results[index]}, but the cursor ${cursor}`);
   return cursor;
 }
 

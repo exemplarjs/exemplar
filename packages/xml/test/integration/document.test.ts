@@ -1,6 +1,6 @@
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, XMLInputFactory } from '@/index.ts';
+import { EventType, XMLInputFactory } from '@/index';
 
 const encoder = new TextEncoder();
 const BOM = [0xef, 0xbb, 0xbf];

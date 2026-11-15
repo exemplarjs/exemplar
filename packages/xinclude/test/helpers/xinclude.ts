@@ -1,17 +1,17 @@
 import { canonicalize } from '@exemplarjs/canonical';
 import {
+  type AsyncStreamReader,
   type EntityResolver,
   EventType,
   type InputOptions,
-  type AsyncStreamReader,
   type ResolvedSource,
   type StreamReader,
   type XIncludeProcessor,
   XMLError,
   XMLInputFactory,
 } from '@exemplarjs/xml';
-import { type DecoderRegistry, accessAllows, accessRefusedError } from '@exemplarjs/xml/internal';
-import { type XIncludeSettings, xincludeProcessor } from '@/index.ts';
+import { accessAllows, accessRefusedError, type DecoderRegistry } from '@exemplarjs/xml/internal';
+import { xincludeProcessor, type XIncludeOptions } from '@/index';
 
 /** The XInclude namespace, and its declaration with the usual prefix. */
 export const XI_NS = 'http://www.w3.org/2001/XInclude';
@@ -26,7 +26,7 @@ export type Files = Readonly<Record<string, string | Uint8Array | ResolvedSource
 /** How a test reads: resolvers answering with promises, the processor's settings, and other factory options. */
 export interface Setup {
   readonly async?: boolean;
-  readonly settings?: Partial<XIncludeSettings>;
+  readonly settings?: XIncludeOptions;
   readonly options?: InputOptions;
 }
 
@@ -73,7 +73,7 @@ function escaped(text: string): string {
 }
 
 /** Writes the cursor's current event as XML: a start tag's declarations, then its attributes, in reported order. */
-export function written(reader: StreamReader | AsyncStreamReader): string {
+function written(reader: StreamReader | AsyncStreamReader): string {
   switch (reader.eventType()) {
     case EventType.START_ELEMENT: {
       let tag = `<${reader.name()}`;
@@ -118,6 +118,7 @@ export function events(reader: StreamReader): string {
 export async function eventsAsync(reader: AsyncStreamReader): Promise<string> {
   let out = '';
   for (let event = reader.next(); event !== EventType.END_DOCUMENT; event = reader.next()) {
+    // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
     if (event === EventType.NEED_INPUT) await reader.fill();
     else out += written(reader);
   }

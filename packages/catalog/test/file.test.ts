@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type CatalogFile, readCatalogFile } from '@/file.ts';
+import { type CatalogFile, readCatalogFile } from '@/file';
 
 const NS = 'xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog"';
 const URI = 'file:///c/catalog.xml';
@@ -43,9 +43,7 @@ describe('readCatalogFile: entry types (§6.5)', () => {
     [
       'rewriteSystem',
       '<rewriteSystem systemIdStartString="http://x/ é/" rewritePrefix="local/"/>',
-      {
-        rewriteSystem: [{ startString: 'http://x/%20%C3%A9/', rewritePrefix: 'file:///c/local/' }],
-      },
+      { rewriteSystem: [{ startString: 'http://x/%20%C3%A9/', rewritePrefix: 'file:///c/local/' }] },
     ],
     [
       'systemSuffix',
@@ -55,24 +53,18 @@ describe('readCatalogFile: entry types (§6.5)', () => {
     [
       'delegatePublic',
       '<delegatePublic publicIdStartString="-//A  B//" catalog="d.xml"/>',
-      {
-        delegatePublic: [{ startString: '-//A B//', catalog: 'file:///c/d.xml', preferPublic: true }],
-      },
+      { delegatePublic: [{ startString: '-//A B//', catalog: 'file:///c/d.xml', preferPublic: true }] },
     ],
     [
       'delegateSystem',
       '<delegateSystem systemIdStartString="http://x/ y/" catalog="d.xml"/>',
-      {
-        delegateSystem: [{ startString: 'http://x/%20y/', catalog: 'file:///c/d.xml', preferPublic: true }],
-      },
+      { delegateSystem: [{ startString: 'http://x/%20y/', catalog: 'file:///c/d.xml', preferPublic: true }] },
     ],
     ['uri', '<uri name="http://x/u v.xml" uri="u.xml"/>', { uri: { 'http://x/u%20v.xml': 'file:///c/u.xml' } }],
     [
       'rewriteURI',
       '<rewriteURI uriStartString="http://x/r/" rewritePrefix="http://mirror/r/"/>',
-      {
-        rewriteURI: [{ startString: 'http://x/r/', rewritePrefix: 'http://mirror/r/' }],
-      },
+      { rewriteURI: [{ startString: 'http://x/r/', rewritePrefix: 'http://mirror/r/' }] },
     ],
     [
       'uriSuffix',
@@ -82,9 +74,7 @@ describe('readCatalogFile: entry types (§6.5)', () => {
     [
       'delegateURI',
       '<delegateURI uriStartString="http://d/" catalog="../d.xml"/>',
-      {
-        delegateURI: [{ startString: 'http://d/', catalog: 'file:///d.xml', preferPublic: true }],
-      },
+      { delegateURI: [{ startString: 'http://d/', catalog: 'file:///d.xml', preferPublic: true }] },
     ],
     [
       'nextCatalog',
@@ -270,9 +260,11 @@ describe('readCatalogFile: what is ignored (§6, §8)', () => {
     expect(readCatalogFile(source, URI, true)?.system.get('http://x/a')).toBe('file:///c/a');
   });
 
-  it('reads a catalog despite validity errors, such as an xml:id used twice', () => {
-    const text = `<catalog ${NS}><group xml:id="g"/><group xml:id="g"/><system systemId="http://x/a" uri="a"/></catalog>`;
-    expect(readCatalogFile({ text }, URI, true)?.system.size).toBe(1);
+  it('reads a catalog despite warnings and recoverable errors, such as an xml:id used twice or an undeclared parameter entity', () => {
+    const entries = `<group xml:id="g"/><group xml:id="g"/><system systemId="http://x/a" uri="a"/>`;
+    expect(readCatalogFile({ text: `<catalog ${NS}>${entries}</catalog>` }, URI, true)?.system.size).toBe(1);
+    const undeclared = `<!DOCTYPE catalog [%p;]><catalog ${NS}>${entries}</catalog>`;
+    expect(readCatalogFile({ text: undeclared }, URI, true)?.system.size).toBe(1);
   });
 
   it.each([

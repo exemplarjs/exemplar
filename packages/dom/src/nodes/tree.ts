@@ -1,4 +1,4 @@
-import { NodeType } from '../node-type.ts';
+import { NodeType } from '@/node-type';
 import type { Document } from './document.ts';
 import type { Element } from './element.ts';
 import type { Entity } from './entity.ts';

@@ -1,11 +1,22 @@
 import { ErrorCode } from '@exemplarjs/xml';
-import { Char, Unicode, codePointLabel, isChar, isRestrictedChar } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
+import {
+  Char,
+  codePointLabel,
+  ErrorFactory,
+  isChar,
+  isRestrictedChar,
+  SURROGATE_PAIR_LENGTH,
+  Unicode,
+} from '@exemplarjs/xml/internal';
+import { unicodeEscape } from './encoders.ts';
 import { WriterError } from './error.ts';
 
 const { AMPERSAND, CARRIAGE_RETURN, DOUBLE_QUOTE, GREATER_THAN, LESS_THAN, LINE_FEED, LINE_SEPARATOR, NEXT_LINE, TAB } =
   Char;
 const { SUPPLEMENTARY_FIRST } = Unicode;
+
+/** How many characters `]]` takes, the start of the `]]>` that text must not hold. */
+export const CDATA_BRACKETS_LENGTH = 2;
 
 /** How text and attribute values are escaped for one writer. */
 export interface EscapeOptions {
@@ -17,14 +28,18 @@ export interface EscapeOptions {
   readonly unencodable: RegExp | undefined;
   /** Throw on characters XML does not allow. */
   readonly checkCharacters: boolean;
+  /** Characters written as the strings they map to, unescaped; none by default. */
+  readonly characterMap?: ReadonlyMap<string, string>;
 }
 
 /** Escapes character data and attribute values. */
 export interface Escaper {
   /** What it escapes for. */
   readonly options: EscapeOptions;
+
   /** Character data, escaped. */
   text(text: string): string;
+
   /** An attribute value, escaped for writing between double quotes. */
   attribute(value: string): string;
 }
@@ -46,17 +61,24 @@ function allowedLiterally(code: number, version11: boolean): boolean {
   return isChar(code, version11) && !(version11 && isRestrictedChar(code));
 }
 
+/** A string as `\uXXXX` escapes of its code units, which a regular expression matches literally. */
+function codeUnitEscapes(text: string): string {
+  // eslint-disable-next-line prefer-code-point -- each code unit, a surrogate pair as two
+  return Array.from({ length: text.length }, (_, index) => unicodeEscape(text.charCodeAt(index))).join('');
+}
+
 /** Builds the escaper for one writer's options. */
 export function escaper(options: EscapeOptions): Escaper {
-  const { minimal, version11, unencodable, checkCharacters } = options;
+  const { minimal, version11, unencodable, checkCharacters, characterMap } = options;
   // The character class without its brackets.
   const special = (version11 ? SPECIAL_XML_11 : NOT_CHAR_XML_10).source.slice(1, -1);
-  const orUnencodable = unencodable === undefined ? '' : `|${unencodable.source}`;
+  const mapped = [...(characterMap?.keys() ?? [])].map((char) => `|${codeUnitEscapes(char)}`).join('');
+  const extraAlternatives = (unencodable === undefined ? '' : `|${unencodable.source}`) + mapped;
   // One test finds anything to escape, any character XML forbids, and any the encoding lacks.
   const textClass = minimal ? '[&<' + special + ']|]]>' : String.raw`[&<>\r` + special + ']';
   const attributeClass = minimal ? '[&<"' + special + ']' : String.raw`[&<"\t\n\r` + special + ']';
-  const textNeedsEscaping = new RegExp(textClass + orUnencodable);
-  const valueNeedsEscaping = new RegExp(attributeClass + orUnencodable);
+  const textNeedsEscaping = new RegExp(textClass + extraAlternatives);
+  const valueNeedsEscaping = new RegExp(attributeClass + extraAlternatives);
   /** A character markup does not need escaped: as it is, refused, or a reference when XML 1.1 or the encoding needs one. */
   const escapeCharacter = (char: string, code: number): string => {
     if (!isChar(code, version11)) {
@@ -76,7 +98,7 @@ export function escaper(options: EscapeOptions): Escaper {
   const escapeInText = (char: string, code: number, text: string, index: number): string => {
     if (code === AMPERSAND) return '&amp;';
     if (code === LESS_THAN) return '&lt;';
-    if (code === GREATER_THAN && (!minimal || text.slice(index - 2, index) === ']]')) return '&gt;';
+    if (code === GREATER_THAN && (!minimal || text.slice(index - CDATA_BRACKETS_LENGTH, index) === ']]')) return '&gt;';
     if (code === CARRIAGE_RETURN && !minimal) return `&#${code};`;
     return escapeCharacter(char, code);
   };
@@ -88,23 +110,39 @@ export function escaper(options: EscapeOptions): Escaper {
     if (!minimal && (code === TAB || code === LINE_FEED || code === CARRIAGE_RETURN)) return `&#${code};`;
     return escapeCharacter(char, code);
   };
-  /** Escapes a string a character at a time, a surrogate pair as one. */
-  const escapeEach = (text: string, context: 'text' | 'attribute'): string => {
-    let escaped = '';
-    for (let i = 0; i < text.length; i++) {
-      const code = text.codePointAt(i) as number;
-      const isPair = code >= SUPPLEMENTARY_FIRST;
-      const char = isPair ? text.slice(i, i + 2) : (text[i] as string);
-      if (isPair) i++;
-      escaped += context === 'attribute' ? escapeInValue(char, code) : escapeInText(char, code, text, i);
-    }
-    return escaped;
-  };
   return {
     options,
-    text: (text) => (textNeedsEscaping.test(text) ? escapeEach(text, 'text') : text),
-    attribute: (value) => (valueNeedsEscaping.test(value) ? escapeEach(value, 'attribute') : value),
+    text: (text) => (textNeedsEscaping.test(text) ? mapCharacters(text, characterMap, escapeInText) : text),
+    attribute: (value) => (valueNeedsEscaping.test(value) ? mapCharacters(value, characterMap, escapeInValue) : value),
   };
+}
+
+/** Writes a character the character map does not map, given its code point, the text, and its offset there. */
+export type CharacterWriter = (char: string, code: number, text: string, index: number) => string;
+
+/**
+ * Writes each character as the character map maps it, else as `other` writes it (unchanged by default);
+ * a surrogate pair counts as one character. XSLT's character maps, for an output method that writes its own text.
+ *
+ * @example
+ * mapCharacters('a-b', new Map([['-', '&#x2D;']])); // 'a&#x2D;b'
+ */
+export function mapCharacters(
+  text: string,
+  characterMap: ReadonlyMap<string, string> | undefined,
+  other?: CharacterWriter
+): string {
+  if (other === undefined && (characterMap === undefined || characterMap.size === 0)) return text;
+  let written = '';
+  for (let i = 0; i < text.length; i++) {
+    const code = text.codePointAt(i) as number;
+    const char = code >= SUPPLEMENTARY_FIRST ? text.slice(i, i + SURROGATE_PAIR_LENGTH) : (text[i] as string);
+    const mapped = characterMap?.get(char);
+    if (mapped === undefined) written += other === undefined ? char : other(char, code, text, i);
+    else written += mapped;
+    i += char.length - 1;
+  }
+  return written;
 }
 
 /** Throws when markup that cannot hold references holds a character XML or the encoding does not allow. */
@@ -136,6 +174,20 @@ export function checkLiteral(text: string, options: EscapeOptions, what: string)
 /** A literal in whichever quotes it does not hold, as a DOCTYPE's identifiers are written. */
 export function quotedLiteral(literal: string): string {
   return literal.includes('"') ? `'${literal}'` : `"${literal}"`;
+}
+
+/** A DOCTYPE declaration: a name, an external identifier if there is a system or public id, and an internal subset if given. */
+export function doctypeDeclaration(
+  name: string,
+  publicId: string | null | undefined,
+  systemId: string | null | undefined,
+  internalSubset?: string | null
+): string {
+  let declaration = `<!DOCTYPE ${name}`;
+  if (publicId) declaration += ` PUBLIC ${quotedLiteral(publicId)} ${quotedLiteral(systemId ?? '')}`;
+  else if (systemId) declaration += ` SYSTEM ${quotedLiteral(systemId)}`;
+  if (internalSubset) declaration += ` [${internalSubset}]`;
+  return `${declaration}>`;
 }
 
 /** Text as CDATA sections, split around `]]>`. */

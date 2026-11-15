@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { readLocalFile } from '@/read.ts';
+import { readLocalFile } from '@/read';
 
 // Reading real files needs a file system, so these tests run on Node only.
 describe('readLocalFile on Node', () => {

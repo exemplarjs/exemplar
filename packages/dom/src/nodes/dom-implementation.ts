@@ -1,4 +1,5 @@
-import { checkQName, fail } from '../names.ts';
+import { isAsciiDigit } from '@exemplarjs/xml/internal';
+import { checkQName, fail } from '@/names';
 import { DocumentType } from './document-type.ts';
 import { Document } from './document.ts';
 import { hasFeature } from './features.ts';
@@ -21,7 +22,12 @@ export const DOMImplementationRegistry = {
     for (let i = 0; i < tokens.length; i++) {
       const feature = tokens[i] as string;
       // A token starting with a digit is the version of the feature before it.
-      const version = /^\d/.test(tokens[i + 1] ?? '') ? (tokens[++i] as string) : null;
+      let version: string | null = null;
+      const next = tokens[i + 1];
+      if (next !== undefined && isAsciiDigit(next[0])) {
+        version = next;
+        i++;
+      }
       fits &&= implementation.hasFeature(feature, version);
     }
     const found = fits ? [implementation] : [];
@@ -29,8 +35,19 @@ export const DOMImplementationRegistry = {
   },
 };
 
+/** What `getAttribute` gives for a missing attribute: null, as browsers do, or the empty string, as DOM Level 3 says. */
+export type MissingAttribute = 'null' | 'empty';
+
 /** The DOM implementation: which features it has, and how to make documents and document types. */
 export class DOMImplementation {
+  /** What `getAttribute` gives for an attribute an element lacks. @internal */
+  readonly _missingAttribute: string | null;
+
+  /** An implementation whose elements give null for a missing attribute, or with `'empty'`, the empty string. */
+  constructor(options: { readonly missingAttribute?: MissingAttribute } = {}) {
+    this._missingAttribute = options.missingAttribute === 'empty' ? '' : null;
+  }
+
   hasFeature(feature: string, version: string | null): boolean {
     return hasFeature(feature, version);
   }

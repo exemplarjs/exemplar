@@ -2,11 +2,11 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { canonicalOfAsync } from '@test/helpers/canonical.ts';
-import { canonical } from '@test/helpers/parse.ts';
+import { canonicalOfAsync } from '@test/helpers/canonical';
+import { canonical } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { type ResolvedSource, XMLInputFactory } from '@/index.ts';
-import { fileResolver } from '@/resolvers/file.ts';
+import { type ResolvedSource, XMLInputFactory } from '@/index';
+import { fileResolver } from '@/resolvers/file';
 
 // The file resolver needs a file system, so these tests run on Node only.
 describe('fileResolver', () => {
@@ -78,5 +78,20 @@ describe('fileResolver', () => {
 
   it('supplies nothing for a URI whose escapes are not UTF-8', () => {
     expect(resolver.resolveEntity({ name: '[dtd]', systemId: 'a%dtd', baseURI: document })).toBeUndefined();
+  });
+
+  it('reads files anywhere below a root that is the file system root', () => {
+    const everywhere = fileResolver({ root: path.parse(root).root });
+    expect(everywhere.resolve('sub/e.xml', document)).toBeDefined();
+  });
+
+  it('resolves URIs too, an href against a base, keeping to the access list a request carries', () => {
+    const resolved = resolver.resolve('sub/e.xml', document) as ResolvedSource;
+    expect(resolved.systemId).toBe(pathToFileURL(path.join(root, 'sub', 'e.xml')).href);
+    expect(new TextDecoder().decode(resolved.bytes)).toBe('<b>from a subdirectory</b>');
+    expect(resolver.resolve('../outside.dtd', document)).toBeUndefined();
+    expect(() => resolver.resolve('a.dtd', document, { access: ['https'] })).toThrow(
+      expect.objectContaining({ code: 'ACCESS_REFUSED' })
+    );
   });
 });

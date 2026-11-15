@@ -1,4 +1,4 @@
-import { namesEveryWay, readEveryWay } from '@test/helpers/agreement.ts';
+import { namesEveryWay, readEveryWay } from '@test/helpers/agreement';
 import { describe, expect, it } from 'vitest';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';

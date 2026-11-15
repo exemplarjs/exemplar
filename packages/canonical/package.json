@@ -10,6 +10,7 @@
     "directory": "packages/canonical"
   },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "exemplar-source": "./src/index.ts",

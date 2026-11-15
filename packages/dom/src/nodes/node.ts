@@ -1,7 +1,7 @@
 // Imports no subclass of Node: one loaded first would extend Node before it exists.
 import { XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
-import { fail, orNull } from '../names.ts';
-import { DocumentPosition, NodeType } from '../node-type.ts';
+import { fail, orNull } from '@/names';
+import { DocumentPosition, NodeType } from '@/node-type';
 import type { Document } from './document.ts';
 import type { Element } from './element.ts';
 import { hasFeature } from './features.ts';
@@ -95,6 +95,13 @@ function childRemoved(parent: Node, wasLast: boolean): void {
   else list._drop();
 }
 
+/** The first element among a node and the siblings after it, or before it. */
+function elementFrom(start: Node | null, direction: 'forwards' | 'backwards'): Element | null {
+  let node = start;
+  while (node !== null && node.nodeType !== ELEMENT_NODE) node = direction === 'forwards' ? node._next : node._prev;
+  return node as Element | null;
+}
+
 /** The node types an element, entity, entity reference or document fragment may hold. */
 const CONTENT_TYPES: ReadonlySet<number> = new Set<number>([
   ELEMENT_NODE,
@@ -155,7 +162,7 @@ export abstract class Node {
   /** Bits for the node's booleans, kept in one field to save memory. @internal */
   declare _flags: number;
 
-  constructor(owner: Document | null) {
+  protected constructor(owner: Document | null) {
     this._owner = owner;
     this._parent = null;
     this._prev = null;
@@ -179,6 +186,7 @@ export abstract class Node {
   }
 
   abstract get nodeType(): number;
+
   abstract get nodeName(): string;
 
   get nodeValue(): string | null {
@@ -215,6 +223,33 @@ export abstract class Node {
 
   get nextSibling(): Node | null {
     return this._next;
+  }
+
+  /** The first child that is an element, or null. */
+  get firstElementChild(): Element | null {
+    return elementFrom(this._first, 'forwards');
+  }
+
+  /** The last child that is an element, or null. */
+  get lastElementChild(): Element | null {
+    return elementFrom(this._last, 'backwards');
+  }
+
+  /** The next sibling that is an element, or null. */
+  get nextElementSibling(): Element | null {
+    return elementFrom(this._next, 'forwards');
+  }
+
+  /** The previous sibling that is an element, or null. */
+  get previousElementSibling(): Element | null {
+    return elementFrom(this._prev, 'backwards');
+  }
+
+  /** How many of the children are elements. */
+  get childElementCount(): number {
+    let count = 0;
+    for (let child = this.firstElementChild; child !== null; child = child.nextElementSibling) count++;
+    return count;
   }
 
   get childNodes(): NodeList {
@@ -408,10 +443,11 @@ export abstract class Node {
     if ((this._flags & CHILD_LIST) !== 0) childRemoved(this, wasLast);
   }
 
-  cloneNode(deep = false): Node {
+  /** A copy of this node, of its own kind, with its descendants when deep. */
+  cloneNode(deep = false): this {
     const clone = this._clone(this._owner as Document, deep);
     this._notify(UserDataOperation.NODE_CLONED, clone);
-    return clone;
+    return clone as this;
   }
 
   /** A copy of this node owned by a document, with its descendants when deep. @internal */

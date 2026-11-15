@@ -61,7 +61,7 @@ export class Output {
 
   /** Resolves when the sink has room for more; at once for a sink that never fills. */
   async drain(): Promise<void> {
-    await (this.#textSink ?? this.#byteSink)?.ready?.();
+    await (this.#textSink ?? this.#byteSink)?.drain?.();
   }
 
   /** Flushes and closes the sink. */

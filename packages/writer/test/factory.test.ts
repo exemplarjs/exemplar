@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { InvalidArgumentError } from '@exemplarjs/xml';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { BytesSink, EventWriter, type Sink, StreamWriter, StringSink, XMLOutputFactory } from '@/index.ts';
+import { BytesSink, EventWriter, type Sink, StreamWriter, StringSink, XMLOutputFactory } from '@/index';
 
 describe('XMLOutputFactory', () => {
   it('resolves its options once, with the defaults filled in', () => {
@@ -53,10 +54,12 @@ describe('XMLOutputFactory', () => {
     expect(stream.locked).toBe(true);
   });
 
-  it('throws a RangeError for an encoding it has no encoder for', () => {
-    expect(() => new XMLOutputFactory({ encoding: 'UTF-32' }).createStreamWriter(new BytesSink())).toThrow(RangeError);
+  it('throws an InvalidArgumentError for an encoding it has no encoder for', () => {
+    expect(() => new XMLOutputFactory({ encoding: 'UTF-32' }).createStreamWriter(new BytesSink())).toThrow(
+      InvalidArgumentError
+    );
     expect(() => new XMLOutputFactory().createStreamWriter(new BytesSink(), { encoding: 'x-none' })).toThrow(
-      RangeError
+      InvalidArgumentError
     );
   });
 

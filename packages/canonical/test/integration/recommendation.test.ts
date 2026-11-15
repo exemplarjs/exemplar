@@ -1,7 +1,7 @@
 import fixtures from '@test/fixtures/c14n/examples.json' with { type: 'json' };
-import { factoryFor, tree } from '@test/helpers/c14n.ts';
+import { factoryFor, tree } from '@test/helpers/c14n';
 import { describe, expect, it } from 'vitest';
-import { canonicalize } from '@/index.ts';
+import { canonicalize } from '@/index';
 
 interface Example {
   readonly name: string;

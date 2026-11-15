@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventType, XMLInputFactory } from '@exemplarjs/xml';
-import * as validation from '@/index.ts';
+import * as validation from '@/index';
 
 describe('@exemplarjs/validation', () => {
   it('exports dtdValidator, and nothing else at run time', () => {

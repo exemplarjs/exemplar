@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { isAllWhitespace, isWhitespaceChar, isWhitespaceSpan, normalizePublicId } from '@/util/whitespace.ts';
+import {
+  collapseWhitespace,
+  isAllWhitespace,
+  isWhitespaceChar,
+  isWhitespaceSpan,
+  normalizePublicId,
+  splitWhitespace,
+  trimWhitespace,
+  WHITESPACE_CLASS,
+} from '@/util/whitespace';
 
 describe('whitespace (§2.3 [3])', () => {
   it('is space, tab, LF and CR, and in XML 1.1 also NEL and LS', () => {
@@ -54,5 +63,25 @@ describe('normalizePublicId (§4.2.2, XML Catalogs §6.2)', () => {
     ['\n\t ', ''],
   ])('normalizes %j to %j', (id, expected) => {
     expect(normalizePublicId(id)).toBe(expected);
+  });
+});
+
+describe('collapseWhitespace, trimWhitespace and splitWhitespace', () => {
+  it('take only space, tab, CR and LF as whitespace, never U+00A0', () => {
+    expect(collapseWhitespace(' a \t\r\n b ')).toBe('a b');
+    expect(collapseWhitespace('\u00A0a\u00A0')).toBe('\u00A0a\u00A0');
+    expect(trimWhitespace(' \t a b \n')).toBe('a b');
+    expect(trimWhitespace('\u00A0a ')).toBe('\u00A0a');
+    expect(trimWhitespace('  ')).toBe('');
+    expect(splitWhitespace(' a  b\tc ')).toEqual(['a', 'b', 'c']);
+    expect(splitWhitespace(' \n ')).toEqual([]);
+  });
+});
+
+describe('WHITESPACE_CLASS', () => {
+  it('matches the four whitespace characters and nothing else', () => {
+    const whitespace = new RegExp(`^${WHITESPACE_CLASS}$`);
+    expect([' ', '\t', '\n', '\r'].every((character) => whitespace.test(character))).toBe(true);
+    expect(whitespace.test('\u00A0')).toBe(false);
   });
 });

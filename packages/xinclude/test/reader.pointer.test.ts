@@ -1,8 +1,8 @@
-import { type Files, MAIN, XI, factory, failure, included, read } from '@test/helpers/xinclude.ts';
+import { factory, failure, type Files, included, MAIN, read, XI } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
-import type { InputOptions, ResolveRequest, ResolvedSource } from '@exemplarjs/xml';
+import type { InputOptions, ResolvedSource, ResolveRequest } from '@exemplarjs/xml';
 import { EventType, XMLInputFactory } from '@exemplarjs/xml';
-import { xincludeProcessor } from '@/index.ts';
+import { xincludeProcessor } from '@/index';
 
 const FILES: Files = {
   'file:///doc/part.xml':

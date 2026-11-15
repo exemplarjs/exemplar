@@ -3,12 +3,16 @@
   "trailingComma": "es5",
   "singleQuote": true,
   "printWidth": 120,
-  "objectWrap": "preserve",
+  "objectWrap": "collapse",
+  "proseWrap": "always",
   "sortPackageJson": false,
   "sortImports": {
     "newlinesBetween": false,
-    "customGroups": [{ "groupName": "exemplar", "elementNamePattern": ["@exemplarjs/**"] }],
-    "groups": ["builtin", "external", "exemplar", ["parent", "sibling", "index"]]
+    "customGroups": [
+      { "groupName": "exemplar", "elementNamePattern": ["@exemplarjs/**"] },
+      { "groupName": "package", "elementNamePattern": ["@/**"] }
+    ],
+    "groups": ["builtin", "external", "exemplar", "package", ["parent", "sibling", "index"]]
   },
   "ignorePatterns": [
     // pnpm rewrites these itself.
@@ -17,6 +21,6 @@
     // Whitespace-sensitive test fixtures: reformatting them changes what is under test.
     "**/fixtures/",
     // API docs that TypeDoc generates.
-    "api/"
+    "/api/"
   ]
 }

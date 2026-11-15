@@ -1,9 +1,9 @@
-import { utf16 } from '@test/helpers/agreement.ts';
-import { canonicalHandler } from '@test/helpers/canonical.ts';
-import { recorder } from '@test/helpers/recorder.ts';
+import { utf16 } from '@test/helpers/agreement';
+import { canonicalHandler } from '@test/helpers/canonical';
+import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
 import { XMLError } from '@exemplarjs/xml';
-import { SAXParser } from '@/index.ts';
+import { SAXParser } from '@/index';
 
 const UTF8 = new TextEncoder();
 
@@ -166,11 +166,13 @@ describe('SAX gives the same events however the input is split', () => {
   it('reports events as soon as their markup is complete, before the rest arrives', async () => {
     const seen: string[] = [];
     const snapshots: string[][] = [];
+
     async function* source(): AsyncGenerator<Uint8Array> {
       yield UTF8.encode('<a><b/><c x="1">');
       snapshots.push([...seen]);
       yield UTF8.encode('</c></a>');
     }
+
     await new SAXParser().parseAsync(source(), { startElement: (_uri, localName) => seen.push(localName) });
     expect(snapshots[0]).toEqual(['a', 'b', 'c']);
   });

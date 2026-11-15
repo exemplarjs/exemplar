@@ -1,6 +1,6 @@
 import type { AsyncStreamReader, StreamReader } from '@exemplarjs/xml';
-import { XMLNS_NAMESPACE, XML_NAMESPACE, declaredPrefixes } from '@exemplarjs/xml/internal';
-import type { XIncludeSettings } from './reader.ts';
+import { declaredPrefixes, XML_NAMESPACE, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
+import type { Fixups } from './reader.ts';
 import type { Namespaces, Scope } from './scopes.ts';
 import { relativeURI } from './uri.ts';
 
@@ -31,7 +31,7 @@ export interface Overlay {
 }
 
 /** No fix-ups, for elements that are not included, such as those at the top of a fallback. */
-export const NO_FIXUPS: XIncludeSettings = { fixupBaseURIs: false, fixupLanguage: false };
+export const NO_FIXUPS: Fixups = { fixupBaseURIs: false, fixupLanguage: false };
 
 /** No attribute indices, as an end tag has. */
 const NO_ATTRIBUTES: readonly number[] = [];
@@ -46,7 +46,7 @@ export function topOverlay(
   tag: StreamReader | AsyncStreamReader,
   scope: Scope,
   parent: Scope,
-  fixups: XIncludeSettings,
+  fixups: Fixups,
   namespacePrefixes: boolean
 ): Overlay | undefined {
   const fixesBase = fixups.fixupBaseURIs && scope.base !== parent.base;
@@ -71,7 +71,7 @@ function langAttribute(
   lang: string | undefined,
   parentLang: string | undefined
 ): AddedAttribute | undefined {
-  if (tag.attributeValue(XML_NAMESPACE, 'lang') !== undefined) return undefined;
+  if (tag.attribute('lang', XML_NAMESPACE) !== undefined) return undefined;
   return sameLanguage(lang, parentLang) ? undefined : xmlAttribute('lang', lang ?? '');
 }
 

@@ -1,15 +1,18 @@
-import type { ResolvedOptions } from '../config/options.ts';
-import type { AttributeDeclaration, AttributeType } from '../dtd/declarations.ts';
-import { normalizeTokens } from '../entities/attribute-value.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import { ScanFlag, holdsAt, sameSpan } from '../scan/scanner.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
-import { isNcName } from '../util/names.ts';
-import { XMLNS_NAMESPACE } from '../util/namespaces.ts';
-import { normalizeAttributeValue } from '../util/normalize.ts';
+import type { ResolvedOptions } from '@/config/options';
+import type { AttributeDeclaration, AttributeType } from '@/dtd/declarations';
+import { normalizeTokens } from '@/entities/attribute-value';
+import { ErrorCode } from '@/errors/codes';
+import { XML_BINDING } from '@/namespaces/namespaces';
+import { holdsAt, sameSpan, ScanFlag } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
+import { isNcName } from '@/util/names';
+import { XMLNS_NAMESPACE } from '@/util/namespaces';
+import { normalizeAttributeValue } from '@/util/normalize';
 import { AttributeList } from './attributes.ts';
+import type { ElementStack } from './element-stack.ts';
 import { fail, outOfRange } from './internal.ts';
-import { type NamespaceScopes, XML_LENGTH, XMLNS_LENGTH, checkQName } from './namespace-scopes.ts';
+import { checkQName, type NamespaceScopes, XML_LENGTH, XMLNS_LENGTH } from './namespace-scopes.ts';
+import { XmlAttributeScopes } from './xml-attribute-scopes.ts';
 
 /** Up to this many attributes, duplicates are found by comparing each pair rather than with a set. */
 const PAIRWISE_ATTRIBUTES = 16;
@@ -64,10 +67,19 @@ export class AttributeCollector {
   #xmlIdCandidate = -1;
   /** The ID values seen so far, each with whether an `xml:id` held it; xml:id must not repeat any of them. */
   #ids: Map<string, boolean> | undefined;
+  /** The `xml:` attributes of the open elements, for an element canonicalized on its own. */
+  readonly #xmlAttributes: XmlAttributeScopes;
 
-  constructor(options: ResolvedOptions, scopes: NamespaceScopes, report: Report, expand: (tagIndex: number) => string) {
+  constructor(
+    options: ResolvedOptions,
+    scopes: NamespaceScopes,
+    elements: ElementStack,
+    report: Report,
+    expand: (tagIndex: number) => string
+  ) {
     this.#options = options;
     this.#scopes = scopes;
+    this.#xmlAttributes = new XmlAttributeScopes(elements);
     this.#report = report;
     this.#expandValue = expand;
   }
@@ -143,9 +155,9 @@ export class AttributeCollector {
       this.#declareAll(tokenizer);
     }
     if (tokenizer.nameFirstColon >= 0) scopes.bindElement(tokenizer, elementDepth);
-    if ((present & AttributeKind.PREFIXED) !== 0) this.#resolveAttributes(tokenizer);
+    if ((present & AttributeKind.PREFIXED) !== 0) this.#resolveAttributes(tokenizer, elementDepth);
     this.#declarationsHidden = declarations && !this.#options.namespacePrefixes;
-    if ((present & AttributeKind.XMLID) !== 0) this.#checkSpanXmlId(tokenizer);
+    if ((present & AttributeKind.XMLID) !== 0) this.#checkSpanXmlId(tokenizer, elementDepth);
   }
 
   /** Applies the start tag's `xmlns` declarations, binding their prefixes. */
@@ -159,14 +171,15 @@ export class AttributeCollector {
   }
 
   /** Normalizes and checks the xml:id of a start tag read from spans, and keeps its value for the accessors. */
-  #checkSpanXmlId(tokenizer: Tokenizer): void {
+  #checkSpanXmlId(tokenizer: Tokenizer, elementDepth: number): void {
     const i = this.#xmlIdCandidate;
     this.#xmlIdValue = this.#checkXmlId(tokenizer, normalizeTokens(spanValue(tokenizer, i)), undefined);
     this.#xmlIdTagIndex = i;
+    this.#xmlAttributes.note(elementDepth, 'xml:id', this.#xmlIdValue);
   }
 
-  /** Resolves the prefixed attributes, then checks that their expanded names are unique. */
-  #resolveAttributes(tokenizer: Tokenizer): void {
+  /** Resolves the prefixed attributes, noting the `xml:` ones, then checks that their expanded names are unique. */
+  #resolveAttributes(tokenizer: Tokenizer, elementDepth: number): void {
     const count = tokenizer.attributeCount;
     for (let i = 0; i < count; i++) {
       if (this.#kinds[i] !== AttributeKind.PREFIXED) continue;
@@ -179,9 +192,17 @@ export class AttributeCollector {
         colon,
         tokenizer.attributeColonCount[i] as number
       );
-      this.#bindings[i] = this.#scopes.resolvePrefix(tokenizer, start, colon);
+      const binding = this.#scopes.resolvePrefix(tokenizer, start, colon);
+      this.#bindings[i] = binding;
+      if (binding === XML_BINDING) this.#noteXmlAttribute(tokenizer, i, elementDepth);
     }
     if (count > 1) this.#checkExpandedDuplicates(tokenizer);
+  }
+
+  /** Notes an `xml:` attribute read from spans; `xml:id` is noted once checked. */
+  #noteXmlAttribute(tokenizer: Tokenizer, tagIndex: number, elementDepth: number): void {
+    const name = nameOf(tokenizer, tagIndex);
+    if (name !== 'xml:id') this.#xmlAttributes.note(elementDepth, name, spanValue(tokenizer, tagIndex));
   }
 
   /** Whether the attributes at tag indexes `first` and `second` have the same namespace URI and local name. */
@@ -282,6 +303,15 @@ export class AttributeCollector {
       this.#options.namespacePrefixes,
       listFail
     );
+    for (let i = 0; i < list.count; i++) {
+      if (list.prefixes[i] === 'xml')
+        this.#xmlAttributes.note(elementDepth, list.names[i] as string, list.values[i] as string);
+    }
+  }
+
+  /** The `xml:` attributes of the elements above `elementDepth`, outermost first, as qualified name and value. */
+  xmlAttributesAbove(elementDepth: number): [string, string][] {
+    return this.#xmlAttributes.above(elementDepth);
   }
 
   /** Makes the `xml:id` attribute an ID, normalized as one, and reports what breaks the xml:id rules (xml:id §4). */
@@ -413,9 +443,8 @@ export class AttributeCollector {
 
 /** What an attribute without a prefix is to namespaces: `xmlns` declares one. */
 function plainKind(buffer: string, start: number, end: number): number {
-  return end - start === XMLNS_LENGTH && holdsAt(buffer, start, 'xmlns')
-    ? AttributeKind.DECLARATION
-    : AttributeKind.PLAIN;
+  if (end - start === XMLNS_LENGTH && holdsAt(buffer, start, 'xmlns')) return AttributeKind.DECLARATION;
+  return AttributeKind.PLAIN;
 }
 
 /** What a prefixed attribute is to namespaces: `xmlns:` declares one, and `xml:id` is marked as well. */
@@ -439,9 +468,8 @@ function localStart(tokenizer: Tokenizer, tagIndex: number): number {
 /** An attribute's value as the start tag gives it, normalized (§3.3.3). */
 function spanValue(tokenizer: Tokenizer, tagIndex: number): string {
   const value = tokenizer.buffer.slice(tokenizer.attributeValueStart[tagIndex], tokenizer.attributeValueEnd[tagIndex]);
-  return ((tokenizer.attributeFlags[tagIndex] as number) & VALUE_FLAGS) === 0
-    ? value
-    : normalizeAttributeValue(value, tokenizer.version11, tokenizer.isReplacementText);
+  if (((tokenizer.attributeFlags[tagIndex] as number) & VALUE_FLAGS) === 0) return value;
+  return normalizeAttributeValue(value, tokenizer.version11, tokenizer.isReplacementText);
 }
 
 /** Whether the attributes at tag indexes `first` and `second` have the same qualified name. */

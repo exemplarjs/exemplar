@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type EscapeOptions, checkLiteral, escaper, cdataSections, cdataSectionsAround } from '@/escape.ts';
+import { cdataSections, cdataSectionsAround, checkLiteral, type EscapeOptions, escaper, mapCharacters } from '@/escape';
 
 /** Escape options: round-trip XML 1.0, checked, every character encodable, with any changes given. */
 function options(changes: Partial<EscapeOptions> = {}): EscapeOptions {
@@ -206,5 +206,27 @@ describe('CDATA sections', () => {
   it('writes characters an encoding lacks as references between sections, a surrogate pair as one', () => {
     const text = `a\u20ACb${String.fromCodePoint(0x1_f6_00)}`;
     expect(cdataSectionsAround(text, LATIN1)).toBe('<![CDATA[a]]>&#8364;<![CDATA[b]]>&#128512;');
+  });
+});
+
+describe('mapCharacters', () => {
+  it('writes the strings a map gives for its characters, and leaves the rest, with no map or an empty one', () => {
+    const map = new Map([
+      ['-', '[dash]'],
+      ['\u{1F600}', '[smile]'],
+    ]);
+    expect(mapCharacters('a-b\u{1F600}c', map)).toBe('a[dash]b[smile]c');
+    expect(mapCharacters('a-b', new Map())).toBe('a-b');
+    expect(mapCharacters('a-b', undefined)).toBe('a-b');
+  });
+
+  it('gives every other character to the writer, a surrogate pair as one, with its code point and offset', () => {
+    const seen: string[] = [];
+    const written = mapCharacters('<\u{1F600}-x', new Map([['-', '_']]), (char, code, text, index) => {
+      seen.push(`${code}@${index}`);
+      return text[index] === '<' ? '&lt;' : char;
+    });
+    expect(written).toBe('&lt;\u{1F600}_x');
+    expect(seen).toEqual(['60@0', '128512@1', '120@4']);
   });
 });

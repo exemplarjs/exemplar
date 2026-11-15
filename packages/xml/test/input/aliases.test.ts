@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ALIASES } from '@/input/aliases.ts';
-import { DecoderRegistry } from '@/input/decoders.ts';
+import { ALIASES } from '@/input/aliases';
+import { DecoderRegistry } from '@/input/decoders';
 
 describe('the encoding alias table', () => {
   it('keys every name in lower case, as names compare case-insensitively (§4.3.3)', () => {

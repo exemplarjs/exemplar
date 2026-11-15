@@ -1,9 +1,18 @@
 import type { Decoder } from '@exemplarjs/xml';
-import { DecodeError, NO_BYTES, withCarry } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
+import {
+  BYTE_BITS,
+  BYTE_VALUES,
+  Char,
+  DecodeError,
+  ErrorFactory,
+  NO_BYTES,
+  Radix,
+  UNDEFINED_CHARACTER,
+  UTF16_UNIT_BYTES,
+  withCarry,
+} from '@exemplarjs/xml/internal';
 
-/** U+FFFF marks a sequence a table leaves undefined. */
-const UNDEFINED = 0xff_ff;
+const { NON_ASCII } = Char;
 
 /** The rows and cells of the JIS, KS and GB character sets: 94 of each, numbered from byte 0xA1 as EUC writes them. */
 export const Euc = { FIRST: 0xa1, LAST: 0xfe, COUNT: 94 } as const;
@@ -11,8 +20,9 @@ export const Euc = { FIRST: 0xa1, LAST: 0xfe, COUNT: 94 } as const;
 /** Half-width katakana: bytes 0xA1–0xDF in Shift_JIS and after EUC-JP's SS2, U+FF61–U+FF9F in Unicode. */
 const Katakana = { BYTE_FIRST: 0xa1, BYTE_LAST: 0xdf, UNICODE_FIRST: 0xff_61 } as const;
 
-/** Bytes below this are ASCII in every encoding here. */
-const ASCII_END = 0x80;
+/** How many bytes a two-byte sequence and one after EUC-JP's SS3 take. */
+const DOUBLE_BYTE_LENGTH = 2;
+const SS3_SEQUENCE_LENGTH = 3;
 
 /** How much decoded text gathers in a run before it is joined onto the output, which keeps the joins few. */
 const RUN_FLUSH_LENGTH = 4096;
@@ -20,11 +30,17 @@ const RUN_FLUSH_LENGTH = 4096;
 /** Decodes base64 into 16-bit units, little-endian. */
 export function unitsFromBase64(base64: string): Uint16Array {
   const binary = atob(base64);
-  const units = new Uint16Array(binary.length / 2);
-  // eslint-disable-next-line prefer-code-point -- reads bytes from a binary string
-  for (let i = 0; i < units.length; i++) units[i] = binary.charCodeAt(2 * i) | (binary.charCodeAt(2 * i + 1) << 8);
+  const units = new Uint16Array(binary.length / UTF16_UNIT_BYTES);
+  for (let i = 0; i < units.length; i++) {
+    const low = UTF16_UNIT_BYTES * i;
+    // eslint-disable-next-line prefer-code-point -- reads bytes from a binary string
+    units[i] = binary.charCodeAt(low) | (binary.charCodeAt(low + 1) << BYTE_BITS);
+  }
   return units;
 }
+
+/** How many numbers give a trail range: its first and last byte. */
+const BOUNDS_PER_RANGE = 2;
 
 /**
  * Characters by two-byte sequence, as a grid: a row per lead byte from `leadFirst` up to 0xFE, a
@@ -35,7 +51,7 @@ export function unitsFromBase64(base64: string): Uint16Array {
 export class PairTable {
   readonly #leadFirst: number;
   /** Each trail byte's column plus one, or 0 for a byte no trail range holds. */
-  readonly #columns = new Uint8Array(256);
+  readonly #columns = new Uint8Array(BYTE_VALUES);
   readonly #columnCount: number;
   /** The cells, row by row. */
   readonly #units: Uint16Array;
@@ -44,7 +60,7 @@ export class PairTable {
   constructor(leadFirst: number, trailRanges: readonly number[], units: Uint16Array) {
     this.#leadFirst = leadFirst;
     let column = 0;
-    for (let range = 0; range < trailRanges.length; range += 2) {
+    for (let range = 0; range < trailRanges.length; range += BOUNDS_PER_RANGE) {
       const last = trailRanges[range + 1] as number;
       for (let trail = trailRanges[range] as number; trail <= last; trail++) this.#columns[trail] = ++column;
     }
@@ -55,8 +71,8 @@ export class PairTable {
   /** The code unit for a sequence, or U+FFFF. */
   get(lead: number, trail: number): number {
     const column = this.#columns[trail] as number;
-    if (lead < this.#leadFirst || lead > Euc.LAST || column === 0) return UNDEFINED;
-    return this.#units[(lead - this.#leadFirst) * this.#columnCount + column - 1] ?? UNDEFINED;
+    if (lead < this.#leadFirst || lead > Euc.LAST || column === 0) return UNDEFINED_CHARACTER;
+    return this.#units[(lead - this.#leadFirst) * this.#columnCount + column - 1] ?? UNDEFINED_CHARACTER;
   }
 }
 
@@ -83,7 +99,7 @@ abstract class MultiByteDecoder implements Decoder {
   /** The bytes of an incomplete sequence at the end of the last chunk. */
   #carry = NO_BYTES;
 
-  constructor(name: string, leads: string, overrides: Overrides) {
+  protected constructor(name: string, leads: string, overrides: Overrides) {
     this.#name = name;
     this.#isLead = leadFlags(leads);
     this.#singleOverrides = overridesFromRuns(overrides.singles);
@@ -92,13 +108,13 @@ abstract class MultiByteDecoder implements Decoder {
 
   /** How many bytes the sequence starting with this byte takes: two after a lead byte, else one. */
   protected sequenceLength(bytes: Uint8Array, start: number): number {
-    return this.#isLead[bytes[start] as number] === 1 ? 2 : 1;
+    return this.#isLead[bytes[start] as number] === 1 ? DOUBLE_BYTE_LENGTH : 1;
   }
 
   /** A single byte's character, or undefined: ASCII. */
   protected singleByteChar(byte: number): string | undefined {
     // eslint-disable-next-line prefer-code-point -- an ASCII byte
-    return byte < ASCII_END ? String.fromCharCode(byte) : undefined;
+    return byte < NON_ASCII ? String.fromCharCode(byte) : undefined;
   }
 
   /** A two-byte sequence's character, or undefined. */
@@ -139,12 +155,14 @@ abstract class MultiByteDecoder implements Decoder {
     const first = input[start] as number;
     if (length === 1) {
       const overridden = this.#singleOverrides.get(first);
-      return overridden === undefined ? this.singleByteChar(first) : (overridden ?? undefined);
+      if (overridden === undefined) return this.singleByteChar(first);
+      return overridden ?? undefined;
     }
-    if (length === 2) {
+    if (length === DOUBLE_BYTE_LENGTH) {
       const trail = input[start + 1] as number;
-      const overridden = this.#pairOverrides.get((first << 8) | trail);
-      return overridden === undefined ? this.pairChar(first, trail) : (overridden ?? undefined);
+      const overridden = this.#pairOverrides.get((first << BYTE_BITS) | trail);
+      if (overridden === undefined) return this.pairChar(first, trail);
+      return overridden ?? undefined;
     }
     return this.longerSequenceChar(input, start, length);
   }
@@ -152,6 +170,9 @@ abstract class MultiByteDecoder implements Decoder {
 
 /** The code point an override gives for a sequence that decodes to an error. */
 const ERROR_CODE_POINT = 0xff_ff_ff;
+
+/** The bytes of each field in an override run: the first key, the count, and each code point. */
+const OverrideRun = { KEY_BYTES: 2, COUNT_BYTES: 1, CODE_POINT_BYTES: 3 } as const;
 
 /** Overrides keyed by the bytes as one number, from their packed runs; null marks an error. */
 function overridesFromRuns(runs: string | undefined): Map<number, string | null> {
@@ -162,15 +183,15 @@ function overridesFromRuns(runs: string | undefined): Map<number, string | null>
   const readNumber = (start: number, length: number): number => {
     let value = 0;
     // eslint-disable-next-line prefer-code-point -- reads bytes from a binary string
-    for (let offset = 0; offset < length; offset++) value = (value << 8) | bytes.charCodeAt(start + offset);
+    for (let offset = 0; offset < length; offset++) value = (value << BYTE_BITS) | bytes.charCodeAt(start + offset);
     return value;
   };
   for (let i = 0; i < bytes.length;) {
-    const firstKey = readNumber(i, 2);
-    const count = readNumber(i + 2, 1);
-    i += 3;
-    for (let offset = 0; offset < count; offset++, i += 3) {
-      const codePoint = readNumber(i, 3);
+    const firstKey = readNumber(i, OverrideRun.KEY_BYTES);
+    const count = readNumber(i + OverrideRun.KEY_BYTES, OverrideRun.COUNT_BYTES);
+    i += OverrideRun.KEY_BYTES + OverrideRun.COUNT_BYTES;
+    for (let offset = 0; offset < count; offset++, i += OverrideRun.CODE_POINT_BYTES) {
+      const codePoint = readNumber(i, OverrideRun.CODE_POINT_BYTES);
       overrides.set(firstKey + offset, codePoint === ERROR_CODE_POINT ? null : String.fromCodePoint(codePoint));
     }
   }
@@ -180,15 +201,18 @@ function overridesFromRuns(runs: string | undefined): Map<number, string | null>
 /** A table's code unit as a string, or undefined for U+FFFF. */
 function charOfUnit(unit: number): string | undefined {
   // eslint-disable-next-line prefer-code-point -- table entries are 16-bit units
-  return unit === UNDEFINED ? undefined : String.fromCharCode(unit);
+  return unit === UNDEFINED_CHARACTER ? undefined : String.fromCharCode(unit);
 }
+
+/** How many bytes' lead flags each hex digit of a lead mask holds. */
+const FLAGS_PER_HEX_DIGIT = 4;
 
 /** Lead bytes from a 256-bit mask in hex: each digit holds four bytes' flags, the lowest byte in the lowest bit. */
 function leadFlags(mask: string): Uint8Array {
-  const isLead = new Uint8Array(256);
-  for (let byte = 0; byte < 256; byte++) {
-    const digit = Number.parseInt(mask[Math.floor(byte / 4)] ?? '0', 16);
-    isLead[byte] = (digit >> (byte % 4)) & 1;
+  const isLead = new Uint8Array(BYTE_VALUES);
+  for (let byte = 0; byte < BYTE_VALUES; byte++) {
+    const digit = Number.parseInt(mask[Math.floor(byte / FLAGS_PER_HEX_DIGIT)] ?? '0', Radix.HEXADECIMAL);
+    isLead[byte] = (digit >> (byte % FLAGS_PER_HEX_DIGIT)) & 1;
   }
   return isLead;
 }
@@ -212,6 +236,8 @@ const ShiftJis = {
   TRAIL_GAP: 0x7f,
   TRAIL_LAST: 0xfc,
   TRAILS_PER_LEAD: 188,
+  /** How many JIS rows each lead byte covers. */
+  ROWS_PER_LEAD: 2,
   /** The leads windows-31j gives to private use, and the code point they start at. */
   PRIVATE_LEAD_FIRST: 0xf0,
   PRIVATE_LEAD_LAST: 0xf9,
@@ -255,7 +281,7 @@ export class ShiftJisDecoder extends MultiByteDecoder {
   protected pairChar(lead: number, trail: number): string | undefined {
     if (trail < ShiftJis.TRAIL_FIRST || trail === ShiftJis.TRAIL_GAP || trail > ShiftJis.TRAIL_LAST) return undefined;
     const trailIndex = shiftJisTrailIndex(trail);
-    const row = shiftJisLeadIndex(lead) * 2 + (trailIndex < Euc.COUNT ? 0 : 1);
+    const row = shiftJisLeadIndex(lead) * ShiftJis.ROWS_PER_LEAD + (trailIndex < Euc.COUNT ? 0 : 1);
     const cell = trailIndex % Euc.COUNT;
     if (row < Euc.COUNT) return charOfUnit(this.#jis.get(Euc.FIRST + row, Euc.FIRST + cell));
     if (!this.#hasPrivateUse || lead > ShiftJis.PRIVATE_LEAD_LAST) return undefined;
@@ -285,7 +311,7 @@ export class EucJpDecoder extends MultiByteDecoder {
   }
 
   protected override sequenceLength(bytes: Uint8Array, start: number): number {
-    return bytes[start] === SINGLE_SHIFT_3 ? 3 : super.sequenceLength(bytes, start);
+    return bytes[start] === SINGLE_SHIFT_3 ? SS3_SEQUENCE_LENGTH : super.sequenceLength(bytes, start);
   }
 
   protected pairChar(lead: number, trail: number): string | undefined {
@@ -294,9 +320,11 @@ export class EucJpDecoder extends MultiByteDecoder {
   }
 
   protected override longerSequenceChar(bytes: Uint8Array, start: number): string | undefined {
-    const [lead, trail] = [bytes[start + 1] as number, bytes[start + 2] as number];
-    const overridden = this.#tripleOverrides.get((lead << 8) | trail);
-    return overridden === undefined ? charOfUnit(this.#supplementary.get(lead, trail)) : (overridden ?? undefined);
+    const lead = bytes[start + 1] as number;
+    const trail = bytes[start + SS3_SEQUENCE_LENGTH - 1] as number;
+    const overridden = this.#tripleOverrides.get((lead << BYTE_BITS) | trail);
+    if (overridden === undefined) return charOfUnit(this.#supplementary.get(lead, trail));
+    return overridden ?? undefined;
   }
 }
 
@@ -324,6 +352,9 @@ const Mode = { ASCII: 0, ROMAN: 1, JIS0208: 2, KANA: 3 } as const;
 const ESCAPE = 0x1b;
 const SHIFT_OUT = 0x0e;
 const SHIFT_IN = 0x0f;
+
+/** How many bytes an escape sequence takes: ESC and the two that name the mode. */
+const ESCAPE_SEQUENCE_LENGTH = 3;
 
 /** The mode each escape sequence switches to, by the two bytes after ESC. */
 const ESCAPE_MODES: ReadonlyMap<string, number> = new Map([
@@ -379,7 +410,7 @@ export class Iso2022JpDecoder implements Decoder {
   #decodeStep(input: Uint8Array, start: number): number | undefined {
     const byte = input[start] as number;
     this.#stepText = '';
-    if (byte >= ASCII_END) return undefined;
+    if (byte >= NON_ASCII) return undefined;
     if (byte === ESCAPE) return this.#switchMode(input, start);
     if (byte === SHIFT_OUT) {
       this.#modeBeforeShiftOut = this.#mode;
@@ -394,10 +425,10 @@ export class Iso2022JpDecoder implements Decoder {
       case Mode.JIS0208: {
         if (start + 1 >= input.length) return -1;
         const unit = this.#jis.get(byte + HIGH_BIT, (input[start + 1] as number) + HIGH_BIT);
-        if (unit === UNDEFINED) return undefined;
+        if (unit === UNDEFINED_CHARACTER) return undefined;
         // eslint-disable-next-line prefer-code-point -- table entries are 16-bit units
         this.#stepText = String.fromCharCode(unit);
-        return 2;
+        return DOUBLE_BYTE_LENGTH;
       }
       case Mode.KANA: {
         if (byte > KANA_BYTE_LAST) return undefined;
@@ -416,19 +447,22 @@ export class Iso2022JpDecoder implements Decoder {
 
   /** Switches mode at an escape sequence; returns its length, -1 when more bytes are needed, or undefined if unknown. */
   #switchMode(input: Uint8Array, start: number): number | undefined {
-    if (start + 2 >= input.length) return -1;
-    const mode = ESCAPE_MODES.get(String.fromCodePoint(input[start + 1] as number, input[start + 2] as number));
+    const last = start + ESCAPE_SEQUENCE_LENGTH - 1;
+    if (last >= input.length) return -1;
+    const mode = ESCAPE_MODES.get(String.fromCodePoint(input[start + 1] as number, input[last] as number));
     if (mode === undefined) return undefined;
     this.#mode = mode;
-    return 3;
+    return ESCAPE_SEQUENCE_LENGTH;
   }
 }
 
 /** Where JIS X 0201 Roman differs from ASCII: the yen sign for the backslash, the overline for the tilde. */
+/* eslint-disable no-magic-numbers -- encoding data: the bytes JIS X 0201 Roman remaps */
 const ROMAN: ReadonlyMap<number, string> = new Map([
   [0x5c, '\u00A5'],
   [0x7e, '\u203E'],
 ]);
+/* eslint-enable no-magic-numbers */
 
 /** A JIS X 0201 Roman byte's character. */
 function romanChar(byte: number): string {

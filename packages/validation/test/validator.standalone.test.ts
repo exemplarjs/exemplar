@@ -1,4 +1,4 @@
-import { eventTypes, validity, withFiles } from '@test/helpers/validity.ts';
+import { eventTypes, validity, withFiles } from '@test/helpers/validity';
 import { describe, expect, it } from 'vitest';
 import { ErrorCode, EventType, XMLError } from '@exemplarjs/xml';
 

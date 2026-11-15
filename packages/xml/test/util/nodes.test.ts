@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { XMLNS_NAMESPACE } from '@/util/namespaces.ts';
-import { type NodeLike, NodeType, attributesOf, prefixDeclaredBy } from '@/util/nodes.ts';
+import { XMLNS_NAMESPACE } from '@/util/namespaces';
+import { attributesOf, type NodeLike, NodeType, prefixDeclaredBy } from '@/util/nodes';
 
 /** An attribute node, namespaced unless its local name is null. */
 function attr(nodeName: string, localName: string | null, namespaceURI: string | null = null): NodeLike<never> {

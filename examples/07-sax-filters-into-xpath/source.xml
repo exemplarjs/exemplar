@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<orders>
+  <order id="1001" store="S1">
+    <line sku="B-101" qty="2"/>
+    <line sku="B-310" qty="1"/>
+  </order>
+  <order id="1002" store="S2">
+    <line sku="B-205" qty="1"/>
+  </order>
+  <order id="1003" store="S3">
+    <line sku="B-101" qty="1"/>
+    <line sku="B-205" qty="2"/>
+  </order>
+</orders>

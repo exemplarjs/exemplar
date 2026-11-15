@@ -1,7 +1,7 @@
-import { canonical } from '@test/helpers/canonical.ts';
-import { written } from '@test/helpers/write.ts';
+import { canonical } from '@test/helpers/canonical';
+import { written } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
-import type { StreamWriter } from '@/index.ts';
+import type { StreamWriter } from '@/index';
 
 const indent = { indent: '  ' };
 
@@ -146,6 +146,51 @@ describe('StreamWriter indentation (OutputKeys.INDENT)', () => {
     };
     expect(written(write, { indent: '\t' })).toBe('<a>\n\t<b>\n\t\t<c/>\n\t</b>\n</a>');
     expect(written(write, { indent: '' })).toBe('<a>\n<b>\n<c/>\n</b>\n</a>');
+  });
+
+  it('adds no whitespace inside the elements whose indentation is suppressed, by qualified or expanded name', () => {
+    const out = written(
+      (w) => {
+        w.writeStartElement('a');
+        w.writeStartElement('pre');
+        w.writeEmptyElement('b');
+        w.writeEndElement();
+        w.writeStartElement('x', 'pre', 'urn:x');
+        w.writeNamespace('x', 'urn:x');
+        w.writeEmptyElement('b');
+        w.writeEndElement();
+        w.writeStartElement('c');
+        w.writeEmptyElement('d');
+        w.writeEndDocument();
+      },
+      { ...indent, suppressIndentation: ['pre', '{urn:x}pre'] }
+    );
+    expect(out).toBe('<a>\n  <pre><b/></pre>\n  <x:pre xmlns:x="urn:x"><b/></x:pre>\n  <c>\n    <d/>\n  </c>\n</a>');
+  });
+
+  it('suppresses indentation by the default namespace the start tag itself declares', () => {
+    const out = written(
+      (w) => {
+        w.writeStartElement('a');
+        w.writeStartElement('pre');
+        w.writeDefaultNamespace('urn:x');
+        w.writeEmptyElement('b');
+        w.writeEndDocument();
+      },
+      { ...indent, suppressIndentation: ['{urn:x}pre'] }
+    );
+    expect(out).toBe('<a>\n  <pre xmlns="urn:x"><b/></pre>\n</a>');
+  });
+
+  it('puts the XML declaration and the DOCTYPE on lines of their own only when indenting', () => {
+    const prolog = (w: StreamWriter): void => {
+      w.writeStartDocument();
+      w.writeDTD('<!DOCTYPE a>');
+      w.writeEmptyElement('a');
+      w.writeEndDocument();
+    };
+    expect(written(prolog)).toBe('<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE a><a/>');
+    expect(written(prolog, { indent: '  ' })).toBe('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE a>\n<a/>');
   });
 
   it('writes no line breaks without the option', () => {

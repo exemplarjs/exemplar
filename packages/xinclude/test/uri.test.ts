@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { relativeURI } from '@/uri.ts';
+import { relativeURI } from '@/uri';
 
 const SEGMENTS = ['', 'a', 'b', 'a:b', '%2E', 'C:'];
 

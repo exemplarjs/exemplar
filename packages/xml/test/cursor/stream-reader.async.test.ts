@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createFilteredReader } from '@/filters/index.ts';
-import {
-  type AsyncStreamReader,
-  EventType,
-  type InputOptions,
-  type Source,
-  XMLError,
-  XMLInputFactory,
-} from '@/index.ts';
+import { createFilteredReader } from '@/filters/index';
+import { IllegalStateError } from '@/index';
+import { type AsyncStreamReader, EventType, type InputOptions, type Source, XMLError, XMLInputFactory } from '@/index';
 
 const encoder = new TextEncoder();
 
@@ -49,7 +43,7 @@ describe('the asynchronous cursor (Aalto’s non-blocking reader)', () => {
     reader.feed(encoder.encode('<?xml version="1.0" encod'));
     expect(reader.next()).toBe(EventType.NEED_INPUT);
     reader.feed(encoder.encode('ing="UTF-8"?><a/>'));
-    expect([reader.next(), reader.encoding()]).toEqual([EventType.START_DOCUMENT, 'UTF-8']);
+    expect([reader.next(), reader.declaredEncoding()]).toEqual([EventType.START_DOCUMENT, 'UTF-8']);
   });
 
   it('reports NEED_INPUT whenever a fed reader runs out of input, and the rest once fed', () => {
@@ -129,11 +123,11 @@ describe('the asynchronous cursor (Aalto’s non-blocking reader)', () => {
 
   it('refuses feed() and endOfInput() on a reader that reads a source, or a synchronous one', () => {
     const streaming = asyncReader(encoder.encode('<a/>'));
-    expect(() => streaming.feed(new Uint8Array(1))).toThrow(TypeError);
-    expect(() => streaming.endOfInput()).toThrow(TypeError);
+    expect(() => streaming.feed(new Uint8Array(1))).toThrow(IllegalStateError);
+    expect(() => streaming.endOfInput()).toThrow(IllegalStateError);
     const sync = new XMLInputFactory().createStreamReader('<a/>');
     // @ts-expect-error -- a synchronous reader has no feed(), and refuses one called anyway
-    expect(() => sync.feed(new Uint8Array(1))).toThrow(TypeError);
+    expect(() => sync.feed(new Uint8Array(1))).toThrow(IllegalStateError);
     // @ts-expect-error -- nor endOfInput()
     expect(() => sync.endOfInput()).toThrow('Only an asynchronous reader created without a source can be fed');
   });
@@ -145,11 +139,13 @@ describe('the asynchronous cursor (Aalto’s non-blocking reader)', () => {
 
   it('runs filters only on events, never on NEED_INPUT, and always passes END_DOCUMENT', async () => {
     const seen: EventType[] = [];
+
     /** The document's bytes, two at a time. */
     async function* pairs() {
       const bytes = encoder.encode('<a><!--c--><b/></a>');
       for (let i = 0; i < bytes.length; i += 2) yield bytes.subarray(i, i + 2);
     }
+
     const reader = createFilteredReader(asyncReader(pairs()), (r) => {
       seen.push(r.eventType());
       return r.eventType() !== EventType.COMMENT;
@@ -280,6 +276,26 @@ describe('nextTagAsync and elementTextAsync', () => {
   });
 });
 
+describe('skipElementAsync', () => {
+  it('skips an element across chunk boundaries, stopping at its end tag', async () => {
+    const reader = asyncReader(trickle('<a><b>x<c><b/></c></b><e/></a>'));
+    await reader.nextTagAsync();
+    await reader.nextTagAsync();
+    await reader.skipElementAsync();
+    expect([reader.eventType(), reader.localName()]).toEqual([EventType.END_ELEMENT, 'b']);
+    expect([await reader.nextTagAsync(), reader.localName()]).toEqual([EventType.START_ELEMENT, 'e']);
+  });
+
+  it('needs a START_ELEMENT, and skipElement cannot wait for input', async () => {
+    await expect(asyncReader('<a/>').skipElementAsync()).rejects.toThrow('skipElementAsync() needs a START_ELEMENT');
+    const waiting = asyncReader(trickle('<a>some text</a>'));
+    await waiting.nextTagAsync();
+    expect(() => waiting.skipElement()).toThrow(
+      'skipElement() cannot wait for input; use skipElementAsync() with an asynchronous reader'
+    );
+  });
+});
+
 describe('forEachEvent', () => {
   it('calls back for every event, START_DOCUMENT to END_DOCUMENT, awaiting input between', async () => {
     const reader = asyncReader(trickle('<a x="1">t<b/></a>'));
@@ -388,6 +404,17 @@ describe('resolvers in the asynchronous cursor', () => {
     const events = await drive(asyncReader(xml, options));
     expect(events.filter((e) => e === 'NEED')).toHaveLength(2);
     expect(errors).toEqual(['VC_ENTITY_DECLARED']);
+  });
+
+  it('reads the DTD again after each answer, reporting its warnings once', async () => {
+    const warnings: string[] = [];
+    const options: InputOptions = {
+      ...resolving(() => Promise.resolve({ text: '<!ELEMENT a ANY>' })),
+      errorHandler: { warning: (e) => warnings.push(e.code) },
+    };
+    const xml = '<!DOCTYPE a SYSTEM "a.dtd" [<!ENTITY e "1"><!ENTITY e "2"><!ENTITY % p SYSTEM "p.ent">%p;]><a/>';
+    await drive(asyncReader(xml, options));
+    expect(warnings).toEqual(['DTD_DUPLICATE_ENTITY']);
   });
 
   it('reports the held-back recoverable errors before a fatal error in the DTD', async () => {

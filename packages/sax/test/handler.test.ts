@@ -3,14 +3,14 @@ import type { XMLError } from '@exemplarjs/xml';
 import type {
   Attributes,
   ContentHandler,
-  DTDHandler,
   DeclHandler,
+  DTDHandler,
   LexicalHandler,
   Locator,
   SAXErrorHandler,
   SAXHandler,
-} from '@/handler.ts';
-import { XMLFilterImpl } from '@/index.ts';
+} from '@/handler';
+import { XMLFilterImpl } from '@/index';
 
 describe('the SAX handler interfaces', () => {
   it('make SAXHandler every SAX2 handler at once', () => {

@@ -1,6 +1,6 @@
-import { byteByByte, bytes, decode, decodeChunks, factory, hex, splits } from '@test/helpers/bytes.ts';
+import { byteByByte, bytes, decode, decodeChunks, factory, hex, splits } from '@test/helpers/bytes';
 import { describe, expect, it } from 'vitest';
-import { cjkDecoders } from '@/index.ts';
+import { cjkDecoders } from '@/index';
 
 /** Every charset the package registers, by canonical name. */
 const CHARSETS = ['big5', 'big5-hkscs', 'euc-jp', 'euc-kr', 'gb2312', 'gbk', 'iso-2022-jp', 'shift_jis', 'windows-31j'];

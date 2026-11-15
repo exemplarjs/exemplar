@@ -1,4 +1,4 @@
-import { type Files, MAIN, XI, factory, failure } from '@test/helpers/xinclude.ts';
+import { factory, failure, type Files, MAIN, XI } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import { DocumentBuilder } from '@exemplarjs/dom';
 import { SAXParser } from '@exemplarjs/sax';

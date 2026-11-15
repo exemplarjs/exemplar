@@ -1,4 +1,4 @@
-import { XMLNS_NAMESPACE } from './namespaces.ts';
+import { XMLNS_COLON, XMLNS_NAMESPACE } from './namespaces.ts';
 
 /** The node types, numbered as DOM Level 3 numbers them. */
 export const NodeType = {
@@ -15,9 +15,6 @@ export const NodeType = {
   DOCUMENT_FRAGMENT_NODE: 11,
   NOTATION_NODE: 12,
 } as const;
-
-/** How the name of an attribute that declares a prefix starts, as in `xmlns:p="…"`. */
-const XMLNS_COLON = 'xmlns:';
 
 /**
  * The parts of a DOM Level 2 node that the writer and canonicalization read, so they work on any

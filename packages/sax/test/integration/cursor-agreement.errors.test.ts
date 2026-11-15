@@ -1,4 +1,4 @@
-import { errorEveryWay, utf16 } from '@test/helpers/agreement.ts';
+import { errorEveryWay, utf16 } from '@test/helpers/agreement';
 import { describe, expect, it } from 'vitest';
 import type { InputOptions } from '@exemplarjs/xml';
 

@@ -1,5 +1,11 @@
-import { XMLNS_NAMESPACE, XML_NAMESPACE, isNcName, isXmlName, splitQName } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
+import {
+  ErrorFactory,
+  isNcName,
+  isXmlName,
+  splitQName,
+  XML_NAMESPACE,
+  XMLNS_NAMESPACE,
+} from '@exemplarjs/xml/internal';
 
 /** The namespace the DTD's attribute types are named in, and the schema type that names the DTD. */
 export const DTD_TYPES = 'http://www.w3.org/TR/REC-xml';

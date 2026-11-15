@@ -2,7 +2,19 @@ import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
 /** The library packages, whose tests run in Chromium, Firefox and WebKit too. */
-const PACKAGES = ['xml', 'sax', 'writer', 'dom', 'canonical', 'validation', 'xinclude', 'catalog', 'encodings-cjk'];
+const PACKAGES = [
+  'xml',
+  'sax',
+  'writer',
+  'dom',
+  'canonical',
+  'validation',
+  'xinclude',
+  'catalog',
+  'encodings-cjk',
+  'xdm',
+  'xpath',
+];
 
 export default defineConfig({
   test: {

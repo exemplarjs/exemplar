@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { CanonicalizeOptions } from '@/canonicalize.ts';
-import { Canonicalizer, type CanonicalAttribute, sortAttributes } from '@/render.ts';
+import type { CanonicalizeOptions } from '@/canonicalize';
+import { type CanonicalAttribute, Canonicalizer, type CanonicalXMLMethod, sortAttributes } from '@/render';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 
 /** A canonicalizer whose shared steps a test can call one at a time. */
 class Probe extends Canonicalizer {
-  constructor(options: CanonicalizeOptions = {}, encoding?: string | null, exclusive = false) {
-    super(exclusive, options, encoding);
+  constructor(options: CanonicalizeOptions = {}, encoding?: string | null, method: CanonicalXMLMethod = 'c14n') {
+    super(method, options, encoding);
   }
 
   /** What has been written so far. */
@@ -140,8 +140,8 @@ describe('Canonicalizer', () => {
     const scope = ns(['', 'urn:d'], ['p', 'urn:p'], ['q', 'urn:q'], ['r', 'urn:r']);
 
     it("names the element's prefix, the default for an unprefixed element", () => {
-      expect(new Probe({}, null, true).usedBy('', [], scope)).toEqual(['']);
-      expect(new Probe({}, null, true).usedBy('p', [], scope)).toEqual(['p']);
+      expect(new Probe({}, null, 'exc-c14n').usedBy('', [], scope)).toEqual(['']);
+      expect(new Probe({}, null, 'exc-c14n').usedBy('p', [], scope)).toEqual(['p']);
     });
 
     it('adds the prefixes of qualified attributes, not of unqualified or xml: ones', () => {
@@ -150,11 +150,11 @@ describe('Canonicalizer', () => {
         [XML, 'lang', 'xml:lang', 'en'],
         ['urn:q', 'b', 'q:b', ''],
       ];
-      expect(new Probe({}, null, true).usedBy('p', attributes, scope)).toEqual(['p', 'q']);
+      expect(new Probe({}, null, 'exc-c14n').usedBy('p', attributes, scope)).toEqual(['p', 'q']);
     });
 
     it('adds the prefixes of the inclusive list that are in scope, #default naming the default namespace', () => {
-      const probe = new Probe({ inclusivePrefixes: ['r', '#default', 'unbound'] }, null, true);
+      const probe = new Probe({ inclusivePrefixes: ['r', '#default', 'unbound'] }, null, 'exc-c14n');
       expect(probe.usedBy('p', [], scope).toSorted()).toEqual(['', 'p', 'r']);
     });
   });

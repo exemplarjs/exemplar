@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import * as filters from '@/filters/index.ts';
-import { StreamReaderDelegate, createFilteredReader } from '@/filters/index.ts';
-import { EventType, type XMLEvent, XMLInputFactory } from '@/index.ts';
+import * as filters from '@/filters/index';
+import { createDelegatedReader, createFilteredReader, StreamReaderDelegate } from '@/filters/index';
+import { EventType, type XMLEvent, XMLInputFactory } from '@/index';
 
 const xml = new XMLInputFactory();
 const DOCUMENT = '<a><!--c--><?p d?><b>t</b></a>';
@@ -15,7 +15,11 @@ function types(reader: { next(): EventType }): EventType[] {
 
 describe('@exemplarjs/xml/filters', () => {
   it('exports the filtered readers and the delegate', () => {
-    expect(Object.keys(filters).toSorted()).toEqual(['StreamReaderDelegate', 'createFilteredReader']);
+    expect(Object.keys(filters).toSorted()).toEqual([
+      'StreamReaderDelegate',
+      'createDelegatedReader',
+      'createFilteredReader',
+    ]);
     expect(StreamReaderDelegate).toBeTypeOf('function');
   });
 });
@@ -48,6 +52,25 @@ describe('filtered readers (StAX StreamFilter)', () => {
     );
     for (let e = reader.next(); e !== EventType.END_DOCUMENT; e = reader.next()) names.push(reader.localName());
     expect(names).toEqual(['b']);
+  });
+
+  it('take several filters, each seeing only what those before it accepted', () => {
+    const seen: EventType[] = [];
+    const cursor = xml.createStreamReader(DOCUMENT);
+    const reader = createFilteredReader(
+      cursor,
+      (r) => r.eventType() === EventType.START_ELEMENT,
+      (r) => {
+        seen.push(r.eventType());
+        return r.localName() !== 'a';
+      }
+    );
+    expect([reader, types(reader), seen]).toEqual([
+      cursor,
+      [EventType.START_ELEMENT],
+      [EventType.START_ELEMENT, EventType.START_ELEMENT],
+    ]);
+    expect(createFilteredReader(cursor)).toBe(cursor);
   });
 
   it('always pass END_DOCUMENT, without asking the filter', () => {
@@ -90,6 +113,15 @@ describe('filtered event readers (StAX EventFilter)', () => {
     ]);
   });
 
+  it('take several event filters, in order', () => {
+    const reader = createFilteredReader(
+      xml.createEventReader(DOCUMENT),
+      (e) => e.type === EventType.START_ELEMENT,
+      (e) => e.type === EventType.START_ELEMENT && e.name.localName === 'b'
+    );
+    expect([...reader].map((e) => e.type)).toEqual([EventType.START_ELEMENT, EventType.END_DOCUMENT]);
+  });
+
   it('are the event reader they were given', () => {
     const reader = xml.createEventReader(DOCUMENT);
     expect(createFilteredReader(reader, () => true)).toBe(reader);
@@ -103,5 +135,44 @@ describe('filtered event readers (StAX EventFilter)', () => {
     const texts: string[] = [];
     for await (const event of reader) if (event.type === EventType.CHARACTERS) texts.push(event.text);
     expect(texts).toEqual(['t']);
+  });
+});
+
+describe('delegated readers (createDelegatedReader)', () => {
+  /** A delegate that puts a mark after text. */
+  class Marked extends StreamReaderDelegate {
+    readonly #mark: string;
+
+    constructor(mark: string) {
+      super();
+      this.#mark = mark;
+    }
+
+    override text(): string {
+      return `${super.text()}${this.#mark}`;
+    }
+  }
+
+  it('stack delegates on a reader, each reading through the one before it', () => {
+    const cursor = xml.createStreamReader('<a>t</a>');
+    const [first, second] = [new Marked('1'), new Marked('2')];
+    const reader = createDelegatedReader(cursor, first, second);
+    expect([reader, first.parent, second.parent]).toEqual([second, cursor, first]);
+    expect([reader.next(), reader.next(), reader.text()]).toEqual([
+      EventType.START_ELEMENT,
+      EventType.CHARACTERS,
+      't12',
+    ]);
+  });
+
+  it('stack on a delegate too, and a single delegate reads the reader itself', () => {
+    const below = new StreamReaderDelegate(xml.createStreamReader('<a>t</a>'));
+    const reader = createDelegatedReader(below, new Marked('!'));
+    expect([reader.parent, reader.next(), reader.next(), reader.text()]).toEqual([
+      below,
+      EventType.START_ELEMENT,
+      EventType.CHARACTERS,
+      't!',
+    ]);
   });
 });

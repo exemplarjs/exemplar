@@ -1,6 +1,6 @@
-import { build, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import type { CharacterData, Text } from '@/index.ts';
+import type { CharacterData, Text } from '@/index';
 
 /** A text node `hello` in an element. */
 function hello(): Text {

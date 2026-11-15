@@ -1,10 +1,10 @@
-import type { EntityDeclaration } from '../dtd/declarations.ts';
-import type { DeclarationStore } from '../dtd/store.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import { Char, isChar } from '../util/chars.ts';
-import { isXmlName } from '../util/names.ts';
-import { normalizeLineEnds } from '../util/normalize.ts';
-import { PREDEFINED_ENTITIES, codePointOfReference } from '../util/references.ts';
+import type { EntityDeclaration } from '@/dtd/declarations';
+import type { DeclarationStore } from '@/dtd/store';
+import { ErrorCode } from '@/errors/codes';
+import { Char, isChar } from '@/util/chars';
+import { isXmlName } from '@/util/names';
+import { normalizeLineEnds } from '@/util/normalize';
+import { codePointOfReference, PREDEFINED_ENTITIES } from '@/util/references';
 import type { EntityCounter } from './limits.ts';
 
 // Module-level constants, so V8 can inline them.
@@ -43,8 +43,10 @@ export interface ExpansionContext {
   readonly counter: EntityCounter;
   readonly version11: boolean;
   readonly namespaceAware: boolean;
+
   /** Throws a fatal error. */
   fail(code: ErrorCode, message: string): never;
+
   /** Reports a recoverable error. */
   error(code: ErrorCode, message: string): void;
 }

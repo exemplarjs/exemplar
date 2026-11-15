@@ -1,14 +1,14 @@
-import type { ExpansionContext } from '../entities/attribute-value.ts';
-import type { ExceededLimit } from '../entities/limits.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import type { Location } from '../errors/xml-error.ts';
-import { ResolutionError } from '../resolvers/resolver.ts';
-import { NAME_CLASSES, NameClass } from '../scan/classes.ts';
-import { Char } from '../util/chars.ts';
-import { ErrorFactory } from '../util/errors.ts';
-import { isNcName, isNmtoken, isXmlName, splitQName } from '../util/names.ts';
-import { normalizeLineEnds } from '../util/normalize.ts';
-import { isWhitespaceChar } from '../util/whitespace.ts';
+import type { ExpansionContext } from '@/entities/attribute-value';
+import type { ExceededLimit } from '@/entities/limits';
+import { ErrorCode } from '@/errors/codes';
+import type { Location } from '@/errors/xml-error';
+import { ResolutionError } from '@/resolvers/resolver';
+import { NAME_CLASSES, NameClass } from '@/scan/classes';
+import { Char } from '@/util/chars';
+import { ErrorFactory } from '@/util/errors';
+import { isNcName, isNmtoken, isXmlName, splitQName } from '@/util/names';
+import { normalizeLineEnds } from '@/util/normalize';
+import { isWhitespaceChar } from '@/util/whitespace';
 import type { EntityDeclaration } from './declarations.ts';
 import type { DeclarationStore } from './store.ts';
 
@@ -58,10 +58,16 @@ export interface ExternalText {
 export interface DtdContext extends Omit<ExpansionContext, 'fail' | 'error'> {
   /** Throws a fatal error at a location, naming the entities that led there. */
   fail(code: ErrorCode, message: string, location: Location, entities: readonly string[]): never;
+
   /** Reports a recoverable error. */
   error(code: ErrorCode, message: string, location: Location): void;
+
   /** Reads an external parameter entity, or returns undefined when it is not read. */
   readParameterEntity(entity: EntityDeclaration): ExternalText | undefined;
+
+  /** Reports a warning about the DTD; absent when nothing listens for warnings. */
+  warn?(code: ErrorCode, message: string, location: Location): void;
+
   /** Reports a validity constraint the DTD breaks; present only when validating. */
   invalid?(code: ErrorCode, message: string, location: Location): void;
 }
@@ -205,6 +211,11 @@ export class DtdInput {
   /** Throws a fatal error at a location, naming the parameter entities being read. */
   failAt(code: ErrorCode, message: string, location: Location): never {
     return this.#context.fail(code, message, location, this.openEntityNames());
+  }
+
+  /** Reports a warning here. */
+  reportWarning(code: ErrorCode, message: string): void {
+    this.#context.warn?.(code, message, this.location());
   }
 
   /** Reports a validity constraint broken here, when validating. */

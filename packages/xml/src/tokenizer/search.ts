@@ -28,6 +28,12 @@ const NOT_SEARCHED = -1;
  */
 const NOT_FOUND = 0x3f_ff_ff_ff;
 
+/** How many numbers the cache keeps for each needle: where it was found, and where that search started. */
+const SLOTS_PER_NEEDLE = 2;
+
+/** The searches of a new cache, none made yet, copied for each. */
+const NO_SEARCHES: readonly number[] = NEEDLES.flatMap(() => [NOT_SEARCHED, NOT_SEARCHED]);
+
 /**
  * Remembers where the tokenizer's searches found each needle, so that a repeated search can be
  * answered without looking again.
@@ -46,12 +52,12 @@ export class SearchCache {
    * Two numbers for each needle, side by side in one array: where the last search found it (an
    * index, NOT_FOUND or NOT_SEARCHED), then where that search started.
    */
-  readonly #searches: number[] = NEEDLES.flatMap(() => [NOT_SEARCHED, NOT_SEARCHED]);
+  readonly #searches: number[] = NO_SEARCHES.slice();
 
   /** The index of the next `needle` in `text` at or after `from`, or NOT_FOUND, which is past any index. */
   find(text: string, needle: number, from: number): number {
     const searches = this.#searches;
-    const foundAtSlot = needle * 2;
+    const foundAtSlot = needle * SLOTS_PER_NEEDLE;
     const foundAt = searches[foundAtSlot] as number;
     if ((searches[foundAtSlot + 1] as number) <= from && from <= foundAt) return foundAt;
     const found = text.indexOf(NEEDLES[needle] as string, from);

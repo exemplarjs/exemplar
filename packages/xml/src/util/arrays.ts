@@ -1,6 +1,9 @@
 /** The typed arrays the reader grows as it fills them. */
 type GrowableArray = Uint8Array | Int32Array;
 
+/** How many times longer a grown array is than the old one, at least. */
+export const GROWTH_FACTOR = 2;
+
 /**
  * A bigger copy of a typed array, of the same kind: at least `minLength` long and at least twice
  * the old length, so repeated growing stays cheap. Copies the first `usedLength` elements, by
@@ -8,7 +11,7 @@ type GrowableArray = Uint8Array | Int32Array;
  */
 export function grown<A extends GrowableArray>(array: A, minLength: number, usedLength = array.length): A {
   const Kind = array.constructor as new (length: number) => A;
-  const bigger = new Kind(Math.max(minLength, array.length * 2));
+  const bigger = new Kind(Math.max(minLength, array.length * GROWTH_FACTOR));
   bigger.set(array.subarray(0, usedLength));
   return bigger;
 }

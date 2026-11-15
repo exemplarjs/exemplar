@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorCode, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { cjkDecoders } from '@/index.ts';
+import { cjkDecoders } from '@/index';
 
 // Tables generated without GBK's entry.
 vi.mock('@/tables.ts', async (importOriginal) => {

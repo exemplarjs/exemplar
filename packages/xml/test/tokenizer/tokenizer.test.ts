@@ -1,7 +1,7 @@
-import { verdict } from '@test/helpers/lexical.ts';
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { verdict } from '@test/helpers/lexical';
+import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType } from '@/index.ts';
+import { EventType } from '@/index';
 
 /** The text of each comment in a document. */
 function comments(xml: string): string[] {

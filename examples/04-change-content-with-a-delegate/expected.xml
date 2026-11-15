@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+  <book id="b1">
+    <title>The Lighthouse Keeper</title>
+    <weight unit="kg">0.54</weight>
+    <height unit="cm">21.6</height>
+    <width unit="cm">14.0</width>
+  </book>
+  <book id="b2">
+    <title>Small Worlds</title>
+    <weight unit="kg">0.41</weight>
+    <height unit="cm">19.8</height>
+    <width unit="cm">13.0</width>
+  </book>
+  <book id="b3">
+    <title>Winter Harbour</title>
+    <weight unit="kg">1.09</weight>
+    <height unit="cm">23.4</height>
+    <width unit="cm">15.5</width>
+  </book>
+</catalog>

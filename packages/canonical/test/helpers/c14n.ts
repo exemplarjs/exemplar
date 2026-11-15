@@ -1,6 +1,6 @@
 import { type Document, DocumentBuilder, type Element } from '@exemplarjs/dom';
 import { XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { type CanonicalInput, type CanonicalNode, type CanonicalizeOptions, canonicalize } from '@/index.ts';
+import { type CanonicalInput, canonicalize, type CanonicalizeOptions, type CanonicalNode } from '@/index';
 
 /** A factory that reads external files from memory, as `file:///examples/<name>`. */
 export function factoryFor(files: Readonly<Record<string, string>> = {}): XMLInputFactory {

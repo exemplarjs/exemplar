@@ -8,8 +8,8 @@ import {
   streamOf,
   utf16,
   utf8,
-} from '@test/helpers/dom.ts';
-import { fallingBack, including, resolver, spaceValidator } from '@test/helpers/stubs.ts';
+} from '@test/helpers/dom';
+import { fallingBack, including, resolver, spaceValidator } from '@test/helpers/stubs';
 import { describe, expect, it } from 'vitest';
 import { XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import {
@@ -21,7 +21,7 @@ import {
   type Entity,
   type Notation,
   type Text,
-} from '@/index.ts';
+} from '@/index';
 
 const DOC = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!DOCTYPE doc [

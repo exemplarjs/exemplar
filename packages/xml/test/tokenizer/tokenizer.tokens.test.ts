@@ -1,9 +1,9 @@
-import { describeToken, pieces, textSource, tokens } from '@test/helpers/lexical.ts';
+import { describeToken, pieces, textSource, tokens } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
-import { DecodingFailureError, type TextSource } from '@/input/source.ts';
-import { TABLES_XML_10, TABLES_XML_11, TABLES_REPLACEMENT_TEXT } from '@/scan/classes.ts';
-import { ScanFlag } from '@/scan/scanner.ts';
-import { Token, Tokenizer, type TokenizerOptions } from '@/tokenizer/tokenizer.ts';
+import { DecodingFailureError, type TextSource } from '@/input/source';
+import { TABLES_REPLACEMENT_TEXT, TABLES_XML_10, TABLES_XML_11 } from '@/scan/classes';
+import { ScanFlag } from '@/scan/scanner';
+import { Token, Tokenizer, type TokenizerOptions } from '@/tokenizer/tokenizer';
 
 /** A started tokenizer over text given in chunks. */
 function tokenizer(chunks: readonly (string | null)[], options: Partial<TokenizerOptions> = {}): Tokenizer {

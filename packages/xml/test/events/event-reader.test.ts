@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type AsyncEventReader, EventType, type XMLEvent, XMLInputFactory } from '@/index.ts';
+import { type AsyncEventReader, EventType, type XMLEvent, XMLInputFactory } from '@/index';
 
 const xml = new XMLInputFactory();
 
@@ -77,6 +77,22 @@ describe('the event reader', () => {
       expected.push(`${reader.location().line}:${reader.location().column}`);
     }
     const found = events.slice(1, -1).map((e) => `${e.location.line}:${e.location.column}`);
+    expect(found).toEqual(expected);
+  });
+
+  it('works out the location of each event at once, while the reader is still counting its lines', () => {
+    const doc = '<a>\n  <b/>\r\n  <c>t</c>\n</a>';
+    const expected: string[] = [];
+    const cursor = xml.createStreamReader(doc);
+    for (let e = cursor.next(); e !== EventType.END_DOCUMENT; e = cursor.next()) {
+      expected.push(`${cursor.location().line}:${cursor.location().column}`);
+    }
+    const reader = xml.createEventReader(doc);
+    reader.nextEvent();
+    const found: string[] = [];
+    for (let event = reader.nextEvent(); event.type !== EventType.END_DOCUMENT; event = reader.nextEvent()) {
+      found.push(`${event.location.line}:${event.location.column}`);
+    }
     expect(found).toEqual(expected);
   });
 

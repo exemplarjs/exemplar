@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Locator, SAXParser } from '@/index.ts';
+import { type Locator, SAXParser } from '@/index';
 
 /** The locator's public and system identifiers at the root element, for a source object. */
 function identifiersOf(source: { text: string; systemId?: string; publicId?: string }): string[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EventBuilder } from '@/events/events.ts';
+import { EventBuilder } from '@/events/events';
 import {
   type AsyncStreamReader,
   Attribute,
@@ -8,7 +8,7 @@ import {
   QName,
   type XMLEvent,
   XMLInputFactory,
-} from '@/index.ts';
+} from '@/index';
 
 /** The events of a document as objects. */
 function eventsOf(xml: string, options: InputOptions = {}): XMLEvent[] {
@@ -207,7 +207,7 @@ describe('EventBuilder', () => {
     const reader = new XMLInputFactory().createStreamReader('<a x="1"/>');
     const builder = new EventBuilder();
     const type = reader.next();
-    const event = builder.build(reader as AsyncStreamReader, type);
+    const event = builder.build(reader as AsyncStreamReader, reader as AsyncStreamReader, type);
     expect(event.type === EventType.START_ELEMENT && [event.name.localName, event.attributes[0]?.value]).toEqual([
       'a',
       '1',

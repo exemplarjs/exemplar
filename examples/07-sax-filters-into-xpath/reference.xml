@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<reference>
+  <product sku="B-101" price="8.99"/>
+  <product sku="B-205" price="14.50"/>
+  <product sku="B-310" price="11.25"/>
+  <store id="S1" region="North"/>
+  <store id="S2" region="South"/>
+  <store id="S3" region="North"/>
+</reference>

@@ -11,11 +11,7 @@ export function createVitestConfig(options: ViteUserConfig = {}): ViteUserConfig
     ssr: { resolve: { conditions: [SOURCE_CONDITION, ...defaultServerConditions] } },
     test: {
       include: ['test/**/*.test.ts'],
-      coverage: {
-        provider: 'v8',
-        reporter: ['text', 'json', 'json-summary'],
-        include: ['src/**/*.ts'],
-      },
+      coverage: { provider: 'v8', reporter: ['text', 'json', 'json-summary'], include: ['src/**/*.ts'] },
     },
   });
   return mergeConfig(base, options);

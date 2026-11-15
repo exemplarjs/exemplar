@@ -8,3 +8,9 @@ pre-commit:
     - name: lint
       glob: '*.{js,mjs,cjs,ts,tsx}'
       run: pnpm exec oxlint --no-error-on-unmatched-pattern {staged_files}
+
+pre-push:
+  jobs:
+    # Unused files, exports and dependencies across the whole workspace.
+    - name: knip
+      run: pnpm knip

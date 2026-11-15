@@ -1,6 +1,6 @@
-import { build, children, domException } from '@test/helpers/dom.ts';
+import { build, children, domException } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { type Document, type DocumentType, type Element, Entity, type Node, type Text } from '@/index.ts';
+import { type Document, type DocumentType, type Element, Entity, type Node, type Text } from '@/index';
 
 const DTD = `<!DOCTYPE r PUBLIC "-//P//EN" "r.dtd" [
 <!ENTITY t "text">

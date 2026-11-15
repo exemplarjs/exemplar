@@ -1,8 +1,8 @@
-import { eventTypes, validating, validity, validityErrors, withSubset } from '@test/helpers/validity.ts';
+import { eventTypes, validating, validity, validityErrors, withSubset } from '@test/helpers/validity';
 import { describe, expect, it } from 'vitest';
 import { ErrorCode, EventType, XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import { createFilteredReader } from '@exemplarjs/xml/filters';
-import { dtdValidator } from '@/index.ts';
+import { dtdValidator } from '@/index';
 
 const DTD = `<!DOCTYPE doc [
   <!ELEMENT doc (head, item*, foot?)>

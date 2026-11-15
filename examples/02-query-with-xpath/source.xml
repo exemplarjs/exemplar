@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+  <book id="b1" genre="fiction">
+    <title>The Lighthouse Keeper</title>
+    <author>Ada Brennan</author>
+    <price>8.99</price>
+  </book>
+  <book id="b2" genre="science">
+    <title>Small Worlds</title>
+    <author>Tomas Ruiz</author>
+    <price>14.50</price>
+  </book>
+  <book id="b3" genre="fiction">
+    <title>Winter Harbour</title>
+    <author>Ada Brennan</author>
+    <price>11.25</price>
+  </book>
+</catalog>

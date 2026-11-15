@@ -1,6 +1,6 @@
-import { newDocument } from '@test/helpers/dom.ts';
+import { newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import type { Comment } from '@/index.ts';
+import type { Comment } from '@/index';
 
 describe('Comment', () => {
   it('is a comment node named #comment', () => {

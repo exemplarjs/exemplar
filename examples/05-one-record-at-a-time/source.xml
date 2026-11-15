@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export xmlns="urn:example:shop" generated="2026-03-03">
+  <order id="1001">
+    <line sku="B-101" quantity="2" price="8.99"/>
+    <line sku="B-205" quantity="1" price="14.50"/>
+  </order>
+  <order id="1002">
+    <line sku="B-310" quantity="1" price="11.25"/>
+  </order>
+  <order id="1003">
+    <line sku="B-101" quantity="3" price="8.99"/>
+    <line sku="B-412" quantity="2" price="6.75"/>
+  </order>
+</export>

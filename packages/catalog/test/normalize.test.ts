@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOG_NAMESPACE, normalizePublicId, normalizeURI, unwrapURN } from '@/normalize.ts';
+import { CATALOG_NAMESPACE, normalizePublicId, normalizeURI, unwrapURN } from '@/normalize';
 
 describe('CATALOG_NAMESPACE', () => {
   it('is the OASIS XML Catalogs namespace (§6)', () => {

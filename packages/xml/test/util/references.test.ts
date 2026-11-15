@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PREDEFINED_ENTITIES, codePointOfReference, readDigits } from '@/util/references.ts';
+import { codePointOfReference, PREDEFINED_ENTITIES, readDigits } from '@/util/references';
 
 describe('codePointOfReference', () => {
   it.each([

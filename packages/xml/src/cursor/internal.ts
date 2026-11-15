@@ -1,10 +1,10 @@
-import type { ErrorCode } from '../errors/codes.ts';
-import { scanError } from '../scan/scanner.ts';
-import type { Tokenizer } from '../tokenizer/tokenizer.ts';
-import { ErrorFactory } from '../util/errors.ts';
+import type { ErrorCode } from '@/errors/codes';
+import { scanError } from '@/scan/scanner';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
+import { ErrorFactory } from '@/util/errors';
 
 /*
- * Hooks the other reading APIs (events, SAX, the DOM builder, XInclude) use on the cursor. They are
+ * Hooks the other reading APIs (events, SAX, the tree builders, XInclude) use on the cursor. They are
  * symbol-keyed so they stay out of the public API; `@exemplarjs/xml/internal` exports them.
  */
 /** Sets the listener that hears where expanded entities start and end, as SAX's LexicalHandler does. */
@@ -27,13 +27,21 @@ export const INPUT_ENCODING: unique symbol = Symbol('inputEncoding');
 export const XML_ENCODING: unique symbol = Symbol('xmlEncoding');
 /** The unparsed entities and notations included content has added, which XInclude reports. */
 export const INCLUDED_DECLARATIONS: unique symbol = Symbol('includedDeclarations');
+/** The options the cursor reads with, which consumers given a reader check. */
+export const READER_OPTIONS: unique symbol = Symbol('readerOptions');
+/** The namespace bindings in scope at the current element. */
+export const NAMESPACES_IN_SCOPE: unique symbol = Symbol('namespacesInScope');
+/** The `xml:` attributes of the current element's ancestors. */
+export const ANCESTOR_XML_ATTRIBUTES: unique symbol = Symbol('ancestorXmlAttributes');
 
 /** Hears where expanded entities start and end, as SAX's `LexicalHandler` does. */
 export interface EntityListener {
   /** An expanded entity's text starts. */
   startEntity(name: string): void;
+
   /** An expanded entity's text ends. */
   endEntity(name: string): void;
+
   /** An external entity's encoding as detected and as declared, and its declared version, once its text declaration is read. */
   readExternal?(name: string, inputEncoding?: string, xmlEncoding?: string, xmlVersion?: string): void;
 }

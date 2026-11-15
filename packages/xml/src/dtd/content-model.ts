@@ -1,5 +1,5 @@
-import { ErrorCode } from '../errors/codes.ts';
-import { Char } from '../util/chars.ts';
+import { ErrorCode } from '@/errors/codes';
+import { Char } from '@/util/chars';
 import type { DtdInput, Frame } from './input.ts';
 
 // Module-level constants, so V8 can inline them.

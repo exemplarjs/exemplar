@@ -1,6 +1,6 @@
 import { prefixOf } from '@exemplarjs/xml/internal';
-import { checkName, checkPrefix, fail, orNull } from '../names.ts';
-import { NodeType } from '../node-type.ts';
+import { checkName, checkPrefix, fail, orNull } from '@/names';
+import { NodeType } from '@/node-type';
 import type { Document } from './document.ts';
 import { Node } from './node.ts';
 
@@ -13,7 +13,7 @@ export abstract class NamedNode extends Node {
   /** @internal */ declare _namespaceURI: string | null;
   /** @internal */ declare _localName: string | null;
 
-  constructor(owner: Document | null, name: string, namespaceURI: string | null, localName: string | null) {
+  protected constructor(owner: Document | null, name: string, namespaceURI: string | null, localName: string | null) {
     super(owner);
     this._holdsChildren();
     this._name = name;

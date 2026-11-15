@@ -1,8 +1,8 @@
-import type { AttributeType } from '../dtd/declarations.ts';
-import { ErrorCode } from '../errors/codes.ts';
-import type { NamespaceBindings } from '../namespaces/namespaces.ts';
-import { isNcName } from '../util/names.ts';
-import { XMLNS_NAMESPACE, reservedBindingProblem } from '../util/namespaces.ts';
+import type { AttributeType } from '@/dtd/declarations';
+import { ErrorCode } from '@/errors/codes';
+import type { NamespaceBindings } from '@/namespaces/namespaces';
+import { isNcName } from '@/util/names';
+import { reservedBindingProblem, XMLNS_NAMESPACE } from '@/util/namespaces';
 
 /** How the namespace checks of a start tag report a fatal error. */
 export type Fail = (code: ErrorCode, message: string) => never;

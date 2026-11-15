@@ -1,8 +1,8 @@
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse.ts';
+import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType } from '@/index.ts';
-import { NamespaceBindings } from '@/namespaces/namespaces.ts';
-import { XMLNS_NAMESPACE, XML_NAMESPACE } from '@/util/namespaces.ts';
+import { EventType } from '@/index';
+import { NamespaceBindings } from '@/namespaces/namespaces';
+import { XML_NAMESPACE, XMLNS_NAMESPACE } from '@/util/namespaces';
 
 const XML = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -314,9 +314,9 @@ describe('the namespace accessors', () => {
       ['y', '', 'y', ''],
       ['xml:lang', 'xml', 'lang', XML],
     ]);
-    expect(r.attributeValue('u', 'x')).toBe('1');
-    expect(r.attributeValue('', 'y')).toBe('2');
-    expect(r.attributeValue('d', 'y')).toBeUndefined();
+    expect(r.attribute('x', 'u')).toBe('1');
+    expect(r.attribute('y')).toBe('2');
+    expect(r.attribute('y', 'd')).toBeUndefined();
   });
 
   it('lists the namespace declarations of a start and end tag', () => {
@@ -468,7 +468,7 @@ describe('start tags that repeat the attributes of the one before', () => {
     expect(
       errorOf('<r><a xml:id="x"/><a xml:id="x"/></r>', {
         errorHandler: {
-          error: (e) => {
+          warning: (e) => {
             throw e;
           },
         },

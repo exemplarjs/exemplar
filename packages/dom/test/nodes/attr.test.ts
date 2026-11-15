@@ -1,6 +1,6 @@
-import { build, children, domException, newDocument } from '@test/helpers/dom.ts';
+import { build, children, domException, newDocument } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import type { Attr, Element, Node } from '@/index.ts';
+import type { Attr, Element, Node } from '@/index';
 
 /** A DTD giving `r` a default `d`, a defaulted enumeration `e` and an ID `i`. */
 const DTD = '<!DOCTYPE r [<!ATTLIST r d CDATA "dv" e (x|y) "x" i ID #IMPLIED>]>';

@@ -1,10 +1,9 @@
 import { StringSink, XMLOutputFactory } from '@exemplarjs/writer';
-import { XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
-import { ErrorFactory } from '@exemplarjs/xml/internal';
+import { InvalidArgumentError, XMLError, XMLInputFactory } from '@exemplarjs/xml';
+import { ErrorFactory, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
+import { type Document, Element, type Node, Text } from '@/nodes';
 import { DocumentBuilder } from './builder.ts';
 import { fail } from './names.ts';
-import { type Document, Element, type Node, Text } from './nodes/index.ts';
 
 /** The namespace Firefox puts its `parsererror` element in. */
 // eslint-disable-next-line no-clear-text-protocols -- a namespace name, never fetched
@@ -23,7 +22,8 @@ export class DOMParser {
 
   parseFromString(string: string, type: string): Document {
     if (type === 'text/html') fail('NotSupportedError', 'exemplar parses XML, not HTML');
-    if (!XML_TYPES.has(type)) throw ErrorFactory.create(TypeError, `${type} is not a type DOMParser supports`);
+    if (!XML_TYPES.has(type))
+      throw ErrorFactory.create(InvalidArgumentError, `${type} is not a type DOMParser supports`);
     try {
       return this.#builder.parse(String(string));
     } catch (error) {
@@ -38,7 +38,7 @@ function errorDocument(builder: DocumentBuilder, error: XMLError, text: string):
   const document = builder.newDocument();
   const root = new Element(document, 'parsererror', PARSER_ERROR_NAMESPACE, 'parsererror');
   const where = `Location: ${error.systemId ?? 'about:blank'}\nLine Number ${error.line}, Column ${error.column}:`;
-  root._append(new Text(document, `XML Parsing Error: ${error.message}\n${where}`));
+  root._append(new Text(document, `XML Parsing Error: ${error.description}\n${where}`));
   const line = text.split(/\r\n?|\n/)[error.line - 1];
   if (line !== undefined) {
     const source = new Element(document, 'sourcetext', PARSER_ERROR_NAMESPACE, 'sourcetext');

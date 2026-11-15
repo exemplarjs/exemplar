@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DocumentBuilder } from '@exemplarjs/dom';
 import { xincludeProcessor } from '@exemplarjs/xinclude';
 import { XMLInputFactory } from '@exemplarjs/xml';
-import { catalogResolver } from '@/index.ts';
+import { catalogResolver } from '@/index';
 
 // The default reader reads catalog files from the file system, so these tests run on Node only.
 const CATALOG = new URL('../fixtures/catalogs/catalog.xml', import.meta.url).href;

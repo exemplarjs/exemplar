@@ -1,7 +1,7 @@
-import { reader } from '@test/helpers/parse.ts';
+import { reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { EventType, type InputOptions, ResolutionError, type StreamReader, XMLInputFactory } from '@/index.ts';
-import { LISTEN_ENTITIES, accessRefusedError } from '@/internal.ts';
+import { EventType, type InputOptions, ResolutionError, type StreamReader, XMLInputFactory } from '@/index';
+import { accessRefusedError, LISTEN_ENTITIES } from '@/internal';
 
 /** Options that read external general entities from a map of system id to text or bytes. */
 function external(files: Record<string, string | Uint8Array>): InputOptions {
@@ -232,5 +232,15 @@ describe('the entity listener hook', () => {
     });
     while (detailed.next() !== EventType.END_DOCUMENT);
     expect(encodings).toEqual([['x', 'utf-8', undefined, undefined]]);
+  });
+
+  it('stops telling a listener once it is replaced with undefined', () => {
+    const r = new XMLInputFactory().createStreamReader(`${DECLARED}<a>&t;<b/>&t;</a>`);
+    const heard: string[] = [];
+    r[LISTEN_ENTITIES]({ startEntity: (name) => heard.push(name), endEntity: () => undefined });
+    while (r.next() !== EventType.END_ELEMENT);
+    r[LISTEN_ENTITIES](undefined);
+    while (r.next() !== EventType.END_DOCUMENT);
+    expect(heard).toEqual(['t']);
   });
 });

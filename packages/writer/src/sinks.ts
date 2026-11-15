@@ -1,16 +1,20 @@
 /** Where a writer's output goes, as text in chunks. */
 export interface Sink {
   write(chunk: string): void;
+
   /** Resolves when the sink has room for more; a sink that never fills need not have it. */
-  ready?(): Promise<void>;
+  drain?(): Promise<void>;
+
   close?(): void | Promise<void>;
 }
 
 /** Where a writer's encoded output goes, in byte chunks. */
 export interface ByteSink {
   writeBytes(chunk: Uint8Array): void;
+
   /** Resolves when the sink has room for more; a sink that never fills need not have it. */
-  ready?(): Promise<void>;
+  drain?(): Promise<void>;
+
   close?(): void | Promise<void>;
 }
 
@@ -67,7 +71,7 @@ export class WritableStreamSink implements ByteSink {
   }
 
   /** Resolves when the stream has room for more, as its writer's `ready` does; rejects once a write has failed. */
-  async ready(): Promise<void> {
+  async drain(): Promise<void> {
     if (this.#failed) throw this.#failure;
     await this.#writer.ready;
   }

@@ -1,7 +1,7 @@
-import type { DeclarationStore } from '../dtd/store.ts';
-import { ScanFlag } from '../scan/scanner.ts';
-import { Token, type Tokenizer } from '../tokenizer/tokenizer.ts';
-import { decodeReferences, normalizeLineEnds } from '../util/normalize.ts';
+import type { DeclarationStore } from '@/dtd/store';
+import { ScanFlag } from '@/scan/scanner';
+import { Token, type Tokenizer } from '@/tokenizer/tokenizer';
+import { decodeReferences, normalizeLineEnds } from '@/util/normalize';
 import { copyString } from './internal.ts';
 import type { Doctype } from './stream-reader.ts';
 

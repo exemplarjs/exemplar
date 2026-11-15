@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+  <product code="B-101">
+    <name>The Lighthouse Keeper</name>
+    <price currency="GBP">8.99</price>
+  </product>
+  <product code="B-310">
+    <name>Winter Harbour</name>
+    <price currency="GBP">11.25</price>
+  </product>
+</products>

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { XMLInputFactory } from '@exemplarjs/xml';
 import {
-  type IncludeAttributes,
   attributeProblem,
   headersOf,
-  inclusionKey,
+  type IncludeAttributes,
   includeAttributesOf,
+  inclusionKey,
   isDocumentLoop,
   isIntraDocumentLoop,
-} from '@/include.ts';
+} from '@/include';
 
 /** An xi:include's attributes, with the defaults filled in. */
 function include(attributes: Partial<IncludeAttributes>): IncludeAttributes {

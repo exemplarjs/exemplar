@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ResolutionError, accessAllows, orElse } from '@/resolvers/resolver.ts';
+import { accessAllows, orElse, ResolutionError } from '@/resolvers/resolver';
 
 describe('ResolutionError', () => {
   it('carries an error code for the reader to fail with', () => {

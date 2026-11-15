@@ -1,4 +1,4 @@
-import { XMLNS_NAMESPACE, XML_NAMESPACE } from '@exemplarjs/xml/internal';
+import { XML_NAMESPACE, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
 
 /**
  * The namespace bindings in scope while writing: those declared in the output, and those set for

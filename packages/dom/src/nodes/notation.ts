@@ -1,7 +1,7 @@
-import { NodeType } from '../node-type.ts';
+import { NodeType } from '@/node-type';
 import { Declared } from './declared.ts';
 import type { Document } from './document.ts';
-import { type Node, holdsNoChildren } from './node.ts';
+import { holdsNoChildren, type Node } from './node.ts';
 
 // Module-level constants, so V8 can inline them.
 const { NOTATION_NODE } = NodeType;

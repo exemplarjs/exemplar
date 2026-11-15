@@ -1,4 +1,4 @@
-import { DTD_TYPES } from '../names.ts';
+import { DTD_TYPES } from '@/names';
 
 /** An element's or attribute's type: the DTD type of an attribute, as DOM Level 3's TypeInfo gives it. */
 export class TypeInfo {

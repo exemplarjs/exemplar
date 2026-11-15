@@ -1,11 +1,11 @@
-import { canonicalOfAsync } from '@test/helpers/canonical.ts';
-import { bytes, framed, join, singleByte, split, utf16, utf32, utf8, verdict } from '@test/helpers/lexical.ts';
-import { reader } from '@test/helpers/parse.ts';
+import { canonicalOfAsync } from '@test/helpers/canonical';
+import { bytes, framed, join, singleByte, split, utf16, utf32, utf8, verdict } from '@test/helpers/lexical';
+import { reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
-import { isEbcdic } from '@/encodings/decoders.ts';
-import { SINGLE_BYTE_TABLES } from '@/encodings/tables.ts';
-import { type XMLError, XMLInputFactory } from '@/index.ts';
-import { type Detection, checkDeclaredEncoding, detect } from '@/input/detect.ts';
+import { isEbcdic } from '@/encodings/decoders';
+import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
+import { type XMLError, XMLInputFactory } from '@/index';
+import { checkDeclaredEncoding, detect, type Detection } from '@/input/detect';
 
 /** Every EBCDIC page exemplar decodes. */
 const EBCDIC = Object.keys(SINGLE_BYTE_TABLES).filter((name) => isEbcdic(name));
@@ -375,7 +375,7 @@ describe('detection in documents', () => {
   });
 
   it('reports the encoding the declaration names, or else the one detected', () => {
-    expect(reader(utf8('<?xml version="1.0" encoding="Latin1"?><a/>')).encoding()).toBe('Latin1');
+    expect(reader(utf8('<?xml version="1.0" encoding="Latin1"?><a/>')).declaredEncoding()).toBe('Latin1');
     expect(reader(utf8('<a/>')).encoding()).toBe('utf-8');
     expect(reader(utf16('<a/>', false, true)).encoding()).toBe('utf-16be');
     expect(reader('<a/>').encoding()).toBeUndefined();

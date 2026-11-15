@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { IllegalStateError } from '@exemplarjs/xml';
 import { EventType, XMLInputFactory } from '@exemplarjs/xml';
-import { canonicalize } from '@/index.ts';
+import { canonicalize } from '@/index';
 
 const FORMS = ['suite-first', 'suite-second'] as const;
 
@@ -45,10 +46,15 @@ describe("canonicalize: the XML suite's first canonical form", () => {
     expect(canonicalize('<!DOCTYPE a SYSTEM "a.dtd"><a/>', { method })).toBe('<a></a>');
   });
 
-  it.each(FORMS)('%s canonicalizes the rest of a cursor from where it stands', (method) => {
+  it.each(FORMS)('%s refuses a cursor that stands past the start of its document', (method) => {
     const reader = new XMLInputFactory().createStreamReader('<a><b/></a><?p d?>');
     while (reader.next() !== EventType.PROCESSING_INSTRUCTION);
-    expect(canonicalize(reader, { method })).toBe('<?p d?>');
+    expect(() => canonicalize(reader, { method })).toThrow(IllegalStateError);
+  });
+
+  it.each(FORMS)('%s reads a cursor without namespaces', (method) => {
+    const reader = new XMLInputFactory({ namespaceAware: false }).createStreamReader('<a:b xmlns:a="x"/>');
+    expect(canonicalize(reader, { method })).toBe('<a:b xmlns:a="x"></a:b>');
   });
 });
 

@@ -1,12 +1,12 @@
 import { EventType, type Location } from '@exemplarjs/xml';
 import {
-  StreamReader as Cursor,
   EVENT_OFFSET,
   EVENT_POSITION,
-  type LineSegment,
-  isIndex,
   isAllWhitespace,
+  isIndex,
+  type LineSegment,
   outOfRange,
+  StreamReader as Cursor,
 } from '@exemplarjs/xml/internal';
 import type { AddedAttribute, NamespaceDeclaration, Overlay } from './overlay.ts';
 
@@ -194,16 +194,10 @@ export class SplicingReader extends Cursor {
     return this[VIEW] === undefined ? super.isAttributeSpecified(mapped) : this[VIEW].isAttributeSpecified(mapped);
   }
 
-  override attributeValue(index: number): string;
-  override attributeValue(namespaceURI: string, localName: string): string | undefined;
-  override attributeValue(indexOrNamespace: number | string, localName?: string): string | undefined {
-    if (typeof indexOrNamespace === 'number') {
-      const mapped = this.#mapAttributeIndex(indexOrNamespace);
-      if (typeof mapped !== 'number') return mapped.value;
-      return this[VIEW] === undefined ? super.attributeValue(mapped) : this[VIEW].attributeValue(mapped);
-    }
-    // The lookup by name goes through the accessors above, so it sees the overlay and the view.
-    return super.attributeValue(indexOrNamespace, localName as string);
+  override attributeValue(index: number): string {
+    const mapped = this.#mapAttributeIndex(index);
+    if (typeof mapped !== 'number') return mapped.value;
+    return this[VIEW] === undefined ? super.attributeValue(mapped) : this[VIEW].attributeValue(mapped);
   }
 
   override text(): string {

@@ -1,6 +1,7 @@
 /** Hooks and helpers the other exemplar packages share; not part of the public API. */
 export {
   ADD_FILTER,
+  ANCESTOR_XML_ATTRIBUTES,
   CREATE_READER,
   DTD_COMPLETE,
   DTD_ITEMS,
@@ -10,47 +11,119 @@ export {
   INCLUDED_DECLARATIONS,
   INPUT_ENCODING,
   LISTEN_ENTITIES,
+  NAMESPACES_IN_SCOPE,
+  READER_OPTIONS,
   XML_ENCODING,
+  copyString,
   isIndex,
   outOfRange,
 } from './cursor/internal.ts';
 export { isCharacterData } from './cursor/event-type.ts';
 export { StreamReader, isReader } from './cursor/stream-reader.ts';
+export { cursorOf } from './filters/delegate.ts';
+export { ReaderInput } from './cursor/reader-input.ts';
+export {
+  NOWHERE,
+  type SAXAttributes,
+  type SAXLocator,
+  StructureCheck,
+  attributeIndex,
+  checkName,
+  checkQName,
+  locationOf,
+} from './util/structure.ts';
+export { EventDispatcher, declareEntity } from './events/event-dispatch.ts';
 export type { DocumentValidator, ValidationContext, Validator } from './cursor/validation.ts';
 export type { ResolvedOptions } from './config/options.ts';
-export { DecodeError, Utf32Decoder, withCarry } from './encodings/decoders.ts';
+export {
+  DecodeError,
+  UNDEFINED_CHARACTER,
+  UTF16_UNIT_BYTES,
+  UTF32_UNIT_BYTES,
+  Utf32Decoder,
+  withCarry,
+} from './encodings/decoders.ts';
 export { SINGLE_BYTE_TABLES } from './encodings/tables.ts';
 export { unmatchedByCatalog } from './entities/external.ts';
 export { type DecoderRegistry, canonicalEncoding } from './input/decoders.ts';
 export { detect } from './input/detect.ts';
 export { type AsyncOpenedSource, type ByteStream, type OpenedSource, openSource, readStream } from './input/source.ts';
-export { accessAllows, orElse, accessRefusedError } from './resolvers/resolver.ts';
+export { accessAllows, accessRefusedError, orElse, resolverMissingError } from './resolvers/resolver.ts';
 export type { LineSegment } from './tokenizer/lines.ts';
 
 // The shared helpers in src/util.
-export { BYTE_ORDER_MARK, NO_BYTES, concatBytes, startsWithBytes } from './util/bytes.ts';
+export {
+  BYTE_BITS,
+  BYTE_MASK,
+  BYTE_ORDER_MARK,
+  BYTE_VALUES,
+  HEX_DIGITS_PER_BYTE,
+  NO_BYTES,
+  concatBytes,
+  startsWithBytes,
+} from './util/bytes.ts';
 export { ErrorFactory } from './util/errors.ts';
 export {
+  CODE_UNIT_HEX_DIGITS,
   Char,
+  SURROGATE_PAIR_LENGTH,
   Unicode,
+  byCodePoint,
   byCodeUnit,
   codePointLabel,
   codePointOf,
   holdsNonChar,
+  isAsciiDigit,
   isChar,
   isHighSurrogate,
   isLowSurrogate,
   isRestrictedChar,
   isSurrogate,
 } from './util/chars.ts';
-export { isNcName, isNmtoken, isXmlName, localPartOf, prefixOf, splitQName } from './util/names.ts';
+export { Radix, upperHex } from './util/numbers.ts';
+export { abandon } from './util/promises.ts';
+export { RememberedResults, remembered } from './util/remembered.ts';
+export { GROWTH_FACTOR } from './util/arrays.ts';
+export { startsWithDeclaration } from './tokenizer/declaration.ts';
+export {
+  isNameChar,
+  isNameStartChar,
+  isNcName,
+  isNmtoken,
+  isXmlName,
+  lexicalQNameParts,
+  localPartOf,
+  prefixOf,
+  splitQName,
+} from './util/names.ts';
 export {
   XML_NAMESPACE,
   XMLNS_NAMESPACE,
+  declarationName,
+  declaredPrefixOf,
   declaredPrefixes,
   reservedBindingProblem,
   namespacesInScope,
 } from './util/namespaces.ts';
 export { type NodeLike, NodeType, attributesOf, prefixDeclaredBy } from './util/nodes.ts';
-export { escapeAndResolveURI, escapeURI, hasScheme, protocolOf, resolveURI } from './util/uri.ts';
-export { isAllWhitespace, isWhitespaceChar, normalizePublicId } from './util/whitespace.ts';
+export { type RegexDialect, type TranslatedRegex, translateRegex } from './util/regex.ts';
+export { RegexError, type RegexErrorKind } from './util/regex-error.ts';
+export {
+  escapeAndResolveURI,
+  resolveEscapedTargetURI,
+  escapeURI,
+  hasScheme,
+  percentEscape,
+  protocolOf,
+  resolveTargetURI,
+  resolveURI,
+} from './util/uri.ts';
+export {
+  collapseWhitespace,
+  isAllWhitespace,
+  isWhitespaceChar,
+  normalizePublicId,
+  splitWhitespace,
+  trimWhitespace,
+  WHITESPACE_CLASS,
+} from './util/whitespace.ts';

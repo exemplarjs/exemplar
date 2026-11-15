@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BytesSink, StringSink, WritableStreamSink } from '@/sinks.ts';
+import { BytesSink, StringSink, WritableStreamSink } from '@/sinks';
 
 describe('StringSink', () => {
   it('joins the chunks it is given', () => {
@@ -48,18 +48,18 @@ describe('WritableStreamSink', () => {
     expect(chunks).toEqual([[1], [2, 3]]);
   });
 
-  it('resolves ready() only once the stream has room, as its writer does', async () => {
+  it('resolves drain() only once the stream has room, as its writer does', async () => {
     const releases: (() => void)[] = [];
     const stream = new WritableStream<Uint8Array>(
       { write: () => new Promise<void>((resolve) => void releases.push(resolve)) },
       { highWaterMark: 1 }
     );
     const sink = new WritableStreamSink(stream);
-    await sink.ready();
+    await sink.drain();
     sink.writeBytes(Uint8Array.of(1));
     sink.writeBytes(Uint8Array.of(2));
     let ready = false;
-    const waiting = sink.ready().then(() => (ready = true));
+    const waiting = sink.drain().then(() => (ready = true));
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(ready).toBe(false);
     while (!ready) {
@@ -70,7 +70,7 @@ describe('WritableStreamSink', () => {
     expect(ready).toBe(true);
   });
 
-  it('rejects ready() with the error a write failed with', async () => {
+  it('rejects drain() with the error a write failed with', async () => {
     const failure = new Error('disk full');
     const stream = new WritableStream<Uint8Array>({
       write: () => {
@@ -79,8 +79,8 @@ describe('WritableStreamSink', () => {
     });
     const sink = new WritableStreamSink(stream);
     sink.writeBytes(Uint8Array.of(1));
-    await expect(sink.ready()).rejects.toBe(failure);
-    await expect(sink.ready()).rejects.toBe(failure);
+    await expect(sink.drain()).rejects.toBe(failure);
+    await expect(sink.drain()).rejects.toBe(failure);
   });
 
   it('locks the stream it writes to', () => {

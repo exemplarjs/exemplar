@@ -1,8 +1,8 @@
-import { recorder } from '@test/helpers/recorder.ts';
+import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
-import { type DtdItem, type EntityResolver, XMLInputFactory, type XIncludeProcessor } from '@exemplarjs/xml';
+import { type DtdItem, type EntityResolver, type XIncludeProcessor, XMLInputFactory } from '@exemplarjs/xml';
 import { INCLUDED_DECLARATIONS, StreamReader } from '@exemplarjs/xml/internal';
-import { SAXParser } from '@/index.ts';
+import { SAXParser } from '@/index';
 
 const BASE = 'http://example.org/docs/';
 
