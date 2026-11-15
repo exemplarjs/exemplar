@@ -170,6 +170,9 @@ function laughs(fanout: number, depth: number): string {
   return `<!DOCTYPE r [${entities.join('')}]><r>&e${depth};</r>`;
 }
 
+/** Time for every bomb together, which coverage on a busy machine slows several times over; each parse has its own bound. */
+const BOMBS_TIMEOUT = 30_000 * SCALE;
+
 /** The limit codes a stopped expansion may give. */
 const ENTITY_LIMITS = ['LIMIT_ENTITY_EXPANSIONS', 'LIMIT_TOTAL_ENTITY_SIZE', 'LIMIT_GENERAL_ENTITY_SIZE'];
 
@@ -191,7 +194,7 @@ test.prop([fc.integer({ min: 1, max: 10 }), fc.integer({ min: 1, max: 12 })], { 
     if (characters <= 1000) expect(text, 'a small expansion is read').toBeDefined();
     if (characters > 200_000) expect(code, 'a bomb is stopped').toBeDefined();
   },
-  10_000 * SCALE
+  BOMBS_TIMEOUT
 );
 
 test.prop([fc.integer({ min: 1, max: 20_000 }), fc.integer({ min: 1, max: 60 })], { numRuns: 50 * SCALE })(

@@ -96,7 +96,7 @@ describe('WritingHandler', () => {
     const handler = new XMLOutputFactory({ omitXMLDeclaration: true }).createSAXHandler(stream);
     new SAXParser().parse('<r>x</r>', handler);
     await handler.close();
-    expect(new TextDecoder().decode(Buffer.concat(chunks))).toBe('<r>x</r>');
+    expect(chunks.map((chunk) => new TextDecoder().decode(chunk)).join('')).toBe('<r>x</r>');
   });
 
   it('refuses an end tag that does not match the open element, as a filter renaming only start tags gives', () => {
