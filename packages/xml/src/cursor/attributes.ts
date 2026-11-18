@@ -1,11 +1,11 @@
 import type { AttributeType } from '@/dtd/declarations';
 import { ErrorCode } from '@/errors/codes';
 import type { NamespaceBindings } from '@/namespaces/namespaces';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
 import { isNcName } from '@/util/names';
-import { reservedBindingProblem, XMLNS_NAMESPACE } from '@/util/namespaces';
-
-/** How the namespace checks of a start tag report a fatal error. */
-export type Fail = (code: ErrorCode, message: string) => never;
+import { reservedBindingProblem, UNDECLARING_PROBLEM, XMLNS_NAMESPACE } from '@/util/namespaces';
+import { fail } from './internal.ts';
+import type { NamespaceScopes } from './namespace-scopes.ts';
 
 /**
  * A start tag's attributes as strings, with those the DTD defaults added after them. The reader
@@ -70,40 +70,32 @@ export class AttributeList {
     this.visibleCount = this.count;
   }
 
-  /** Applies the namespace declarations among the attributes, calling `onBinding` with each new binding's index. */
-  declareNamespaces(
-    bindings: NamespaceBindings,
-    version11: boolean,
-    onBinding: (binding: number) => void,
-    fail: Fail
-  ): void {
+  /** Applies the namespace declarations among the attributes of the start tag `tokenizer` holds, recording each in `scopes`. */
+  declareNamespaces(scopes: NamespaceScopes, tokenizer: Tokenizer): void {
+    const bindings = scopes.bindings;
     for (let i = 0; i < this.count; i++) {
       if (!this.isDeclaration(i)) continue;
       const name = this.names[i] as string;
       const prefix = name === 'xmlns' ? '' : name.slice('xmlns:'.length);
-      if (name !== 'xmlns' && !isNcName(prefix)) fail(ErrorCode.NS_QNAME, `${name} is not a qualified name`);
-      checkDeclaration(prefix, this.values[i] as string, version11, fail);
+      const at = nameIndexOf(tokenizer, i);
+      if (name !== 'xmlns' && !isNcName(prefix))
+        fail(tokenizer, ErrorCode.NS_QNAME, `${name} is not a qualified name`, at);
+      checkDeclaration(tokenizer, prefix, this.values[i] as string, at);
       this.prefixes[i] = prefix === '' ? '' : 'xmlns';
       this.localNames[i] = prefix === '' ? 'xmlns' : prefix;
       this.uris[i] = XMLNS_NAMESPACE;
       const binding = bindings.bindStrings(prefix, this.values[i] as string);
       if (prefix === '') bindings.defaultIndex = binding;
-      onBinding(binding);
+      scopes.recordDeclaration(binding);
     }
   }
 
   /**
    * Resolves the prefixes of the attributes that aren't declarations, checks their expanded names are
-   * unique, and lists the ones to report. `buffer` and `bufferOffset` are the tokenizer's, for bindings
+   * unique, and lists the ones to report. `tokenizer` holds the start tag, and the text of bindings
    * still kept as offsets.
    */
-  resolveNamespaces(
-    bindings: NamespaceBindings,
-    buffer: string,
-    bufferOffset: number,
-    showDeclarations: boolean,
-    fail: Fail
-  ): void {
+  resolveNamespaces(bindings: NamespaceBindings, tokenizer: Tokenizer, showDeclarations: boolean): void {
     const seen = new Set<string>();
     let visibleCount = 0;
     for (let i = 0; i < this.count; i++) {
@@ -111,10 +103,12 @@ export class AttributeList {
         if (showDeclarations) this.visible[visibleCount++] = i;
         continue;
       }
-      this.#resolvePrefixOf(i, bindings, buffer, bufferOffset, fail);
+      this.#resolvePrefixOf(i, bindings, tokenizer);
       const key = `${this.uris[i]}\u0000${this.localNames[i]}`;
-      if (seen.has(key))
-        fail(ErrorCode.NS_DUPLICATE_ATTRIBUTE, `Attribute ${this.localNames[i]} appears twice in one namespace`);
+      if (seen.has(key)) {
+        const message = `Attribute ${this.localNames[i]} appears twice in one namespace`;
+        fail(tokenizer, ErrorCode.NS_DUPLICATE_ATTRIBUTE, message, nameIndexOf(tokenizer, i));
+      }
       seen.add(key);
       this.visible[visibleCount++] = i;
     }
@@ -122,33 +116,35 @@ export class AttributeList {
   }
 
   /** Splits one attribute's name into prefix and local name, and resolves the prefix to its namespace. */
-  #resolvePrefixOf(
-    attributeIndex: number,
-    bindings: NamespaceBindings,
-    buffer: string,
-    bufferOffset: number,
-    fail: Fail
-  ): void {
+  #resolvePrefixOf(attributeIndex: number, bindings: NamespaceBindings, tokenizer: Tokenizer): void {
     const name = this.names[attributeIndex] as string;
     const colon = name.indexOf(':');
     if (colon === -1) return;
     const prefix = name.slice(0, colon);
     const local = name.slice(colon + 1);
-    if (prefix === '' || !isNcName(local)) fail(ErrorCode.NS_QNAME, `${name} is not a qualified name`);
+    const at = nameIndexOf(tokenizer, attributeIndex);
+    if (prefix === '' || !isNcName(local)) fail(tokenizer, ErrorCode.NS_QNAME, `${name} is not a qualified name`, at);
+    const { buffer, bufferOffset } = tokenizer;
     const binding = bindings.findBindingOf(prefix, buffer, bufferOffset);
     if (binding < 0 || bindings.isEmpty(binding))
-      fail(ErrorCode.NS_UNBOUND_PREFIX, `The prefix ${prefix} is not bound`);
+      fail(tokenizer, ErrorCode.NS_UNBOUND_PREFIX, `The prefix ${prefix} is not bound`, at);
     this.prefixes[attributeIndex] = prefix;
     this.localNames[attributeIndex] = local;
     this.uris[attributeIndex] = bindings.uri(binding, buffer, bufferOffset);
   }
 }
 
-/** Checks a namespace declaration against the reserved prefixes and namespaces (Namespaces §3). */
-function checkDeclaration(prefix: string, uri: string, version11: boolean, fail: Fail): void {
+/** The buffer index of the name of a listed attribute in the start tag `tokenizer` holds; the tag's start for a defaulted one. */
+function nameIndexOf(tokenizer: Tokenizer, attributeIndex: number): number {
+  const isInTag = attributeIndex < tokenizer.attributeCount;
+  return isInTag ? (tokenizer.attributeNameStart[attributeIndex] as number) : tokenizer.tokenStart;
+}
+
+/** Checks a namespace declaration against the reserved prefixes and namespaces (Namespaces §3); `at` is where to report it. */
+function checkDeclaration(tokenizer: Tokenizer, prefix: string, uri: string, at: number): void {
   const problem = reservedBindingProblem(prefix, uri);
-  if (problem !== undefined) fail(ErrorCode.NS_RESERVED, problem);
-  if (prefix !== '' && uri === '' && !version11) {
-    fail(ErrorCode.NS_UNDECLARED_PREFIX, 'Namespaces in XML 1.0 do not allow undeclaring a prefix');
+  if (problem !== undefined) fail(tokenizer, ErrorCode.NS_RESERVED, problem, at);
+  if (prefix !== '' && uri === '' && !tokenizer.version11) {
+    fail(tokenizer, ErrorCode.NS_UNDECLARED_PREFIX, UNDECLARING_PROBLEM, at);
   }
 }

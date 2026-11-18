@@ -69,20 +69,21 @@ export class EntityStack {
 
   /**
    * Starts reading entity `name` with `tokenizer`. It was referred to at buffer index `referenceIndex`
-   * in the current text, with `openElements` elements open.
+   * in the current text, with `openElements` elements open. An internal entity's text is replacement text.
    */
   enter(
     name: string,
     tokenizer: Tokenizer,
     referenceIndex: number,
     openElements: number,
-    isInternal: boolean,
     systemId: string | undefined
   ): void {
     const parent = this.current;
     const framesOutside = this.#frames.length;
     let location: Location | undefined;
-    const locate = isInternal ? () => (location ??= this.locationIn(parent, referenceIndex, framesOutside)) : undefined;
+    const locate = tokenizer.isReplacementText
+      ? () => (location ??= this.locationIn(parent, referenceIndex, framesOutside))
+      : undefined;
     this.#frames.push({ entityName: name, parent, elementDepth: openElements, locate, systemId });
     this.current = tokenizer;
     this.depth++;
@@ -132,7 +133,6 @@ export class EntityStack {
 
   /** The location of buffer index `index` in the document's own text. */
   documentLocation(index: number): Location {
-    const systemId = this.#systemId;
-    return { ...this.document.lines.locationAt(index), ...(systemId !== undefined && { systemId }) };
+    return this.locationIn(this.document, index, 0);
   }
 }

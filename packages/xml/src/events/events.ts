@@ -1,5 +1,5 @@
 import { EventType } from '@/cursor/event-type';
-import { copyString, EVENT_OFFSET, EVENT_POSITION } from '@/cursor/internal';
+import { copyString, EVENT_OFFSET, EVENT_POSITION, HAS_FILTERS } from '@/cursor/internal';
 import type { Doctype, StreamReader } from '@/cursor/stream-reader';
 import type { Location } from '@/errors/xml-error';
 import { LineSegment } from '@/tokenizer/lines';
@@ -270,7 +270,7 @@ interface DocumentDetails {
 /**
  * Builds event objects from a cursor. Their strings are copied, so an event doesn't keep the input
  * alive; element names are shared between events with the same name, and an end tag reuses its
- * start tag's name and namespaces.
+ * start tag's name and namespaces unless a filter or delegate may have kept either tag back.
  */
 export class EventBuilder {
   /** The open elements' names, which their end tags report again. */
@@ -295,13 +295,21 @@ export class EventBuilder {
         name = qname;
         namespaces = namespacesOf(reader);
         attributes = attributesOf(reader);
-        this.#names.push(qname);
-        this.#namespaces.push(namespaces);
+        if (reader === cursor && !cursor[HAS_FILTERS]) {
+          this.#names.push(qname);
+          this.#namespaces.push(namespaces);
+        }
         break;
       }
       case EventType.END_ELEMENT: {
-        name = this.#names.pop() as QName;
-        namespaces = this.#namespaces.pop() as readonly Namespace[];
+        // A delegate or a filter may keep tags back, so the tags it gives are not known to pair up.
+        if (reader === cursor && !cursor[HAS_FILTERS]) {
+          name = this.#names.pop() as QName;
+          namespaces = this.#namespaces.pop() as readonly Namespace[];
+        } else {
+          name = this.#qname(reader);
+          namespaces = namespacesOf(reader);
+        }
         break;
       }
       case EventType.CHARACTERS:
@@ -344,7 +352,7 @@ export class EventBuilder {
     const uri = reader.namespaceURI();
     let name = this.#qnames.get(qName);
     if (name?.namespaceURI !== uri) {
-      name = new QName(copyString(uri), copyString(reader.localName()), reader.prefix());
+      name = new QName(copyString(uri), copyString(reader.localName()), copyString(reader.prefix()));
       if (this.#qnames.size < QNAME_CACHE_SIZE) this.#qnames.set(copyString(qName), name);
     }
     return name;
@@ -360,9 +368,9 @@ function attributesOf(reader: StreamReader): readonly Attribute[] {
     const uri = copyString(reader.attributeNamespace(i));
     const localName = copyString(reader.attributeLocalName(i));
     const value = copyString(reader.attributeValue(i));
-    const type = reader.attributeType(i);
+    const prefix = copyString(reader.attributePrefix(i));
     attributes.push(
-      new Attribute(uri, localName, reader.attributePrefix(i), value, type, reader.isAttributeSpecified(i))
+      new Attribute(uri, localName, prefix, value, reader.attributeType(i), reader.isAttributeSpecified(i))
     );
   }
   return attributes;
@@ -374,7 +382,10 @@ function namespacesOf(reader: StreamReader): readonly Namespace[] {
   if (count === 0) return NO_NAMESPACES;
   const namespaces: Namespace[] = [];
   for (let i = 0; i < count; i++) {
-    namespaces.push({ prefix: reader.namespacePrefix(i), namespaceURI: copyString(reader.namespaceURI(i)) });
+    namespaces.push({
+      prefix: copyString(reader.namespacePrefix(i)),
+      namespaceURI: copyString(reader.namespaceURI(i)),
+    });
   }
   return namespaces;
 }

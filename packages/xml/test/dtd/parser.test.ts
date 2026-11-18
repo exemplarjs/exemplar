@@ -161,6 +161,24 @@ describe('markup declarations (§2.8, §3.2, §3.3, §4.2, §4.7)', () => {
   });
 
   it.each([
+    ['after an element name', '<!ELEMENT a~EMPTY>'],
+    ['after a keyword', '<!ELEMENT a EMPTY~>'],
+    ['after a non-ASCII name', '<!ELEMENT a (\u00E9)><!ELEMENT \u00E9~EMPTY>'],
+    ['around an attribute definition', '<!ATTLIST a~b~CDATA~#IMPLIED~>'],
+    ['in an enumeration', '<!ATTLIST a b (x~|~y) #IMPLIED>'],
+    ['in an entity declaration', '<!ENTITY~e~"x"~>'],
+    ['in an external identifier', '<!NOTATION n~PUBLIC~"p"~"s">'],
+  ])('takes NEL and LS as whitespace %s in an XML 1.1 internal subset', (_where, declaration) => {
+    for (const lineEnd of ['\u0085', '\u2028']) {
+      const subset = declaration.replaceAll('~', lineEnd);
+      const spaced = declaration.replaceAll('~', ' ');
+      expect(canonical(`<?xml version="1.1"?><!DOCTYPE a [${subset}]><a/>`)).toBe('<a></a>');
+      expect(canonical(`<!DOCTYPE a [${spaced}]><a/>`)).toBe('<a></a>');
+      expect(() => canonical(`<!DOCTYPE a [${subset}]><a/>`)).toThrow(XMLError);
+    }
+  });
+
+  it.each([
     ['<!ELEMENTa ANY>', 'WF_DECLARATION', 23],
     ['<!ELEMENT a ANY x>', 'WF_DECLARATION', 30],
     ['<!X>', 'WF_DECLARATION', 14],
@@ -445,6 +463,12 @@ describe('parameter entities (§4.4.8, §2.8)', () => {
     });
   });
 
+  it('names a conditional section that never ends', () => {
+    const xml = '<!DOCTYPE a SYSTEM "a.dtd"><a/>';
+    const options = served({ 'a.dtd': '<![INCLUDE[<!ENTITY e "x">' });
+    expect(() => canonical(xml, options)).toThrow('Unterminated conditional section');
+  });
+
   it('lists where each parameter entity starts and ends among what the DTD held', () => {
     const xml = '<!DOCTYPE a [<!ENTITY % d "<!--in-->"> %d;]><a/>';
     expect(
@@ -680,7 +704,6 @@ describe('locations', () => {
       isDocumentText: false,
       betweenDeclarations: false,
       baseURI: undefined,
-      isEntityExpansion: false,
       locate,
     };
     new DtdParser(store, context).parse(frame);

@@ -1,5 +1,5 @@
 import type { EventType } from './event-type.ts';
-import type { DTD_COMPLETE, EVENT_OFFSET, INPUT_ENCODING, READER_OPTIONS, XML_ENCODING } from './internal.ts';
+import type { DTD_COMPLETE, EVENT_OFFSET, READER_OPTIONS } from './internal.ts';
 import type { StreamReader as Cursor } from './stream-reader.ts';
 
 /** The members only an asynchronous reader has. */
@@ -13,12 +13,7 @@ type AsyncMembers =
   | 'forEachEvent';
 
 /** The getters other exemplar packages read, left out as `Omit` drops their `@internal` tags. */
-type InternalGetters =
-  | typeof DTD_COMPLETE
-  | typeof EVENT_OFFSET
-  | typeof INPUT_ENCODING
-  | typeof READER_OPTIONS
-  | typeof XML_ENCODING;
+type InternalGetters = typeof DTD_COMPLETE | typeof EVENT_OFFSET | typeof READER_OPTIONS;
 
 /** A pull reader over input that arrives over time: `next()` returns NEED_INPUT when it has to wait for `fill()`. */
 export interface AsyncStreamReader extends Cursor {

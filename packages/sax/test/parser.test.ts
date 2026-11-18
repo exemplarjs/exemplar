@@ -1,5 +1,6 @@
 import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
+import { UpperCaseText } from '@exemplarjs/test-support';
 import { type EntityResolver, EventType, type ResolveRequest, XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { accessAllows, accessRefusedError, type Validator } from '@exemplarjs/xml/internal';
@@ -407,17 +408,10 @@ describe('SAXParser.parseAsync', () => {
 });
 
 describe('SAXParser: reading a reader', () => {
-  /** A delegate that upper-cases text. */
-  class Upper extends StreamReaderDelegate {
-    override text(): string {
-      return super.text().toUpperCase();
-    }
-  }
-
   it('reads a whole document from a reader at its start, through its filters and delegates, with the reader’s options', () => {
     const factory = new XMLInputFactory({ namespacePrefixes: true });
     const reader = createFilteredReader(
-      new Upper(factory.createStreamReader('<!DOCTYPE a><a xmlns:p="urn:p">x<!--c--></a>')),
+      new UpperCaseText(factory.createStreamReader('<!DOCTYPE a><a xmlns:p="urn:p">x<!--c--></a>')),
       (r) => r.eventType() !== EventType.COMMENT
     );
     const { handler, calls: out } = recorder();
@@ -463,7 +457,7 @@ describe('SAXParser: reading a reader', () => {
     const bytes = new TextEncoder().encode('<!DOCTYPE a [<!ENTITY e "x">]><a>&e;</a>');
     const reader = new XMLInputFactory().createAsyncStreamReader(bytes);
     const { handler, calls: out } = recorder(['characters', 'startEntity', 'endEntity']);
-    await new SAXParser().parseAsync(new Upper(reader), handler);
+    await new SAXParser().parseAsync(new UpperCaseText(reader), handler);
     expect(out).toEqual(['startEntity(e)', 'characters(X)', 'endEntity(e)']);
   });
 

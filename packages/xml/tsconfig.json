@@ -1,1 +1,8 @@
-{ "extends": "@exemplarjs/build-config/tsconfig.lib.json", "compilerOptions": { "types": ["node"] } }
+{
+  "extends": "@exemplarjs/build-config/tsconfig.lib.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // The shared test helpers import this package; read it from source, as the tests do, so its types are one.
+    "customConditions": ["exemplar-source"]
+  }
+}

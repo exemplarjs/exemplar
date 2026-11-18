@@ -59,36 +59,35 @@ function expand(raw: string, ...entities: EntityDeclaration[]): string {
 describe('lookupGeneral (the Entity Declared rules, §4.1)', () => {
   it('finds an entity the DTD declares, before one known in advance', () => {
     const store = storeOf(internal('e', 'dtd'));
-    expect(lookupGeneral(store, new Map([['e', 'known']]), 'e')).toEqual({
-      kind: 'entity',
-      entity: internal('e', 'dtd'),
-    });
+    expect(lookupGeneral(store, new Map([['e', 'known']]), 'e')).toEqual(internal('e', 'dtd'));
   });
 
   it('finds an entity known in advance when the DTD does not declare it', () => {
     expect(lookupGeneral(storeOf(), new Map([['nbsp', '\u00A0']]), 'nbsp')).toEqual({
-      kind: 'entity',
-      entity: { name: 'nbsp', isParameterEntity: false, value: '\u00A0', declaredExternally: false },
+      name: 'nbsp',
+      isParameterEntity: false,
+      value: '\u00A0',
+      declaredExternally: false,
     });
   });
 
   it('makes an undeclared entity fatal with no DTD, or one read in full with no parameter-entity references', () => {
-    expect(lookupGeneral(new DeclarationStore(), new Map(), 'u')).toEqual({ kind: 'fatal' });
-    expect(lookupGeneral(storeOf(), new Map(), 'u')).toEqual({ kind: 'fatal' });
+    expect(lookupGeneral(new DeclarationStore(), new Map(), 'u')).toBe('fatal');
+    expect(lookupGeneral(storeOf(), new Map(), 'u')).toBe('fatal');
   });
 
   it('makes an undeclared entity a validity error when the DTD has parts it may not have read', () => {
     const read = Object.assign(storeOf(), { hasParameterReferences: true });
-    expect(lookupGeneral(read, new Map(), 'u')).toEqual({ kind: 'undeclared' });
+    expect(lookupGeneral(read, new Map(), 'u')).toBe('undeclared');
     const unread = Object.assign(storeOf(), { hasExternalSubset: true, hasUnreadDeclarations: true });
-    expect(lookupGeneral(unread, new Map(), 'u')).toEqual({ kind: 'unread' });
+    expect(lookupGeneral(unread, new Map(), 'u')).toBe('unread');
   });
 
   it('does not count an external declaration in a standalone document', () => {
     const store = storeOf({ name: 'x', isParameterEntity: false, value: 'v', declaredExternally: true });
     store.hasExternalSubset = true;
     store.isStandalone = true;
-    expect(lookupGeneral(store, new Map(), 'x')).toEqual({ kind: 'fatal' });
+    expect(lookupGeneral(store, new Map(), 'x')).toBe('fatal');
   });
 });
 

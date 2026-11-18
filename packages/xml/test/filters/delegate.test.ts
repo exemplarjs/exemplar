@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { UpperCaseText } from '@exemplarjs/test-support';
 import type { StreamReader as Cursor } from '@/cursor/stream-reader';
 import { cursorOf, StreamReaderDelegate } from '@/filters/delegate';
 import { IllegalStateError } from '@/index';
@@ -119,13 +120,7 @@ describe('StreamReaderDelegate (StAX StreamReaderDelegate)', () => {
   });
 
   it('forwards to another delegate', () => {
-    class Upper extends StreamReaderDelegate {
-      override text(): string {
-        return super.text().toUpperCase();
-      }
-    }
-
-    const reader = new StreamReaderDelegate(new Upper(new XMLInputFactory().createStreamReader('<a>x</a>')));
+    const reader = new StreamReaderDelegate(new UpperCaseText(new XMLInputFactory().createStreamReader('<a>x</a>')));
     expect([reader.next(), reader.next(), reader.text()]).toEqual([EventType.START_ELEMENT, EventType.CHARACTERS, 'X']);
   });
 

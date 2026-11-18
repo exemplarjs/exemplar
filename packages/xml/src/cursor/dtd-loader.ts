@@ -10,6 +10,7 @@ import type { Location } from '@/errors/xml-error';
 import type { OpenedSource } from '@/input/source';
 import type { ResolvedSource } from '@/resolvers/resolver';
 import type { Tokenizer } from '@/tokenizer/tokenizer';
+import { ErrorFactory } from '@/util/errors';
 import type { EntityStack } from './entity-stack.ts';
 import type { ErrorReporter } from './error-reporter.ts';
 
@@ -35,7 +36,6 @@ function subsetFrame(
     isDocumentText: !isExternal,
     betweenDeclarations: false,
     baseURI,
-    isEntityExpansion: false,
     locate,
   };
 }
@@ -106,16 +106,14 @@ export class DtdLoader {
     errors.holdErrors();
     try {
       this.load(tokenizer, store, external, counter);
+      return true;
     } catch (error) {
-      if (error instanceof ResolutionPendingError) {
-        errors.discardHeldErrors();
-        return false;
-      }
+      ErrorFactory.expect(error, ResolutionPendingError);
+      errors.discardHeldErrors();
+      return false;
+    } finally {
       errors.releaseHeldErrors();
-      throw error;
     }
-    errors.releaseHeldErrors();
-    return true;
   }
 
   /** Reads the external subset the DOCTYPE names, or the one a resolver offers when it names none. */

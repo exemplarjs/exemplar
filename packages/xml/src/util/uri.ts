@@ -71,7 +71,7 @@ export function resolveEscapedTargetURI(reference: string, baseURI: string | und
   return escapeAndResolveURI(reference, baseURI) ?? reference;
 }
 
-/** The scheme of an absolute URI, lower-cased, such as `https`, as access lists name it. */
+/** The scheme of an absolute URI, lower-cased, such as `https`, as access lists name it; `''` for a URI without one. */
 export function protocolOf(uri: string): string {
-  return uri.slice(0, uri.indexOf(':')).toLowerCase();
+  return uri.slice(0, Math.max(uri.indexOf(':'), 0)).toLowerCase();
 }

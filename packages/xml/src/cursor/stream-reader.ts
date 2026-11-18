@@ -28,14 +28,13 @@ import {
   type EntityListener,
   EVENT_OFFSET,
   EVENT_POSITION,
+  HAS_FILTERS,
   INCLUDED_DECLARATIONS,
-  INPUT_ENCODING,
   isIndex,
   LISTEN_ENTITIES,
   NAMESPACES_IN_SCOPE,
   outOfRange,
   READER_OPTIONS,
-  XML_ENCODING,
 } from './internal.ts';
 import { NamespaceScopes } from './namespace-scopes.ts';
 import * as navigation from './navigation.ts';
@@ -49,7 +48,6 @@ const AS_RETURNED: unique symbol = Symbol('asReturned');
 const CREATE_TOKENIZER: unique symbol = Symbol('createTokenizer');
 const SLICE_BEFORE_DROP: unique symbol = Symbol('sliceBeforeDrop');
 const CURRENT_ELEMENT_DEPTH: unique symbol = Symbol('currentElementDepth');
-const CURRENT_NAME_COLON: unique symbol = Symbol('currentNameColon');
 const START_LOCAL_NAME: unique symbol = Symbol('startLocalName');
 const CURRENT_SCOPE_DEPTH: unique symbol = Symbol('currentScopeDepth');
 const TAG_ATTRIBUTE_INDEX: unique symbol = Symbol('tagAttributeIndex');
@@ -122,6 +120,8 @@ export class StreamReader {
   readonly #processing: EventProcessing;
   /** Whether events come straight from the tokens: no coalescing, entity boundaries, validation or filters. */
   #passesStraightThrough: boolean;
+  /** Whether a filter was added, which may keep an element's start or end tag from being reported. */
+  #hasFilters = false;
 
   constructor(opened: OpenedSource, options: ResolvedOptions, registry: DecoderRegistry, input?: AsyncOpenedSource) {
     this.#opened = opened;
@@ -228,6 +228,12 @@ export class StreamReader {
   [ADD_FILTER](filter: StreamFilter): void {
     this.#processing.addFilter(filter);
     this.#passesStraightThrough = false;
+    this.#hasFilters = true;
+  }
+
+  /** Whether a filter was added. @internal */
+  get [HAS_FILTERS](): boolean {
+    return this.#hasFilters;
   }
 
   /** Tells a listener where expanded entities start and end; undefined stops telling the last one. @internal */
@@ -268,19 +274,9 @@ export class StreamReader {
     return this.#core.offset;
   }
 
-  /** The encoding detection chose for the document; undefined for text given as a string. @internal */
-  get [INPUT_ENCODING](): string | undefined {
-    return this.#opened.text.detection?.decoderName;
-  }
-
   /** The unparsed entities and notations included content has added to the document, which XInclude reports. @internal */
   [INCLUDED_DECLARATIONS](): readonly DtdItem[] {
     return NO_ITEMS;
-  }
-
-  /** The encoding the XML declaration names, if it names one. @internal */
-  get [XML_ENCODING](): string | undefined {
-    return this.#entities.document.declaration?.encoding;
   }
 
   /** Whether every declaration the DTD refers to was read. @internal */
@@ -335,13 +331,6 @@ export class StreamReader {
     return -1;
   }
 
-  /** Where the colon is in the current element's name, or -1 when it has none or namespaces are off. */
-  private [CURRENT_NAME_COLON](): number {
-    const elementDepth = this[CURRENT_ELEMENT_DEPTH]();
-    if (elementDepth < 0 || !this.#options.namespaceAware) return -1;
-    return this.#elements.nameFirstColons[elementDepth] as number;
-  }
-
   /** The current element's qualified name, or the entity's name for ENTITY_REFERENCE. */
   name(): string {
     const core = this.#core;
@@ -373,7 +362,8 @@ export class StreamReader {
 
   /** The current element's prefix, or the empty string. */
   prefix(): string {
-    const colon = this[CURRENT_NAME_COLON]();
+    const elementDepth = this[CURRENT_SCOPE_DEPTH]();
+    const colon = elementDepth < 0 ? -1 : (this.#elements.nameFirstColons[elementDepth] as number);
     return colon < 0 ? '' : this.name().slice(0, colon);
   }
 

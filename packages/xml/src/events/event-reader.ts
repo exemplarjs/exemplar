@@ -201,8 +201,12 @@ export class AsyncEventReader implements AsyncIterableIterator<XMLEvent> {
     const pump = this.#pump;
     while (!pump.ended) {
       const batch: XMLEvent[] = [];
-      for (let event = pump.poll(); event !== undefined; event = pump.poll()) batch.push(event);
-      if (batch.length > 0) yield batch;
+      try {
+        for (let event = pump.poll(); event !== undefined; event = pump.poll()) batch.push(event);
+      } finally {
+        // The events read before a fatal error are given before it is thrown.
+        if (batch.length > 0) yield batch;
+      }
       // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
       if (!pump.ended) await pump.reader.fill();
     }
@@ -213,14 +217,23 @@ export class AsyncEventReader implements AsyncIterableIterator<XMLEvent> {
     const pump = this.#pump;
     // Whether the last pull stopped where the cursor needs input, which the next must wait for first.
     let starved = false;
+    // A fatal error met after events were queued, which the next pull throws once they are read.
+    let failure: { readonly error: unknown } | undefined;
     return new ReadableStream<XMLEvent>({
       pull: async (controller) => {
+        if (failure !== undefined) throw failure.error;
         for (;;) {
           if (starved) await pump.reader.fill();
           let pushed = false;
-          for (let event = pump.poll(); event !== undefined; event = pump.poll()) {
-            controller.enqueue(event);
-            pushed = true;
+          try {
+            for (let event = pump.poll(); event !== undefined; event = pump.poll()) {
+              controller.enqueue(event);
+              pushed = true;
+            }
+          } catch (error) {
+            if (!pushed) throw error;
+            failure = { error };
+            return;
           }
           if (pump.ended) {
             controller.close();

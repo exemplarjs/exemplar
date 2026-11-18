@@ -7,10 +7,8 @@ import {
   type EntityListener,
   ErrorFactory,
   INCLUDED_DECLARATIONS,
-  INPUT_ENCODING,
   LISTEN_ENTITIES,
   type StreamReader,
-  XML_ENCODING,
   XMLNS_NAMESPACE,
 } from '@exemplarjs/xml/internal';
 import {
@@ -185,8 +183,8 @@ export class TreeBuilder implements EntityListener {
     document._xmlVersion = reader.version() ?? '1.0';
     document._xmlStandalone = reader.standalone() ?? false;
     const cursor = cursorOf(reader);
-    document._xmlEncoding = cursor[XML_ENCODING] ?? null;
-    document._inputEncoding = cursor[INPUT_ENCODING]?.toUpperCase() ?? null;
+    document._xmlEncoding = cursor.declaredEncoding() ?? null;
+    document._inputEncoding = cursor.encoding()?.toUpperCase() ?? null;
   }
 
   /** Builds the document type from the DTD's declarations. */

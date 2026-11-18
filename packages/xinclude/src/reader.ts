@@ -17,6 +17,7 @@ import {
   type DecoderRegistry,
   type EntityListener,
   ErrorFactory,
+  HAS_FILTERS,
   INCLUDED_DECLARATIONS,
   isAllWhitespace,
   isCharacterData,
@@ -620,6 +621,10 @@ export class XIncludeReader extends SplicingReader {
   override [ADD_FILTER](filter: StreamFilter): void {
     this.#filters ??= [];
     this.#filters.push(filter);
+  }
+
+  override get [HAS_FILTERS](): boolean {
+    return this.#filters !== undefined;
   }
 
   override [LISTEN_ENTITIES](listener: EntityListener | undefined): void {

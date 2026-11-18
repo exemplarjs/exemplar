@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type AsyncEventReader, EventType, type XMLEvent, XMLInputFactory } from '@/index';
+import { type AsyncEventReader, EventType, type XMLError, type XMLEvent, XMLInputFactory } from '@/index';
 
 const xml = new XMLInputFactory();
 
@@ -371,6 +371,46 @@ describe('the async event reader, further', () => {
     const events: string[] = [];
     for await (const event of xml.createEventStream(chunked(DOCUMENT, 1))) events.push(summary(event));
     expect(events).toEqual(SUMMARIES);
+  });
+
+  it('gives the events before a fatal error in the same chunk, per event, per batch and in streams', async () => {
+    const bad = '<a><b></a>';
+    /** The events read from `events` until it fails, then the error's code. */
+    const read = async (events: AsyncIterable<XMLEvent | XMLEvent[]>): Promise<string[]> => {
+      const seen: string[] = [];
+      try {
+        for await (const event of events) seen.push(...[event].flat().map((e) => summary(e)));
+      } catch (error) {
+        seen.push((error as XMLError).code);
+      }
+      return seen;
+    };
+    /** A reader of the document as one chunk. */
+    const reader = () => xml.createAsyncEventReader(chunked(bad, bad.length));
+    const expected = ['start ', '<a>', '<b>', 'WF_END_TAG_MISMATCH'];
+    expect(await read(reader())).toEqual(expected);
+    expect(await read(reader().batches())).toEqual(expected);
+    expect(await read(reader().stream())).toEqual(expected);
+  });
+
+  it('gives no error to a consumer that stops at the last event before a fatal error, but in a stream', async () => {
+    const bad = '<a><b></a>';
+    /** The events read from `events` up to `<b>`, where the consumer stops. */
+    const readToB = async (events: AsyncIterable<XMLEvent | XMLEvent[]>): Promise<string[]> => {
+      const seen: string[] = [];
+      for await (const event of events) {
+        seen.push(...[event].flat().map((e) => summary(e)));
+        if (seen.at(-1) === '<b>') break;
+      }
+      return seen;
+    };
+    /** A reader of the document as one chunk. */
+    const reader = () => xml.createAsyncEventReader(chunked(bad, bad.length));
+    const expected = ['start ', '<a>', '<b>'];
+    expect(await readToB(reader())).toEqual(expected);
+    expect(await readToB(reader().batches())).toEqual(expected);
+    // A stream reads ahead to refill its queue, so it has met the error by the time the consumer stops.
+    await expect(readToB(reader().stream())).rejects.toThrow(expect.objectContaining({ code: 'WF_END_TAG_MISMATCH' }));
   });
 
   it('rejects with the reader’s error, per event, per batch and in streams', async () => {

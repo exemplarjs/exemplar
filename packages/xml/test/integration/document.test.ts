@@ -1,5 +1,6 @@
 import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { utf16 } from '@exemplarjs/test-support';
 import { EventType, XMLInputFactory } from '@/index';
 
 const encoder = new TextEncoder();
@@ -15,12 +16,6 @@ function failure(source: string | Uint8Array): string {
     return `${code}@${line}:${column}`;
   }
   return 'accepted';
-}
-
-/** UTF-16LE bytes of a string, after a byte-order mark. */
-function utf16le(text: string): Uint8Array {
-  const units = Array.from({ length: text.length }, (_, i) => text.charCodeAt(i));
-  return new Uint8Array([0xff, 0xfe, ...units.flatMap((unit) => [unit & 0xff, unit >> 8])]);
 }
 
 describe('the document (§2.1 [1]: prolog element Misc*)', () => {
@@ -177,7 +172,7 @@ describe('byte-order marks (§4.3.3, Appendix F)', () => {
   });
 
   it('reads UTF-16 with a byte-order mark, the line end after the declaration being prolog whitespace', () => {
-    const r = reader(utf16le('<?xml version="1.0" encoding="UTF-16"?>\n<person>Hi Jérôme</person>'));
+    const r = reader(utf16('<?xml version="1.0" encoding="UTF-16"?>\n<person>Hi Jérôme</person>', true));
     expect([r.next(), r.next(), r.text(), r.location().line]).toEqual([
       EventType.START_ELEMENT,
       EventType.CHARACTERS,
@@ -187,7 +182,7 @@ describe('byte-order marks (§4.3.3, Appendix F)', () => {
   });
 
   it('detects UTF-16 from its byte-order mark without a declaration', () => {
-    const r = reader(utf16le('<a>é</a>'));
+    const r = reader(utf16('<a>é</a>', true));
     expect([r.encoding(), r.next(), r.next(), r.text()]).toEqual([
       'utf-16le',
       EventType.START_ELEMENT,
@@ -202,6 +197,6 @@ describe('byte-order marks (§4.3.3, Appendix F)', () => {
   });
 
   it('rejects UTF-16 with a byte-order mark that declares UTF-8', () => {
-    expect(failure(utf16le('<?xml version="1.0" encoding="UTF-8"?><p/>'))).toBe('ENCODING_MISMATCH@1:1');
+    expect(failure(utf16('<?xml version="1.0" encoding="UTF-8"?><p/>', true))).toBe('ENCODING_MISMATCH@1:1');
   });
 });

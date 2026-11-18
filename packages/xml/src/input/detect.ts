@@ -214,18 +214,10 @@ function isUtf32Family(family: EncodingFamily): boolean {
   return family === 'utf-32be' || family === 'utf-32le' || family === 'x-ucs-4-2143' || family === 'x-ucs-4-3412';
 }
 
-/** A problem with the declared encoding. */
-function encodingProblem(code: ErrorCode, message: string, level: EncodingProblem['level']): EncodingProblem {
-  return { code, message, level };
-}
-
 /** A fatal mismatch between the detected and declared encodings. */
 function encodingMismatch(detected: string, declaration: string): EncodingProblem {
-  return encodingProblem(
-    ErrorCode.ENCODING_MISMATCH,
-    `The document is in ${detected} but declares ${declaration}`,
-    'fatal'
-  );
+  const message = `The document is in ${detected} but declares ${declaration}`;
+  return { code: ErrorCode.ENCODING_MISMATCH, message, level: 'fatal' };
 }
 
 /** Checks an encoding supplied from outside against the declaration: a conflict is only worth a warning (RFC 7303 §3.2). */
@@ -234,7 +226,7 @@ function checkExternal(detection: Detection, declaration: string | undefined): E
   if (declared === undefined || declared === detection.external || detection.byteOrderMark !== undefined)
     return undefined;
   const message = `The encoding supplied from outside, ${detection.external}, overrides the declared ${declaration}`;
-  return encodingProblem(ErrorCode.ENCODING_CONFLICT, message, 'warning');
+  return { code: ErrorCode.ENCODING_CONFLICT, message, level: 'warning' };
 }
 
 /** Checks a document that detection found ASCII-compatible. */
@@ -251,11 +243,8 @@ function checkUtf16(detection: Detection, declaration: string, declared: string)
     return encodingMismatch(detection.family, declaration);
   }
   if (declared !== 'utf-16' || detection.byteOrderMark !== undefined) return undefined;
-  return encodingProblem(
-    ErrorCode.ENCODING_UTF16_WITHOUT_BOM,
-    'A document declared as UTF-16 must begin with a byte-order mark',
-    'error'
-  );
+  const message = 'A document declared as UTF-16 must begin with a byte-order mark';
+  return { code: ErrorCode.ENCODING_UTF16_WITHOUT_BOM, message, level: 'error' };
 }
 
 /** Checks the encoding the XML declaration names against what detection found (§4.3.3, Appendix F, RFC 7303). */
@@ -268,7 +257,7 @@ export function checkDeclaredEncoding(
   if (declaration === undefined) {
     if (detection.family === 'ascii' || detection.byteOrderMark !== undefined) return undefined;
     const message = `A document in ${detection.family} without a byte-order mark must declare its encoding`;
-    return encodingProblem(ErrorCode.ENCODING_UNDECLARED, message, 'fatal');
+    return { code: ErrorCode.ENCODING_UNDECLARED, message, level: 'fatal' };
   }
   const declared = canonicalEncoding(declaration);
   if (detection.family === 'ebcdic') return isEbcdic(declared) ? undefined : encodingMismatch('EBCDIC', declaration);

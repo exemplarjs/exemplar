@@ -1,4 +1,5 @@
 import { canonical } from '@test/helpers/parse';
+import { utf8 } from '@exemplarjs/test-support';
 import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
 import { type InputOptions, type Source, XMLError } from '@/index';
 import { PENDING, type TextSource } from '@/input/source';
@@ -10,11 +11,6 @@ export function bytes(...values: number[]): Uint8Array {
   return new Uint8Array(values);
 }
 
-/** A string's UTF-8 bytes. */
-export function utf8(text: string): Uint8Array {
-  return new TextEncoder().encode(text);
-}
-
 /** Joins byte arrays. */
 export function join(...parts: Uint8Array[]): Uint8Array {
   return bytes(...parts.flatMap((part) => [...part]));
@@ -23,16 +19,6 @@ export function join(...parts: Uint8Array[]): Uint8Array {
 /** UTF-8 text around raw bytes, such as bytes of another encoding or bad ones. */
 export function framed(before: string, raw: readonly number[], after = ''): Uint8Array {
   return join(utf8(before), bytes(...raw), utf8(after));
-}
-
-/** A string's UTF-16 code units in one byte order, after a byte-order mark if asked. */
-export function utf16(text: string, littleEndian: boolean, bom = false): Uint8Array {
-  const units = bom ? `\uFEFF${text}` : text;
-  const out = new Uint8Array(units.length * 2);
-  const view = new DataView(out.buffer);
-  // eslint-disable-next-line prefer-code-point -- UTF-16 is written in code units
-  for (let i = 0; i < units.length; i++) view.setUint16(i * 2, units.charCodeAt(i), littleEndian);
-  return out;
 }
 
 /** A string's code points as four bytes each, in a byte order such as '1234' (big-endian), after a BOM if asked. */

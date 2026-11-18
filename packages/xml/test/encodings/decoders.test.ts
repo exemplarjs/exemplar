@@ -1,5 +1,6 @@
-import { bytes, framed, join, singleByte, split, utf32, utf8, verdict } from '@test/helpers/lexical';
+import { bytes, framed, join, singleByte, split, utf32, verdict } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
+import { utf8 } from '@exemplarjs/test-support';
 import {
   DecodeError,
   isEbcdic,

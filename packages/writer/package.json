@@ -37,6 +37,7 @@
   "devDependencies": {
     "@exemplarjs/build-config": "workspace:*",
     "@exemplarjs/sax": "workspace:*",
+    "@exemplarjs/test-support": "workspace:*",
     "@exemplarjs/xml": "workspace:*"
   }
 }

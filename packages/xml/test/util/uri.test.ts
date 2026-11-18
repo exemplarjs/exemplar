@@ -85,6 +85,10 @@ describe('protocolOf', () => {
   it("gives an absolute URI's protocol in lower case", () => {
     expect([protocolOf('HTTPS://example.com/'), protocolOf('file:///a')]).toEqual(['https', 'file']);
   });
+
+  it('gives no protocol for a URI without one', () => {
+    expect([protocolOf('a/b.dtd'), protocolOf('')]).toEqual(['', '']);
+  });
 });
 
 describe('resolveTargetURI and resolveEscapedTargetURI', () => {

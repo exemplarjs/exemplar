@@ -18,6 +18,9 @@ export function declaredPrefixOf(qName: string): string | undefined {
   return qName.startsWith(XMLNS_COLON) ? qName.slice(XMLNS_COLON.length) : undefined;
 }
 
+/** The message for a declaration that takes a prefix's binding away, which only Namespaces in XML 1.1 has. */
+export const UNDECLARING_PROBLEM = 'Namespaces in XML 1.0 do not allow undeclaring a prefix';
+
 /**
  * The message for the namespace rule (Namespaces §3) that binding `prefix` to `uri` breaks, or
  * undefined when it breaks none. The `xml` prefix and its namespace belong only to each other, and

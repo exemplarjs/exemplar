@@ -72,17 +72,16 @@ const VALID_STANDALONE = /^(?:yes|no)$/;
 export class DeclarationParser {
   readonly #text: string;
   /** Where reading has got to, as an index into the text. */
-  #pos: number;
+  #pos = 0;
   /** The code a malformed declaration fails with: `WF_XML_DECLARATION` or `WF_TEXT_DECLARATION`. */
   #errorCode: ErrorCode = ErrorCode.WF_XML_DECLARATION;
 
-  /** Reads the declaration at `start` in `text`, which must begin with `<?xml` there; `startsWithDeclaration` checks that. */
-  constructor(text: string, start: number) {
+  /** Reads the declaration `text` begins with: it must start with `<?xml`, which `startsWithDeclaration` checks. */
+  constructor(text: string) {
     this.#text = text;
-    this.#pos = start;
   }
 
-  /** The index just after the declaration's `?>` once it has been parsed; before that, where it starts. */
+  /** The index just after the declaration's `?>` once it has been parsed; before that, 0. */
   get end(): number {
     return this.#pos;
   }

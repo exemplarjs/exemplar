@@ -143,14 +143,14 @@ export class EntityExpander {
     this.name = name;
     this.text = '';
     const found = lookupGeneral(store, this.#options.entities, name);
-    if (found.kind === 'fatal') {
+    if (found === 'fatal') {
       this.#fail(ErrorCode.WF_UNDECLARED_ENTITY, `The entity ${name} is not declared`, tokenizer.nameStart);
     }
-    if (found.kind === 'undeclared') {
+    if (found === 'undeclared') {
       const location = this.#parts.entities.locationIn(tokenizer, tokenizer.nameStart);
       this.#parts.errors.error(ErrorCode.VC_ENTITY_DECLARED, `The entity ${name} is not declared`, location);
     }
-    return found.kind === 'entity' ? this.#expandEntity(found.entity, offset) : EventType.ENTITY_REFERENCE;
+    return typeof found === 'string' ? EventType.ENTITY_REFERENCE : this.#expandEntity(found, offset);
   }
 
   /** Expands a declared entity in content, or reports it when expansion is off or it is not read. */
@@ -208,7 +208,7 @@ export class EntityExpander {
     const tokenizer =
       entities.takeSpareTokenizer()?.reset(source) ??
       this.#parts.createTokenizer(source, { replacementText: true, version11: entities.document.version11 });
-    this.#enter(name, tokenizer, offset, true, undefined);
+    this.#enter(name, tokenizer, offset, undefined);
     tokenizer.readDeclaration();
     return undefined;
   }
@@ -234,7 +234,7 @@ export class EntityExpander {
       this.#failIfExceeded(this.counter.countExternalText(size, length))
     );
     const entityTokenizer = this.#parts.createTokenizer(text, { textDeclaration: true, version11 });
-    this.#enter(entity.name, entityTokenizer, offset, false, resolved.systemId);
+    this.#enter(entity.name, entityTokenizer, offset, resolved.systemId);
     entityTokenizer.readDeclaration();
     if (entityTokenizer.declaration?.version === '1.1' && !version11) {
       throw scanError(ErrorCode.WF_ENTITY_VERSION, 0, 'An XML 1.0 document cannot use an XML 1.1 entity');
@@ -253,12 +253,12 @@ export class EntityExpander {
   }
 
   /** Starts reading an entity's text with `tokenizer`, in place of the current text. */
-  #enter(name: string, tokenizer: Tokenizer, offset: number, isInternal: boolean, systemId: string | undefined): void {
+  #enter(name: string, tokenizer: Tokenizer, offset: number, systemId: string | undefined): void {
     const { entities, processing } = this.#parts;
     const parent = entities.current;
     // The names and bindings so far refer to the text being left, so slice them first.
     this.#parts.sliceBeforeLeaving(parent);
-    entities.enter(name, tokenizer, offset - parent.bufferOffset, this.#parts.elements.depth, isInternal, systemId);
+    entities.enter(name, tokenizer, offset - parent.bufferOffset, this.#parts.elements.depth, systemId);
     processing.entityStarted(name);
     // The validator hears of an expansion it alone sees from the reference that ends it.
     if (entities.depth !== processing.validatorOnlyDepth) processing.validation?.entity(name);

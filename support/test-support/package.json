@@ -1,0 +1,27 @@
+{
+  "name": "@exemplarjs/test-support",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The test fixtures and helpers the @exemplarjs packages' tests share",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "exemplar-source": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint"
+  },
+  "peerDependencies": {
+    "@exemplarjs/xml": "workspace:*"
+  },
+  "devDependencies": {
+    "@exemplarjs/build-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

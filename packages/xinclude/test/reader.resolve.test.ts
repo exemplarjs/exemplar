@@ -1,6 +1,4 @@
 import {
-  asyncErrorOf,
-  errorOf,
   events,
   eventsAsync,
   factory,
@@ -12,6 +10,7 @@ import {
   XI,
 } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
+import { asyncErrorOf, errorOf } from '@exemplarjs/test-support';
 import {
   AsyncReaderRequiredError,
   type CatalogProcessor,

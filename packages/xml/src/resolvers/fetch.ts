@@ -1,9 +1,9 @@
 import { resolveURI } from '@/util/uri';
 import {
-  type AccessList,
   checkAccess,
   type EntityResolver,
   type ResolvedSource,
+  type ResolveRequest,
   type URIResolver,
 } from './resolver.ts';
 
@@ -14,11 +14,7 @@ export interface FetchResolverOptions {
 }
 
 /** What a fetch is asked with: the access list and the headers XInclude passes. */
-interface FetchRequest {
-  readonly access?: AccessList;
-  readonly accept?: string;
-  readonly acceptLanguage?: string;
-}
+type FetchRequest = Pick<ResolveRequest, 'access' | 'accept' | 'acceptLanguage'>;
 
 /** Reads `http:` and `https:` entities, DTDs and other resources with `fetch`, as the access list allows; only asynchronous readers can use it. */
 export function fetchResolver(options: FetchResolverOptions = {}): EntityResolver & URIResolver {
@@ -35,8 +31,8 @@ export function fetchResolver(options: FetchResolverOptions = {}): EntityResolve
     };
     const response = await get(uri, { headers });
     if (!response.ok) return;
-    // An HTTP charset is an encoding supplied from outside (RFC 7303).
-    const charset = /charset=([^;]+)/i.exec(response.headers.get('content-type') ?? '')?.[1]?.trim();
+    // An HTTP charset, quoted or not, is an encoding supplied from outside (RFC 7303).
+    const charset = /charset=\s*"?([^";]+)/i.exec(response.headers.get('content-type') ?? '')?.[1]?.trim();
     const bytes = new Uint8Array(await response.arrayBuffer());
     return { systemId: response.url || uri, bytes, ...(charset !== undefined && { encoding: charset }) };
   };

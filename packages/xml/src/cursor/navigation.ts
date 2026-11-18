@@ -55,7 +55,7 @@ export function elementText(reader: Navigable): string {
     const event = reader.next();
     if (event === EventType.END_ELEMENT) return text;
     if (event === EventType.NEED_INPUT) throw cannotWait('elementText');
-    text += elementTextPart(reader, event);
+    text += elementTextPart(reader, event, 'elementText');
   }
 }
 
@@ -69,7 +69,7 @@ export async function elementTextAsync(reader: Navigable): Promise<string> {
     if (event === EventType.END_ELEMENT) return text;
     // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
     if (event === EventType.NEED_INPUT) await reader.fill();
-    else text += elementTextPart(reader, event);
+    else text += elementTextPart(reader, event, 'elementTextAsync');
   }
 }
 
@@ -102,10 +102,10 @@ function depthChange(event: EventType): number {
   return event === EventType.END_ELEMENT ? -1 : 0;
 }
 
-/** The text an event inside a text-only element adds; a child element fails. */
-function elementTextPart(reader: Navigable, event: EventType): string {
+/** The text an event inside a text-only element adds; a child element fails, naming the `method` that met it. */
+function elementTextPart(reader: Navigable, event: EventType, method: string): string {
   if (event === EventType.START_ELEMENT)
-    throw ErrorFactory.create(IllegalStateError, 'elementText() found a child element');
+    throw ErrorFactory.create(IllegalStateError, `${method}() found a child element`);
   if (isCharacterData(event)) return reader.text();
   return '';
 }

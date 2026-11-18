@@ -13,7 +13,19 @@ import type { EntityDeclaration } from './declarations.ts';
 import type { DeclarationStore } from './store.ts';
 
 // Module-level constants, so V8 can inline them.
-const { APOSTROPHE, CARRIAGE_RETURN, DOUBLE_QUOTE, LINE_FEED, NON_ASCII, PERCENT, SEMICOLON, SPACE, TAB } = Char;
+const {
+  APOSTROPHE,
+  CARRIAGE_RETURN,
+  DOUBLE_QUOTE,
+  LINE_FEED,
+  LINE_SEPARATOR,
+  NEXT_LINE,
+  NON_ASCII,
+  PERCENT,
+  SEMICOLON,
+  SPACE,
+  TAB,
+} = Char;
 
 /** Why a parameter-entity reference inside a declaration fails in the internal subset (WFC: PEs in Internal Subset). */
 export const PE_IN_INTERNAL_SUBSET =
@@ -38,10 +50,17 @@ export interface Frame {
   /** Whether the frame was referenced between declarations, so it must hold whole declarations (WFC: PE Between Declarations). */
   readonly betweenDeclarations: boolean;
   readonly baseURI: string | undefined;
-  /** Whether the frame is a parameter entity's replacement text, whose start and end SAX hears of. */
-  readonly isEntityExpansion: boolean;
   /** The location of an index in this frame. */
   readonly locate: (index: number) => Location;
+}
+
+/** A quoted literal read from a frame: its content, and where it starts, for errors found in it later. */
+export interface Literal {
+  /** The content between the quotes, with line ends normalized. */
+  readonly value: string;
+  readonly frame: Frame;
+  /** Where the opening quote is in `frame`'s text. */
+  readonly start: number;
 }
 
 /** External text a resolver supplied, its text declaration already read. */
@@ -101,7 +120,6 @@ function expansionFrame(
     isDocumentText: false,
     betweenDeclarations,
     baseURI: replacement.baseURI,
-    isEntityExpansion: true,
     // The padding space before the text maps to its first character.
     locate: (index) => (replacement.locate ? replacement.locate(Math.max(0, index - 1)) : from.locate(referenceStart)),
   };
@@ -122,10 +140,8 @@ export class DtdInput {
   readonly #frames: Frame[] = [];
   /** The frame being read, the last of `#frames`. */
   #frame: Frame | undefined;
-  /** How many declarations are open, so a frame referenced between declarations cannot end inside one. */
-  #openDeclarations = 0;
-  /** How many frames being read are external or a parameter entity's, whose declarations count as external. */
-  #externalFrames = 0;
+  /** Whether a declaration is being read, which a frame referenced between declarations cannot end inside. */
+  inDeclaration = false;
 
   constructor(store: DeclarationStore, context: DtdContext) {
     this.#store = store;
@@ -136,17 +152,6 @@ export class DtdInput {
   push(frame: Frame): void {
     this.#frames.push(frame);
     this.#frame = frame;
-    if (frame.isExternal || frame.entityName !== undefined) this.#externalFrames++;
-  }
-
-  /** Notes that a declaration has begun, which a frame referenced between declarations must not end inside. */
-  openDeclaration(): void {
-    this.#openDeclarations++;
-  }
-
-  /** Notes that a declaration has ended. */
-  closeDeclaration(): void {
-    this.#openDeclarations--;
   }
 
   /** How many frames are being read. */
@@ -171,14 +176,6 @@ export class DtdInput {
     const frame = this.currentFrame();
     // eslint-disable-next-line prefer-code-point -- callers compare with ASCII delimiters
     return frame.pos < frame.end ? frame.text.charCodeAt(frame.pos) : -1;
-  }
-
-  /** The code unit `offset` after the current position, or -1 past the end of the frame. */
-  charAhead(offset: number): number {
-    const frame = this.currentFrame();
-    const i = frame.pos + offset;
-    // eslint-disable-next-line prefer-code-point -- callers compare with ASCII delimiters
-    return i < frame.end ? frame.text.charCodeAt(i) : -1;
   }
 
   /** Whether the current frame goes on with `expected`. */
@@ -213,6 +210,11 @@ export class DtdInput {
     return this.#context.fail(code, message, location, this.openEntityNames());
   }
 
+  /** Throws a fatal error at a literal read earlier, naming the parameter entities being read. */
+  failAtLiteral(code: ErrorCode, message: string, literal: Literal): never {
+    return this.failAt(code, message, literal.frame.locate(literal.start));
+  }
+
   /** Reports a warning here. */
   reportWarning(code: ErrorCode, message: string): void {
     this.#context.warn?.(code, message, this.location());
@@ -231,7 +233,8 @@ export class DtdInput {
 
   /** Whether declarations read here count as external, which `standalone="yes"` does not count. */
   isInExternal(): boolean {
-    return this.#externalFrames > 0;
+    // Every frame above the subset's is a parameter entity's, whose declarations count as external too.
+    return this.#frames.length > 1 || this.currentFrame().isExternal;
   }
 
   // Between declarations
@@ -254,16 +257,26 @@ export class DtdInput {
   pop(): void {
     const frame = this.#frames.pop() as Frame;
     this.#frame = this.#frames.at(-1);
-    if (frame.isExternal || frame.entityName !== undefined) this.#externalFrames--;
-    if (frame.isEntityExpansion) this.#store.items.push({ kind: 'endEntity', name: frame.entityName as string });
+    if (frame.entityName !== undefined) this.#store.items.push({ kind: 'endEntity', name: frame.entityName });
+  }
+
+  /** Whether NEL and LS are whitespace in the current frame: only document text still holds them, elsewhere line ends are normalized. */
+  #hasVersion11LineEnds(): boolean {
+    return this.#context.version11 && this.currentFrame().isDocumentText;
+  }
+
+  /** Whether a code unit ends a name or keyword in the current frame: a delimiter, or whitespace. */
+  #isDelimiter(char: number): boolean {
+    if (char < NON_ASCII) return DELIMITERS[char] === 1;
+    // Past ASCII only the XML 1.1 line ends are whitespace.
+    return (char === NEXT_LINE || char === LINE_SEPARATOR) && this.#hasVersion11LineEnds();
   }
 
   /** Skips whitespace in the current frame; returns how much there was. */
   skipWhitespace(): number {
     const frame = this.currentFrame();
     const start = frame.pos;
-    // Only document text still holds NEL and LS; elsewhere line ends are normalized.
-    const version11LineEnds = this.#context.version11 && frame.isDocumentText;
+    const version11LineEnds = this.#hasVersion11LineEnds();
     // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
     while (frame.pos < frame.end && isWhitespaceChar(frame.text.charCodeAt(frame.pos), version11LineEnds)) frame.pos++;
     return frame.pos - start;
@@ -357,11 +370,9 @@ export class DtdInput {
 
   // Tokens inside declarations
 
-  /** Skips whitespace inside a declaration, which must be there; returns how much it skipped. */
-  requireWhitespace(): number {
-    const skipped = this.optionalWhitespace();
-    if (skipped === 0) this.fail(ErrorCode.WF_DECLARATION, 'Expected whitespace');
-    return skipped;
+  /** Skips whitespace inside a declaration, which must be there. */
+  requireWhitespace(): void {
+    if (this.optionalWhitespace() === 0) this.fail(ErrorCode.WF_DECLARATION, 'Expected whitespace');
   }
 
   /**
@@ -390,7 +401,7 @@ export class DtdInput {
   /** Leaves an ended frame inside a declaration; one referenced between declarations must not end inside one. */
   #leaveEndedFrame(): void {
     const frame = this.currentFrame();
-    if (frame.betweenDeclarations && this.#openDeclarations > 0) {
+    if (frame.betweenDeclarations && this.inDeclaration) {
       this.fail(
         ErrorCode.WF_PE_BETWEEN_DECLARATIONS,
         'A parameter entity between declarations must hold whole declarations'
@@ -436,7 +447,7 @@ export class DtdInput {
       pos++;
     }
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
-    if (pos < end && !isDelimiter(text.charCodeAt(pos))) return undefined;
+    if (pos < end && !this.#isDelimiter(text.charCodeAt(pos))) return undefined;
     frame.pos = pos;
     return text.slice(start, pos);
   }
@@ -460,7 +471,7 @@ export class DtdInput {
     const frame = this.currentFrame();
     const start = frame.pos;
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
-    while (frame.pos < frame.end && !isDelimiter(frame.text.charCodeAt(frame.pos))) frame.pos++;
+    while (frame.pos < frame.end && !this.#isDelimiter(frame.text.charCodeAt(frame.pos))) frame.pos++;
     return frame.text.slice(start, frame.pos);
   }
 
@@ -470,7 +481,7 @@ export class DtdInput {
     const frame = this.currentFrame();
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
     const after = frame.text.charCodeAt(frame.pos + word.length);
-    if (frame.pos + word.length < frame.end && !isDelimiter(after)) return false;
+    if (frame.pos + word.length < frame.end && !this.#isDelimiter(after)) return false;
     frame.pos += word.length;
     return true;
   }
@@ -479,7 +490,7 @@ export class DtdInput {
    * Reads a quoted literal, which must close in the frame it opened in. Returns its content with
    * line ends normalized, the frame, and where the literal starts, for errors found in it later.
    */
-  readLiteral(description: string): { value: string; frame: Frame; start: number } {
+  readLiteral(description: string): Literal {
     const frame = this.currentFrame();
     const quote = this.currentChar();
     if (quote !== DOUBLE_QUOTE && quote !== APOSTROPHE) {
@@ -517,8 +528,3 @@ const DELIMITERS = new Uint8Array(NON_ASCII);
 // eslint-disable-next-line prefer-code-point -- ASCII delimiters
 for (const char of Array.from('>()|,%"\'?*+[;', (delimiter) => delimiter.charCodeAt(0))) DELIMITERS[char] = 1;
 for (const char of [SPACE, TAB, LINE_FEED, CARRIAGE_RETURN]) DELIMITERS[char] = 1;
-
-/** Whether a code unit ends a name or keyword in a declaration. */
-function isDelimiter(char: number): boolean {
-  return char < NON_ASCII && DELIMITERS[char] === 1;
-}

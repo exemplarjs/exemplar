@@ -52,7 +52,7 @@ export class ChunkReader {
   read(tokenizer: Tokenizer): boolean {
     const chunk = this.#source.read();
     if (chunk === PENDING) return false;
-    if (chunk === undefined) tokenizer.markFinal();
+    if (chunk === undefined) tokenizer.final = true;
     else tokenizer.append(chunk);
     return true;
   }
@@ -78,7 +78,7 @@ export class ChunkReader {
         break;
       }
       if (chunk === undefined) {
-        tokenizer.markFinal();
+        tokenizer.final = true;
         break;
       }
       tokenizer.append(chunk);

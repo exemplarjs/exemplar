@@ -1,5 +1,5 @@
 import { verdict } from '@test/helpers/lexical';
-import { errorOf, parseEveryWay, reader } from '@test/helpers/parse';
+import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 import { EventType } from '@/index';
 
@@ -390,6 +390,28 @@ describe('locations', () => {
   it('counts NEL and LS as line ends in XML 1.1 only', () => {
     expect(errorOf('<?xml version="1.1"?><a>\u0085 <b></a>')).toMatchObject({ line: 3, column: 6 });
     expect(errorOf('<a>\u0085 <b></a>')).toMatchObject({ line: 1, column: 11 });
+  });
+
+  it.each([
+    ['NEL', '\u0085'],
+    ['LS', '\u2028'],
+  ])('takes a space then %s as whitespace in a start tag in XML 1.1', (_name, lineEnd) => {
+    const tag = `<a ${lineEnd}b="c" ${lineEnd}d="e" ${lineEnd}/>`;
+    expect(parseEveryWay(`<?xml version="1.1"?>${tag}`)).toBe('<a b="c" d="e"></a>');
+    expect(errorOf(tag).code).toBe('WF_TAG');
+  });
+
+  it.each([
+    ['an end tag', '<a></a~>', '<a></a>'],
+    ['around = in an attribute', '<a b~=~"c"/>', '<a b="c"></a>'],
+    ['after a PI target', '<a><?t~d?></a>', '<a><?t d?></a>'],
+    ['a document type declaration', '<!DOCTYPE~a~SYSTEM~"s"~[~]~><a/>', '<a></a>'],
+    ['after the root element', '<a/>~<!--c-->~', '<a></a>'],
+  ])('takes NEL and LS as whitespace in %s in XML 1.1', (_where, document, expected) => {
+    for (const lineEnd of ['\u0085', '\u2028']) {
+      const options = { supportExternalEntities: false };
+      expect(canonical(`<?xml version="1.1"?>${document.replaceAll('~', lineEnd)}`, options)).toBe(expected);
+    }
   });
 
   it('counts CR NEL as one line end in XML 1.1 (XML 1.1 §2.11)', () => {

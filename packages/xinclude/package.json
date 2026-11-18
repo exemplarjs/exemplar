@@ -39,6 +39,9 @@
     "@exemplarjs/canonical": "workspace:*",
     "@exemplarjs/dom": "workspace:*",
     "@exemplarjs/sax": "workspace:*",
+    "@exemplarjs/test-support": "workspace:*",
+    "@exemplarjs/writer": "workspace:*",
+    "@exemplarjs/xdm": "workspace:*",
     "@exemplarjs/xml": "workspace:*"
   }
 }

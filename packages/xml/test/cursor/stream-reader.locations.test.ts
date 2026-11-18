@@ -1,5 +1,6 @@
 import { errorOf, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { chunks, utf8 } from '@exemplarjs/test-support';
 import { EventType, type InputOptions, type Source, XMLInputFactory } from '@/index';
 
 const encoder = new TextEncoder();
@@ -13,12 +14,6 @@ function positions(source: Source, options: InputOptions = {}): string[] {
     out.push(`${e}@${line}:${column}`);
   }
   return out;
-}
-
-/** A document's bytes in chunks of one size. */
-function* chunks(xml: string, size: number): Generator<Uint8Array> {
-  const bytes = encoder.encode(xml);
-  for (let i = 0; i < bytes.length; i += size) yield bytes.subarray(i, i + size);
 }
 
 describe('locations (where each event starts, as in Woodstox)', () => {
@@ -75,8 +70,9 @@ describe('locations (where each event starts, as in Woodstox)', () => {
   it('give offsets in the whole document however it is chunked', () => {
     const xml = `<r>${'<e>text</e>\n'.repeat(50)}</r>`;
     const expected = positions(xml);
-    for (const size of [1, 7, 64]) expect(positions(chunks(xml, size))).toEqual(expected);
-    const r = reader(chunks(xml, 5));
+    const bytes = utf8(xml);
+    for (const size of [1, 7, 64]) expect(positions(chunks(bytes, size))).toEqual(expected);
+    const r = reader(chunks(utf8(xml), 5));
     let last = 0;
     for (let e = r.next(); e !== EventType.END_DOCUMENT; e = r.next()) last = r.location().offset;
     expect(last).toBe(xml.length - 4);
@@ -141,7 +137,7 @@ describe('locations (where each event starts, as in Woodstox)', () => {
     const xml = '<?xml version="1.0"?>\r\n<a x="1">\n\t<b>t</b>\r<!--c--></a>';
     const expected = positions(xml);
     const factory = new XMLInputFactory();
-    for (const source of [xml, chunks(xml, 1), chunks(xml, 4)]) {
+    for (const source of [xml, chunks(utf8(xml), 1), chunks(utf8(xml), 4)]) {
       const events = [...factory.createEventReader(source)];
       expect(events.slice(1, -1).map((e) => `${e.type}@${e.location.line}:${e.location.column}`)).toEqual(expected);
     }

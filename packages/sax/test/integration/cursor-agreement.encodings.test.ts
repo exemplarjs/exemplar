@@ -1,5 +1,6 @@
-import { latin1, readEveryWay, utf16 } from '@test/helpers/agreement';
+import { latin1, readEveryWay } from '@test/helpers/agreement';
 import { describe, expect, it } from 'vitest';
+import { utf16 } from '@exemplarjs/test-support';
 
 const UTF8 = new TextEncoder();
 

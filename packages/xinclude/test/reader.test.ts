@@ -1,6 +1,7 @@
-import { errorOf, factory, failure, type Files, included, MAIN, read, XI } from '@test/helpers/xinclude';
+import { factory, failure, type Files, included, MAIN, read, XI } from '@test/helpers/xinclude';
 import { describe, expect, it } from 'vitest';
 import { SAXParser } from '@exemplarjs/sax';
+import { errorOf } from '@exemplarjs/test-support';
 import { EventType, InvalidArgumentError, XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import { xincludeProcessor } from '@/index';
 

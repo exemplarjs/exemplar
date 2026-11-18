@@ -4,7 +4,7 @@ import { isNameStartCharBmp, NAME_CLASSES, NameClass } from '@/scan/classes';
 import { holdsAt } from '@/scan/scanner';
 import type { Tokenizer } from '@/tokenizer/tokenizer';
 import { Char, isHighSurrogate } from '@/util/chars';
-import { XML_NAMESPACE, XMLNS_NAMESPACE } from '@/util/namespaces';
+import { reservedBindingProblem, UNDECLARING_PROBLEM, XML_NAMESPACE, XMLNS_NAMESPACE } from '@/util/namespaces';
 import { fail, isIndex, outOfRange } from './internal.ts';
 
 // Module-level constants, so V8 can inline them.
@@ -16,11 +16,10 @@ export const XMLNS_LENGTH = 'xmlns'.length;
 const XMLNS_PREFIX_LENGTH = 'xmlns:'.length;
 
 /**
- * Checks that the name at buffer indexes `[start, end)` is a QName (Namespaces [7]): at most one
+ * Checks that the name with a colon at buffer indexes `[start, end)` is a QName (Namespaces [7]): one
  * colon, with an NCName on each side. `colon` and `colonCount` are what the scanner recorded for it.
  */
 export function checkQName(tokenizer: Tokenizer, start: number, end: number, colon: number, colonCount: number): void {
-  if (colonCount === 0) return;
   const buffer = tokenizer.buffer;
   // eslint-disable-next-line prefer-code-point -- a lead surrogate in a checked name starts a name
   const afterColon = buffer.charCodeAt(colon + 1);
@@ -115,38 +114,28 @@ export class NamespaceScopes {
     prefixStart: number,
     normalized: string | undefined
   ): void {
-    const at = tokenizer.attributeNameStart[attributeIndex] as number;
     const length = (tokenizer.attributeNameEnd[attributeIndex] as number) - prefixStart;
     // Only a prefix that starts with x can be reserved.
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
     const startsWithX = tokenizer.buffer.charCodeAt(prefixStart) === LOWER_X;
-    if (startsWithX && length === XMLNS_LENGTH && holdsAt(tokenizer.buffer, prefixStart, 'xmlns')) {
-      fail(tokenizer, ErrorCode.NS_RESERVED, 'The prefix xmlns must not be declared', at);
-    }
+    const xmlns = startsWithX && length === XMLNS_LENGTH && holdsAt(tokenizer.buffer, prefixStart, 'xmlns');
     const xml = startsWithX && length === XML_LENGTH && holdsAt(tokenizer.buffer, prefixStart, 'xml');
-    if (xml !== attributeValueIs(tokenizer, attributeIndex, normalized, XML_NAMESPACE)) {
-      fail(
-        tokenizer,
-        ErrorCode.NS_RESERVED,
-        'Only the prefix xml may be bound to the XML namespace, and only to it',
-        at
-      );
-    }
-    if (attributeValueIs(tokenizer, attributeIndex, normalized, XMLNS_NAMESPACE)) {
-      fail(tokenizer, ErrorCode.NS_RESERVED, 'No prefix may be bound to the xmlns namespace', at);
+    if (
+      xmlns ||
+      xml !== attributeValueIs(tokenizer, attributeIndex, normalized, XML_NAMESPACE) ||
+      attributeValueIs(tokenizer, attributeIndex, normalized, XMLNS_NAMESPACE)
+    ) {
+      failReserved(tokenizer, attributeIndex, prefixStart, normalized);
     }
     if (length > 0 && !tokenizer.version11 && attributeValueIs(tokenizer, attributeIndex, normalized, '')) {
-      fail(tokenizer, ErrorCode.NS_UNDECLARED_PREFIX, 'Namespaces in XML 1.0 do not allow undeclaring a prefix', at);
+      const at = tokenizer.attributeNameStart[attributeIndex] as number;
+      fail(tokenizer, ErrorCode.NS_UNDECLARED_PREFIX, UNDECLARING_PROBLEM, at);
     }
   }
 
-  /** Checks the name of `tokenizer`'s start tag as a QName and records the binding its prefix resolves to, for depth `elementDepth`. */
+  /** Checks the prefixed name of `tokenizer`'s start tag as a QName and records the binding its prefix resolves to, for depth `elementDepth`. */
   bindElement(tokenizer: Tokenizer, elementDepth: number): void {
     checkQName(tokenizer, tokenizer.nameStart, tokenizer.nameEnd, tokenizer.nameFirstColon, tokenizer.nameColonCount);
-    if (tokenizer.nameFirstColon < 0) {
-      this.elementBindings[elementDepth] = this.bindings.defaultIndex;
-      return;
-    }
     if (
       tokenizer.nameFirstColon - tokenizer.nameStart === XMLNS_LENGTH &&
       holdsAt(tokenizer.buffer, tokenizer.nameStart, 'xmlns')
@@ -236,6 +225,20 @@ export class NamespaceScopes {
   sliceBeforeDrop(tokenizer: Tokenizer, offset: number): void {
     this.bindings.sliceBeforeDrop(tokenizer.buffer, tokenizer.bufferOffset, offset);
   }
+}
+
+/** Throws the error for the declaration at `attributeIndex`, which binds a reserved prefix or namespace. */
+function failReserved(
+  tokenizer: Tokenizer,
+  attributeIndex: number,
+  prefixStart: number,
+  normalized: string | undefined
+): never {
+  const { buffer, attributeValueStart, attributeValueEnd } = tokenizer;
+  const prefix = buffer.slice(prefixStart, tokenizer.attributeNameEnd[attributeIndex]);
+  const uri = normalized ?? buffer.slice(attributeValueStart[attributeIndex], attributeValueEnd[attributeIndex]);
+  const problem = reservedBindingProblem(prefix, uri) as string;
+  fail(tokenizer, ErrorCode.NS_RESERVED, problem, tokenizer.attributeNameStart[attributeIndex]);
 }
 
 /** Whether attribute `attributeIndex`'s value, or its normalized form when it has one, is `uri`. */

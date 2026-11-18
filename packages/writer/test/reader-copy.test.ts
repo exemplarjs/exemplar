@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { UpperCaseText } from '@exemplarjs/test-support';
 import { EventType, type InputOptions, InvalidArgumentError, XMLInputFactory } from '@exemplarjs/xml';
 import { createDelegatedReader, createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { type Sink, StringSink, XMLOutputFactory } from '@/index';
@@ -58,16 +59,11 @@ describe('StreamWriter.copy', () => {
   });
 
   it('writes what filters and delegates change', () => {
-    class Shouting extends StreamReaderDelegate {
-      override text(): string {
-        return super.text().toUpperCase();
-      }
-    }
     const source = new XMLInputFactory().createStreamReader('<a><!--c--><b>quiet</b></a>');
     const withoutComments = createFilteredReader(source, (reader) => reader.eventType() !== EventType.COMMENT);
     const sink = new StringSink();
     const writer = new XMLOutputFactory({ omitXMLDeclaration: true }).createStreamWriter(sink);
-    writer.copy(createDelegatedReader(withoutComments, new Shouting()));
+    writer.copy(createDelegatedReader(withoutComments, new UpperCaseText()));
     writer.flush();
     expect(sink.toString()).toBe('<a><b>QUIET</b></a>');
   });

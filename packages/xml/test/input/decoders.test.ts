@@ -1,5 +1,6 @@
-import { bytes, framed, utf8, verdict } from '@test/helpers/lexical';
+import { bytes, framed, verdict } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
+import { utf8 } from '@exemplarjs/test-support';
 import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
 import { ALIASES } from '@/input/aliases';
 import type { Decoder } from '@/input/decoders';
@@ -19,6 +20,12 @@ describe('encoding names (§4.3.3)', () => {
 
   it('lower-cases a name it has no alias for', () => {
     expect(canonicalEncoding('X-Custom')).toBe('x-custom');
+  });
+
+  it('takes a name that every object has a property for as any other unknown name', () => {
+    expect(canonicalEncoding('constructor')).toBe('constructor');
+    expect(canonicalEncoding('toString')).toBe('tostring');
+    expect(verdict(utf8('<?xml version="1.0" encoding="constructor"?><a/>'))).toBe('ENCODING_UNSUPPORTED 1:1');
   });
 
   it('maps IBM01140 to IBM01149 and their aliases to the euro EBCDIC tables', () => {

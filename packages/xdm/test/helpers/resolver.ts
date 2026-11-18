@@ -24,19 +24,3 @@ export const spaceValidator: Validator = {
     endDocument: () => undefined,
   }),
 };
-
-/** A stream of a string's UTF-8 bytes, in chunks of `size` bytes. */
-export function streamOf(text: string, size: number): ReadableStream<Uint8Array> {
-  const bytes = new TextEncoder().encode(text);
-  let at = 0;
-  return new ReadableStream<Uint8Array>({
-    pull(controller) {
-      if (at >= bytes.length) {
-        controller.close();
-        return;
-      }
-      controller.enqueue(bytes.slice(at, at + size));
-      at += size;
-    },
-  });
-}

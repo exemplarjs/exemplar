@@ -25,6 +25,11 @@
       "inputs": ["$TURBO_DEFAULT$", "!README.md", "$TURBO_ROOT$/.oxlintrc.json"],
       "outputLogs": "new-only"
     },
+    // The shared test helpers are used from source and have no build; their checks read xml's declarations,
+    // which they cannot reach through `^compile` because xml's tests depend on them in turn.
+    "@exemplarjs/test-support#compile": { "dependsOn": [] },
+    "@exemplarjs/test-support#typecheck": { "dependsOn": ["@exemplarjs/xml#compile"], "outputLogs": "new-only" },
+    "@exemplarjs/test-support#lint": { "dependsOn": ["@exemplarjs/xml#compile"], "outputLogs": "new-only" },
     // Root files that belong to no package.
     "//#lint:root": {
       "inputs": [".github/**", "vitest.config.js", "vitest.browser.config.js", ".oxlintrc.json"],

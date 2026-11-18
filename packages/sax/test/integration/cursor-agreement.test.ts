@@ -1,6 +1,7 @@
 import { readEveryWay } from '@test/helpers/agreement';
-import { canonicalHandler, canonicalOf } from '@test/helpers/canonical';
+import { canonicalHandler } from '@test/helpers/canonical';
 import { describe, expect, it } from 'vitest';
+import { canonicalOf } from '@exemplarjs/test-support';
 import { XMLInputFactory } from '@exemplarjs/xml';
 import { SAXParser } from '@/index';
 
