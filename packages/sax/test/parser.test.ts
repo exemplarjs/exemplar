@@ -471,6 +471,31 @@ describe('SAXParser: reading a reader', () => {
     expect(out).toEqual(['startPrefixMapping(p, urn:p)', 'startElement(, b, b, [])', 'endPrefixMapping(p)']);
   });
 
+  it('asks the reader for namespace declarations at an end tag only when its start tag had some', () => {
+    let asked = 0;
+    class CountingDeclarations extends StreamReaderDelegate {
+      override namespaceCount(): number {
+        asked++;
+        return super.namespaceCount();
+      }
+    }
+
+    const xml = '<a><b/><c/></a>';
+    const startTags = xml.match(/<\w/g)?.length;
+    const { handler } = recorder(['startPrefixMapping', 'endPrefixMapping']);
+    new SAXParser().parse(new CountingDeclarations(new XMLInputFactory().createStreamReader(xml)), handler);
+    expect(asked).toBe(startTags);
+  });
+
+  it('reports the end of prefix mappings to a handler that hears only their ends, and the start to one that hears only starts', () => {
+    const xml = '<a xmlns:p="urn:p"><b/><c xmlns:q="urn:q"/></a>';
+    expect(calls(xml, undefined, ['endPrefixMapping'])).toEqual(['endPrefixMapping(q)', 'endPrefixMapping(p)']);
+    expect(calls(xml, undefined, ['startPrefixMapping'])).toEqual([
+      'startPrefixMapping(p, urn:p)',
+      'startPrefixMapping(q, urn:q)',
+    ]);
+  });
+
   it('makes no call for an event SAX has none for, such as an attribute a delegate reports on its own', () => {
     /** A delegate that reports each comment as an ATTRIBUTE event. */
     class CommentsAsAttributes extends StreamReaderDelegate {

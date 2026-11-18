@@ -40,6 +40,21 @@ function call(handler: SAXHandler, name: string, args: readonly unknown[]): void
   (handler as Record<string, (...a: unknown[]) => void>)[name]?.(...args);
 }
 
+/** How many filters the chain tests stack. */
+const CHAIN_LENGTH = 4;
+
+/** Pass-through filters around a handler, one inside the other. */
+function chainAround(handler: SAXHandler): XMLFilterImpl {
+  let chain = new XMLFilterImpl(handler);
+  for (let i = 1; i < CHAIN_LENGTH; i++) chain = new XMLFilterImpl(chain);
+  return chain;
+}
+
+/** A handler recording `characters`, to tell where text went. */
+function textRecorder(): { handler: SAXHandler; calls: string[] } {
+  return recorder(['characters']);
+}
+
 describe('XMLFilterImpl (SAX2 XMLFilterImpl)', () => {
   it.each(HANDLER_METHODS)('passes %s on with its arguments', (name) => {
     const { handler, calls } = recorder([name]);
@@ -162,5 +177,98 @@ describe('XMLFilterImpl (SAX2 XMLFilterImpl)', () => {
     expect(() => new SAXParser().parse('<!DOCTYPE a [%p;]><a/>', new XMLFilterImpl({}))).toThrow(
       expect.objectContaining({ code: 'VC_ENTITY_DECLARED' })
     );
+  });
+
+  it.each([...HANDLER_METHODS, 'startElement', 'setDocumentLocator'])(
+    'reaches the handler for %s in one call, however many filters pass it on',
+    (name) => {
+      let filterFrames = 0;
+      const handler = {
+        [name]: () => {
+          const frames = (new Error('frames').stack ?? '').split('\n');
+          filterFrames = frames.filter((frame) => frame.includes(`XMLFilterImpl.${name} `)).length;
+        },
+      };
+      call(chainAround(handler), name, ARGUMENTS[name] ?? []);
+      expect(filterFrames).toBe(1);
+    }
+  );
+
+  it('passes on through a chain linked from the outside in', () => {
+    const outer = new XMLFilterImpl();
+    const inner = new XMLFilterImpl();
+    const { handler, calls } = textRecorder();
+    outer.handler = inner;
+    inner.handler = handler;
+    outer.characters('kept');
+    expect(inner.handler).toBe(handler);
+    expect(calls).toEqual(['characters(kept)']);
+  });
+
+  it('follows a filter deep in the chain that is given another handler', () => {
+    const first = textRecorder();
+    const second = textRecorder();
+    const inner = new XMLFilterImpl(first.handler);
+    const outer = new XMLFilterImpl(new XMLFilterImpl(inner));
+    outer.characters('one');
+    inner.handler = second.handler;
+    outer.characters('two');
+    expect(first.calls).toEqual(['characters(one)']);
+    expect(second.calls).toEqual(['characters(two)']);
+  });
+
+  it('follows a filter that changes its own handler while passing events on', () => {
+    const first = textRecorder();
+    const second = textRecorder();
+    class Splitter extends XMLFilterImpl {
+      override startElement(uri: string, localName: string, qName: string, attributes: Attributes) {
+        if (localName === 'b') this.handler = second.handler;
+        super.startElement(uri, localName, qName, attributes);
+      }
+    }
+
+    new SAXParser().parse('<r><a>one</a><b>two</b></r>', new XMLFilterImpl(new Splitter(first.handler)));
+    expect(first.calls).toEqual(['characters(one)']);
+    expect(second.calls).toEqual(['characters(two)']);
+  });
+
+  it('follows a filter two filters pass events to', () => {
+    const first = textRecorder();
+    const second = textRecorder();
+    const shared = new XMLFilterImpl(first.handler);
+    const left = new XMLFilterImpl(shared);
+    const right = new XMLFilterImpl(shared);
+    const outerLeft = new XMLFilterImpl(left);
+    shared.handler = second.handler;
+    left.characters('left');
+    right.characters('right');
+    outerLeft.characters('outer');
+    expect(first.calls).toEqual([]);
+    expect(second.calls).toEqual(['characters(left)', 'characters(right)', 'characters(outer)']);
+  });
+
+  it('stops following a filter it no longer passes events to', () => {
+    const kept = textRecorder();
+    const dropped = textRecorder();
+    const before = new XMLFilterImpl(dropped.handler);
+    const outer = new XMLFilterImpl(before);
+    outer.handler = new XMLFilterImpl(kept.handler);
+    before.handler = {};
+    outer.characters('kept');
+    const next = new XMLFilterImpl(before);
+    before.handler = dropped.handler;
+    next.characters('dropped');
+    expect(kept.calls).toEqual(['characters(kept)']);
+    expect(dropped.calls).toEqual(['characters(dropped)']);
+  });
+
+  it('keeps passing on when given the handler it already has', () => {
+    const { handler, calls } = textRecorder();
+    const inner = new XMLFilterImpl(handler);
+    const outer = new XMLFilterImpl(inner);
+    outer.handler = inner;
+    inner.handler = handler;
+    outer.characters('kept');
+    expect(calls).toEqual(['characters(kept)']);
   });
 });
