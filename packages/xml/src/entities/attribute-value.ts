@@ -10,15 +10,13 @@ import type { EntityCounter } from './limits.ts';
 // Module-level constants, so V8 can inline them.
 const { AMPERSAND, CARRIAGE_RETURN, LESS_THAN, LINE_FEED, TAB } = Char;
 
-/** What a reference to a general entity finds under the Entity Declared rules (§4.1). */
-export type Lookup =
-  | { readonly kind: 'entity'; readonly entity: EntityDeclaration }
-  /** Undeclared where that is a fatal error (WFC: Entity Declared). */
-  | { readonly kind: 'fatal' }
-  /** Not declared in what was read; the declaration may be in what was not. */
-  | { readonly kind: 'unread' }
-  /** Undeclared in a DTD that was read in full: a validity error (VC: Entity Declared). */
-  | { readonly kind: 'undeclared' };
+/**
+ * What a reference to a general entity finds under the Entity Declared rules (§4.1): its declaration, or
+ * why it has none. `fatal` is undeclared where that is a fatal error (WFC: Entity Declared); `unread` is
+ * not declared in what was read, when the declaration may be in what was not; `undeclared` is undeclared
+ * in a DTD that was read in full, a validity error (VC: Entity Declared).
+ */
+export type Lookup = EntityDeclaration | 'fatal' | 'unread' | 'undeclared';
 
 /** Looks up a general entity in the DTD, and then among the entities the options declare in advance. */
 export function lookupGeneral(
@@ -27,12 +25,11 @@ export function lookupGeneral(
   name: string
 ): Lookup {
   const entity = store.generalEntity(name);
-  if (entity) return { kind: 'entity', entity };
+  if (entity) return entity;
   const value = knownEntities.get(name);
-  if (value !== undefined)
-    return { kind: 'entity', entity: { name, isParameterEntity: false, value, declaredExternally: false } };
-  if (store.undeclaredEntityIsFatal) return { kind: 'fatal' };
-  return store.hasUnreadDeclarations ? { kind: 'unread' } : { kind: 'undeclared' };
+  if (value !== undefined) return { name, isParameterEntity: false, value, declaredExternally: false };
+  if (store.undeclaredEntityIsFatal) return 'fatal';
+  return store.hasUnreadDeclarations ? 'unread' : 'undeclared';
 }
 
 /** What expanding an attribute value needs from the reader. */
@@ -100,8 +97,8 @@ function expandReference(body: string, context: ExpansionContext, openEntities: 
     context.fail(ErrorCode.NS_COLON, 'An entity name must not contain a colon');
   }
   const found = lookupGeneral(context.store, context.known, body);
-  if (found.kind !== 'entity') return handleUnusableEntity(body, found.kind, context);
-  return expandEntity(found.entity, context, openEntities);
+  if (typeof found === 'string') return handleUnusableEntity(body, found, context);
+  return expandEntity(found, context, openEntities);
 }
 
 /** Decodes a character reference, which must name a Char (WFC: Legal Character). */

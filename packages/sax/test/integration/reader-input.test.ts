@@ -1,6 +1,7 @@
 import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
-import { EventType, type StreamReader, XMLInputFactory } from '@exemplarjs/xml';
+import { readerAt } from '@exemplarjs/test-support';
+import { XMLInputFactory } from '@exemplarjs/xml';
 import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { SAXParser } from '@/index';
 
@@ -34,14 +35,6 @@ function elementCalls(list: readonly string[], start: number): string[] {
   return [];
 }
 
-/** A cursor over a document, moved to its start tag number `index`, counting from 0. */
-function readerAt(xml: string, index: number): StreamReader {
-  const reader = factory.createStreamReader(xml);
-  let seen = -1;
-  while (reader.next() !== EventType.START_ELEMENT || ++seen < index);
-  return reader;
-}
-
 describe('SAXParser: reading a reader agrees with reading a source', () => {
   it.each(DOCUMENTS)('through a cursor, a delegate and a filter: %s', (xml) => {
     const expected = calls(xml);
@@ -57,7 +50,7 @@ describe('SAXParser: reading a reader agrees with reading a source', () => {
     const whole = withoutMappings(calls(xml));
     const starts = whole.flatMap((call, index) => (call.startsWith('startElement') ? [index] : []));
     for (const [index, start] of starts.entries()) {
-      const record = calls(readerAt(xml, index));
+      const record = calls(readerAt(factory, xml, index));
       expect(withoutMappings(record)).toEqual(['startDocument()', ...elementCalls(whole, start), 'endDocument()']);
       const started = record.flatMap((call) => /^startPrefixMapping\(([^,]*),/.exec(call)?.[1] ?? []);
       const ended = record.flatMap((call) => /^endPrefixMapping\((.*)\)$/.exec(call)?.[1] ?? []);

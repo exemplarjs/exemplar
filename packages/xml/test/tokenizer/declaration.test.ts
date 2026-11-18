@@ -13,7 +13,7 @@ import {
 
 /** Parses a declaration at the start of text: what it says and where it ends, or the error's code and index. */
 function parse(text: string, kind: DeclarationKind = 'xml'): (Declaration & { end: number }) | string {
-  const parser = new DeclarationParser(text, 0);
+  const parser = new DeclarationParser(text);
   try {
     return { ...parser.parse(kind), end: parser.end };
   } catch (error) {
@@ -38,11 +38,11 @@ describe('the XML declaration (§2.8 [23]–[32])', () => {
     expect(parse('<?xml\tversion = "1.0"\nencoding\r=\'x\' \t?>')).toEqual({ version: '1.0', encoding: 'x', end: 39 });
   });
 
-  it('starts where it is told and reports the index after ?>', () => {
-    const parser = new DeclarationParser('xx<?xml version="1.0"?>', 2);
-    expect(parser.end).toBe(2);
+  it('starts at the start of the text and reports the index after ?>', () => {
+    const parser = new DeclarationParser('<?xml version="1.0"?>');
+    expect(parser.end).toBe(0);
     parser.parse('xml');
-    expect(parser.end).toBe(23);
+    expect(parser.end).toBe(21);
   });
 
   it.each([

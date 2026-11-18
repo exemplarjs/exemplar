@@ -1,7 +1,7 @@
-import { canonicalOfAsync } from '@test/helpers/canonical';
-import { bytes, framed, join, singleByte, split, utf16, utf32, utf8, verdict } from '@test/helpers/lexical';
+import { bytes, framed, join, singleByte, split, utf32, verdict } from '@test/helpers/lexical';
 import { reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { canonicalOfAsync, utf16, utf8 } from '@exemplarjs/test-support';
 import { isEbcdic } from '@/encodings/decoders';
 import { SINGLE_BYTE_TABLES } from '@/encodings/tables';
 import { type XMLError, XMLInputFactory } from '@/index';
@@ -312,15 +312,15 @@ describe('detection in documents', () => {
   });
 
   it('rejects UTF-16 with neither a byte-order mark nor a declaration', () => {
-    expect(verdict(utf16('<a/>', true))).toBe('ENCODING_UNDECLARED 1:1');
+    expect(verdict(utf16('<a/>', true, false))).toBe('ENCODING_UNDECLARED 1:1');
   });
 
   it('accepts UTF-16 without a byte-order mark that declares its byte order', () => {
-    expect(verdict(utf16('<?xml version="1.0" encoding="UTF-16BE"?><a/>', false))).toBe('accepted <a></a>');
+    expect(verdict(utf16('<?xml version="1.0" encoding="UTF-16BE"?><a/>', false, false))).toBe('accepted <a></a>');
   });
 
   it('reports UTF-16 without a byte-order mark declared as UTF-16 to the error handler, and reads on', () => {
-    const doc = utf16('<?xml version="1.0" encoding="UTF-16"?><a/>', true);
+    const doc = utf16('<?xml version="1.0" encoding="UTF-16"?><a/>', true, false);
     expect(verdict(doc)).toBe('ENCODING_UTF16_WITHOUT_BOM 1:1');
     const errors: string[] = [];
     expect(verdict(doc, { errorHandler: { error: (e: XMLError) => errors.push(e.code) } })).toBe('accepted <a></a>');

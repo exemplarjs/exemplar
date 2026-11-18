@@ -1,6 +1,6 @@
-import { utf8 } from '@test/helpers/lexical';
 import { errorOf, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { utf8 } from '@exemplarjs/test-support';
 import { ErrorCode, XMLError } from '@/index';
 
 describe('XMLError', () => {

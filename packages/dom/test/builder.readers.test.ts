@@ -1,21 +1,15 @@
-import { serialize, streamOf, utf8 } from '@test/helpers/dom';
+import { serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
+import { streamOf, utf8, UpperCaseText } from '@exemplarjs/test-support';
 import { EventType, XMLInputFactory } from '@exemplarjs/xml';
-import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
+import { createFilteredReader } from '@exemplarjs/xml/filters';
 import { type Attr, DocumentBuilder, type Element } from '@/index';
 
 describe('DocumentBuilder: building from a reader', () => {
-  /** A delegate that upper-cases text. */
-  class Upper extends StreamReaderDelegate {
-    override text(): string {
-      return super.text().toUpperCase();
-    }
-  }
-
   it('builds a whole document from a reader at its start, through its filters and delegates, with its URI', () => {
     const factory = new XMLInputFactory();
     const reader = createFilteredReader(
-      new Upper(
+      new UpperCaseText(
         factory.createStreamReader({ systemId: 'http://example.com/d.xml', text: '<a xmlns:p="urn:p">x<!--c--></a>' })
       ),
       (r) => r.eventType() !== EventType.COMMENT
@@ -60,7 +54,7 @@ describe('DocumentBuilder: building from a reader', () => {
 
   it('builds from an asynchronous reader, awaiting input as it arrives', async () => {
     const reader = new XMLInputFactory().createAsyncStreamReader(streamOf(utf8('<a><b>x</b><b>y</b></a>'), 3));
-    const document = await new DocumentBuilder().parseAsync(new Upper(reader));
+    const document = await new DocumentBuilder().parseAsync(new UpperCaseText(reader));
     expect(serialize(document)).toBe('<a><b>X</b><b>Y</b></a>');
   });
 

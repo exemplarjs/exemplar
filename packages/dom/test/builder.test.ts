@@ -1,16 +1,7 @@
-import {
-  build,
-  buildAsync,
-  children,
-  domException,
-  newDocument,
-  serialize,
-  streamOf,
-  utf16,
-  utf8,
-} from '@test/helpers/dom';
+import { build, buildAsync, children, domException, newDocument, serialize } from '@test/helpers/dom';
 import { fallingBack, including, resolver, spaceValidator } from '@test/helpers/stubs';
 import { describe, expect, it } from 'vitest';
+import { streamOf, utf16, utf8 } from '@exemplarjs/test-support';
 import { XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import {
   type Attr,

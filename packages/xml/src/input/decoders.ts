@@ -30,7 +30,7 @@ const BUILT_IN_DECODERS: Readonly<Record<string, DecoderFactory>> = {
 /** Returns the canonical name for a declared encoding name, or the lower-cased name when exemplar has no alias. */
 export function canonicalEncoding(name: string): string {
   const lower = name.toLowerCase();
-  return ALIASES[lower] ?? lower;
+  return Object.hasOwn(ALIASES, lower) ? (ALIASES[lower] as string) : lower;
 }
 
 /** The decoders a factory can use: the built-in ones plus any the caller registers. */

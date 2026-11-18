@@ -2,9 +2,9 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { canonicalOfAsync } from '@test/helpers/canonical';
 import { canonical } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { canonicalOfAsync } from '@exemplarjs/test-support';
 import { type ResolvedSource, XMLInputFactory } from '@/index';
 import { fileResolver } from '@/resolvers/file';
 

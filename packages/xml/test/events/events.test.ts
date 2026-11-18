@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { EventBuilder } from '@/events/events';
+import { createDelegatedReader, createFilteredReader, type StreamFilter, StreamReaderDelegate } from '@/filters/index';
 import {
   type AsyncStreamReader,
   Attribute,
   EventType,
   type InputOptions,
   QName,
+  type StreamReader,
   type XMLEvent,
   XMLInputFactory,
 } from '@/index';
@@ -201,6 +203,44 @@ describe('EventBuilder', () => {
       .filter((e) => e.type === EventType.START_ELEMENT)
       .map((e) => e.name.localName);
     expect(names.slice(-2)).toEqual(['n0', 'n4199']);
+  });
+
+  it.each<[string, StreamFilter]>([
+    ['a start tag', (r) => !(r.eventType() === EventType.START_ELEMENT && r.localName() === 'b')],
+    ['every start tag', (r) => r.eventType() !== EventType.START_ELEMENT],
+    ['an end tag', (r) => !(r.eventType() === EventType.END_ELEMENT && r.localName() === 'b')],
+    [
+      'one element’s end tag and the next one’s start tag',
+      (r) =>
+        !(r.eventType() === EventType.END_ELEMENT && r.localName() === 'c') &&
+        !(r.eventType() === EventType.START_ELEMENT && r.localName() === 'd'),
+    ],
+  ])('gives each end tag its own name and namespaces when a cursor filter drops %s', (_what, accept) => {
+    const doc = '<a xmlns:p="u"><p:b xmlns:q="v"><c/></p:b><d/></a>';
+    const factory = new XMLInputFactory();
+    /** The tags a filtered reader reports, as the cursor names them. */
+    const tagsOf = (filtered: StreamReader | StreamReaderDelegate): string[] => {
+      const tags: string[] = [];
+      while (filtered.hasNext()) {
+        const type = filtered.next();
+        const declared = Array.from({ length: filtered.namespaceCount() }, (_, i) => filtered.namespacePrefix(i));
+        if (type === EventType.START_ELEMENT) tags.push(`<${filtered.name()}>`);
+        if (type === EventType.END_ELEMENT) tags.push(`</${filtered.name()} ${declared.join(',')}>`);
+      }
+      return tags;
+    };
+    /** The same tags, as the events built from a filtered reader name them. */
+    const eventTagsOf = (filtered: StreamReader | StreamReaderDelegate): string[] =>
+      [...factory.createEventReader(filtered)].flatMap((event) => {
+        if (event.type === EventType.START_ELEMENT) return [`<${event.name.toString()}>`];
+        if (event.type !== EventType.END_ELEMENT) return [];
+        return [`</${event.name.toString()} ${event.namespaces.map((namespace) => namespace.prefix).join(',')}>`];
+      });
+    const overCursor = (): StreamReader => createFilteredReader(factory.createStreamReader(doc), accept);
+    expect(eventTagsOf(overCursor())).toEqual(tagsOf(overCursor()));
+    const overDelegate = (): StreamReaderDelegate =>
+      createFilteredReader(createDelegatedReader(factory.createStreamReader(doc), new StreamReaderDelegate()), accept);
+    expect(eventTagsOf(overDelegate())).toEqual(tagsOf(overDelegate()));
   });
 
   it('builds an event for the cursor’s current event', () => {

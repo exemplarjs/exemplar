@@ -1,5 +1,6 @@
-import { errorEveryWay, utf16 } from '@test/helpers/agreement';
+import { errorEveryWay } from '@test/helpers/agreement';
 import { describe, expect, it } from 'vitest';
+import { utf16 } from '@exemplarjs/test-support';
 import type { InputOptions } from '@exemplarjs/xml';
 
 /** A table row: what is wrong, the document, its error's code and location, and the options to read it with. */

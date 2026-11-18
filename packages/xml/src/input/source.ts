@@ -1,10 +1,10 @@
-import { DecodeError, withCarry } from '@/encodings/decoders';
+import { DecodeError, textBeforeBadBytes, withCarry } from '@/encodings/decoders';
 import { ErrorCode } from '@/errors/codes';
 import { canonicalEncoding, type Decoder, type DecoderRegistry } from '@/input/decoders';
 import { detect, type Detection } from '@/input/detect';
 import { grown } from '@/util/arrays';
 import { NO_BYTES } from '@/util/bytes';
-import { Char, isSurrogate, Unicode } from '@/util/chars';
+import { Char } from '@/util/chars';
 import { AsyncReaderRequiredError, ErrorFactory, IllegalStateError, InvalidArgumentError } from '@/util/errors';
 
 /** A document given with where it came from. Give its content in exactly one of `text`, `bytes`, `chunks` or `stream`. */
@@ -56,11 +56,7 @@ export type ChunkSource = Pick<TextSource, 'read'>;
 /** Thrown by a text source when the bytes are not legal in their encoding; the valid text before them comes first. */
 export class DecodingFailureError extends Error {
   readonly code = ErrorCode.ENCODING_INVALID_BYTES;
-
-  constructor(message: string) {
-    super(message);
-    this.name = 'DecodingFailureError';
-  }
+  override name = 'DecodingFailureError';
 }
 
 /** Thrown when no decoder is registered for the document's encoding. */
@@ -119,96 +115,19 @@ function stringDocument(text: string): StringSource {
   return new StringSource(text.charCodeAt(0) === Char.BYTE_ORDER_MARK ? text.slice(1) : text);
 }
 
-/**
- * UTF-8's layout (Unicode §3.9): lead bytes 110xxxxx, 1110xxxx and 11110xxx start two, three and four bytes,
- * and continuation bytes 10xxxxxx carry six bits of the code point each.
- */
-const Utf8 = {
-  TWO_BYTE_LEAD: 0xc0,
-  THREE_BYTE_LEAD: 0xe0,
-  FOUR_BYTE_LEAD: 0xf0,
-  CONTINUATION: 0x80,
-  CONTINUATION_MASK: 0xc0,
-  PAYLOAD_MASK: 0x3f,
-  PAYLOAD_BITS: 6,
-  /** How many bytes a two-, three- and four-byte sequence takes; four is the longest. */
-  TWO_BYTES: 2,
-  THREE_BYTES: 3,
-  LONGEST: 4,
-} as const;
+/** The most bytes of an unfinished character a UTF-8 chunk can end with: one fewer than its longest character takes. */
+const MAX_HELD_BYTES = 3;
 
-/** The most bytes of an unfinished character a chunk can end with: one fewer than the longest UTF-8 character. */
-const MAX_HELD_BYTES = Utf8.LONGEST - 1;
-
-/** UTF-8's well-formed multi-byte sequences (Unicode Table 3-7): the lead bytes and code points of each length. */
-const UTF8_SEQUENCES = [
-  { length: Utf8.TWO_BYTES, leadFirst: 0xc2, leadLast: 0xdf, first: Char.NON_ASCII, last: 0x7_ff },
-  { length: Utf8.THREE_BYTES, leadFirst: 0xe0, leadLast: 0xef, first: 0x8_00, last: 0xff_ff },
-  {
-    length: Utf8.LONGEST,
-    leadFirst: 0xf0,
-    leadLast: 0xf4,
-    first: Unicode.SUPPLEMENTARY_FIRST,
-    last: Unicode.LAST_CODE_POINT,
-  },
-] as const;
-
-/** Whether a byte continues a UTF-8 sequence rather than starting one. */
-function isContinuation(byte: number): boolean {
-  return (byte & Utf8.CONTINUATION_MASK) === Utf8.CONTINUATION;
-}
-
-/** The length of the well-formed UTF-8 sequence at `pos`, or 0 if it is ill-formed (Unicode §3.9). */
-function sequenceLength(bytes: Uint8Array, pos: number): number {
-  const lead = bytes[pos] as number;
-  if (lead < Char.NON_ASCII) return 1;
-  const sequence = UTF8_SEQUENCES.find(({ leadFirst, leadLast }) => lead >= leadFirst && lead <= leadLast);
-  if (sequence === undefined) return 0;
-  const codePoint = sequenceValue(bytes, pos, sequence.length);
-  // Below its first code point, a sequence is an overlong form of a shorter one.
-  if (codePoint < sequence.first || codePoint > sequence.last || isSurrogate(codePoint)) return 0;
-  return sequence.length;
-}
-
-/** The code point the `length` bytes at `pos` encode, or -1 where a continuation byte is missing or wrong. */
-function sequenceValue(bytes: Uint8Array, pos: number, length: number): number {
-  // The lead byte carries one bit fewer than a continuation byte for each continuation byte after it.
-  let codePoint = (bytes[pos] as number) & (Utf8.PAYLOAD_MASK >> (length - 1));
-  for (let i = 1; i < length; i++) {
-    const next = bytes[pos + i];
-    if (next === undefined || !isContinuation(next)) return -1;
-    codePoint = (codePoint << Utf8.PAYLOAD_BITS) | (next & Utf8.PAYLOAD_MASK);
-  }
-  return codePoint;
-}
-
-/** The length of the longest prefix of `bytes` that is well-formed UTF-8. */
-function utf8ValidLength(bytes: Uint8Array): number {
-  let i = 0;
-  while (i < bytes.length) {
-    const length = sequenceLength(bytes, i);
-    if (length === 0) return i;
-    i += length;
-  }
-  return i;
-}
-
-/** How many bytes the UTF-8 character that a lead byte starts takes. */
-function utf8CharLength(lead: number): number {
-  if (lead >= Utf8.FOUR_BYTE_LEAD) return Utf8.LONGEST;
-  if (lead >= Utf8.THREE_BYTE_LEAD) return Utf8.THREE_BYTES;
-  if (lead >= Utf8.TWO_BYTE_LEAD) return Utf8.TWO_BYTES;
-  return 1;
-}
-
-/** The bytes ending well-formed UTF-8 that start a character not yet complete, which a streaming decoder holds back. */
-function incompleteUtf8Tail(held: Uint8Array, chunk: Uint8Array): Uint8Array {
-  // An unfinished character starts at most three bytes back, among the held bytes when the chunk is shorter.
-  const bytes = chunk.length >= MAX_HELD_BYTES ? chunk : withCarry(held, chunk);
-  for (let back = 1; back <= MAX_HELD_BYTES && back <= bytes.length; back++) {
-    const byte = bytes[bytes.length - back] as number;
-    if (isContinuation(byte)) continue;
-    return utf8CharLength(byte) > back ? bytes.slice(bytes.length - back) : NO_BYTES;
+/** The bytes ending `tail` that start a character not yet complete, which a streaming decoder holds back. */
+function heldBytes(tail: Uint8Array): Uint8Array {
+  for (let start = 0; start < tail.length; start++) {
+    const rest = tail.subarray(start);
+    try {
+      // Only the start of an unfinished character decodes to nothing; a continuation byte fails.
+      if (new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(rest, { stream: true }) === '') return rest;
+    } catch {
+      // Not where a character starts.
+    }
   }
   return NO_BYTES;
 }
@@ -297,8 +216,8 @@ class ByteSource implements TextSource {
   #ended = false;
   /** The failure the next read throws, after the valid text before the bad bytes was returned. */
   #pendingFailure: DecodingFailureError | undefined;
-  /** For UTF-8, the start of a character the decoder holds until the next chunk completes it. */
-  #held: Uint8Array = NO_BYTES;
+  /** For UTF-8, the last bytes decoded, which end with any character the decoder holds until the next chunk completes it. */
+  #tail: Uint8Array = NO_BYTES;
   detection: Detection | undefined;
 
   constructor(chunks: ByteChunks, registry: DecoderRegistry, external: string | undefined) {
@@ -372,7 +291,10 @@ class ByteSource implements TextSource {
     try {
       if (chunk === undefined) return decoder.decode();
       const text = decoder.decode(chunk, { stream: true });
-      if (isUtf8) this.#held = incompleteUtf8Tail(this.#held, chunk);
+      if (isUtf8) {
+        const last = chunk.length >= MAX_HELD_BYTES ? chunk : withCarry(this.#tail, chunk);
+        this.#tail = last.slice(-MAX_HELD_BYTES);
+      }
       return text;
     } catch (error) {
       this.#pendingFailure = ErrorFactory.create(
@@ -382,8 +304,8 @@ class ByteSource implements TextSource {
       if (error instanceof DecodeError) return error.decoded;
       if (chunk === undefined || !isUtf8) return '';
       // The valid text runs from the bytes the decoder held back.
-      const bytes = withCarry(this.#held, chunk);
-      return new TextDecoder('utf-8').decode(bytes.subarray(0, utf8ValidLength(bytes)));
+      const bytes = withCarry(heldBytes(this.#tail), chunk);
+      return textBeforeBadBytes(bytes, () => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }));
     }
   }
 }

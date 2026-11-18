@@ -1,4 +1,5 @@
 import { canonicalize } from '@exemplarjs/canonical';
+import { errorOf } from '@exemplarjs/test-support';
 import {
   type AsyncStreamReader,
   type EntityResolver,
@@ -7,7 +8,6 @@ import {
   type ResolvedSource,
   type StreamReader,
   type XIncludeProcessor,
-  XMLError,
   XMLInputFactory,
 } from '@exemplarjs/xml';
 import { accessAllows, accessRefusedError, type DecoderRegistry } from '@exemplarjs/xml/internal';
@@ -128,28 +128,6 @@ export async function eventsAsync(reader: AsyncStreamReader): Promise<string> {
 /** A document read from MAIN with XInclude through the cursor, written out by `written`. */
 export function read(files: Files, main: string, setup: Setup = {}): string {
   return events(factory(files, setup).createStreamReader({ text: main, systemId: MAIN }));
-}
-
-/** The XMLError a call throws; fails when it throws nothing or something else. */
-export function errorOf(call: () => unknown): XMLError {
-  try {
-    call();
-  } catch (error) {
-    if (error instanceof XMLError) return error;
-    throw error;
-  }
-  throw new Error('Expected an XMLError, but nothing was thrown');
-}
-
-/** The XMLError an asynchronous call rejects with. */
-export async function asyncErrorOf(call: () => Promise<unknown>): Promise<XMLError> {
-  try {
-    await call();
-  } catch (error) {
-    if (error instanceof XMLError) return error;
-    throw error;
-  }
-  throw new Error('Expected an XMLError, but nothing was thrown');
 }
 
 /** The error code reading a document from MAIN with XInclude fails with. */

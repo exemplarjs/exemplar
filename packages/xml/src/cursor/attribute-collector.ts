@@ -279,30 +279,16 @@ export class AttributeCollector {
       if (type === 'ID' && name !== 'xml:id') this.#noteId(tokenizer, normalized, false);
     }
     if (declared) this.#addDefaultAttributes(declared);
-    if (this.#options.namespaceAware && (declared?.has('xml:id') === true || list.names.includes('xml:id'))) {
-      this.#readXmlId(tokenizer, declared);
-    }
     if (!this.#options.namespaceAware) {
       list.showAll();
       return;
     }
+    this.#readXmlId(tokenizer, declared);
     const scopes = this.#scopes;
     scopes.markBindings(elementDepth);
-    const listFail = (code: ErrorCode, message: string): never => fail(tokenizer, code, message);
-    list.declareNamespaces(
-      scopes.bindings,
-      tokenizer.version11,
-      (binding) => scopes.recordDeclaration(binding),
-      listFail
-    );
-    scopes.bindElement(tokenizer, elementDepth);
-    list.resolveNamespaces(
-      scopes.bindings,
-      tokenizer.buffer,
-      tokenizer.bufferOffset,
-      this.#options.namespacePrefixes,
-      listFail
-    );
+    list.declareNamespaces(scopes, tokenizer);
+    if (tokenizer.nameFirstColon >= 0) scopes.bindElement(tokenizer, elementDepth);
+    list.resolveNamespaces(scopes.bindings, tokenizer, this.#options.namespacePrefixes);
     for (let i = 0; i < list.count; i++) {
       if (list.prefixes[i] === 'xml')
         this.#xmlAttributes.note(elementDepth, list.names[i] as string, list.values[i] as string);
@@ -367,17 +353,9 @@ export class AttributeCollector {
 
   /** The tag index of the attribute the accessors number `attributeIndex`; throws a RangeError unless `attributeIndex` is below count(). */
   tagIndexOf(tokenizer: Tokenizer, attributeIndex: number): number {
-    if (this.listed) {
-      const list = this.list;
-      return attributeIndex < list.visibleCount
-        ? (list.visible[attributeIndex] as number)
-        : outOfRange('Attribute', attributeIndex);
-    }
-    if (!this.#declarationsHidden)
-      return attributeIndex < tokenizer.attributeCount ? attributeIndex : outOfRange('Attribute', attributeIndex);
-    return attributeIndex < this.#visibleCount
-      ? (this.#visible[attributeIndex] as number)
-      : outOfRange('Attribute', attributeIndex);
+    if (attributeIndex >= this.count(tokenizer)) return outOfRange('Attribute', attributeIndex);
+    if (this.listed) return this.list.visible[attributeIndex] as number;
+    return this.#declarationsHidden ? (this.#visible[attributeIndex] as number) : attributeIndex;
   }
 
   /** The qualified name of the attribute at a tag index. */

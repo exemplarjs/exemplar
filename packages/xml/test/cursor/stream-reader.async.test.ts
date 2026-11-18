@@ -257,7 +257,7 @@ describe('nextTagAsync and elementTextAsync', () => {
     await expect(text.nextTagAsync()).rejects.toThrow('Expected a start or end tag');
     const child = asyncReader(trickle('<a>x<b/></a>'));
     await child.nextTagAsync();
-    await expect(child.elementTextAsync()).rejects.toThrow('elementText() found a child element');
+    await expect(child.elementTextAsync()).rejects.toThrow('elementTextAsync() found a child element');
     const notStart = asyncReader('<a/>');
     await expect(notStart.elementTextAsync()).rejects.toThrow('elementTextAsync() needs a START_ELEMENT');
   });

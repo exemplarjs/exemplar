@@ -1,7 +1,7 @@
-import { utf16 } from '@test/helpers/agreement';
 import { canonicalHandler } from '@test/helpers/canonical';
 import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
+import { utf16 } from '@exemplarjs/test-support';
 import { XMLError } from '@exemplarjs/xml';
 import { SAXParser } from '@/index';
 

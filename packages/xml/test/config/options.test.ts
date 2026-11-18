@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LIMITS, resolveOptions } from '@/config/options';
+import { DEFAULT_LIMITS, type Limits, resolveOptions } from '@/config/options';
 import type { Validator } from '@/cursor/validation';
 import type { EntityResolver } from '@/index';
 
@@ -100,5 +100,10 @@ describe('resolveOptions', () => {
 
   it('merges the limits given over the defaults', () => {
     expect(resolveOptions({ limits: { elementDepth: 5 } }).limits).toEqual({ ...DEFAULT_LIMITS, elementDepth: 5 });
+  });
+
+  it('keeps the default of a limit given as undefined, as JavaScript callers can', () => {
+    const limits = { elementDepth: undefined, attributesPerElement: 7 } as unknown as Partial<Limits>;
+    expect(resolveOptions({ limits }).limits).toEqual({ ...DEFAULT_LIMITS, attributesPerElement: 7 });
   });
 });

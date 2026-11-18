@@ -1,18 +1,17 @@
 import { readContentModel } from '@/dtd/content-model';
 import type { AttributeDeclaration, AttributeType, DefaultMode, EntityDeclaration } from '@/dtd/declarations';
 import { expandEntityValue } from '@/dtd/entity-value';
-import { type DtdContext, DtdInput, type Frame } from '@/dtd/input';
+import { type DtdContext, DtdInput, type Frame, type Literal } from '@/dtd/input';
 import type { DeclarationStore } from '@/dtd/store';
 import { expandAttributeValue, normalizeTokens } from '@/entities/attribute-value';
 import { ErrorCode } from '@/errors/codes';
-import { DECLARATION_OPEN_LENGTH, PI_CLOSE_LENGTH, PI_OPEN_LENGTH } from '@/tokenizer/syntax';
+import { PI_CLOSE_LENGTH, PI_OPEN_LENGTH } from '@/tokenizer/syntax';
 import { Char, isPubidText } from '@/util/chars';
 import { PREDEFINED_ENTITIES } from '@/util/references';
 import { isWhitespaceChar, normalizePublicId } from '@/util/whitespace';
 
 // Module-level constants, so V8 can inline them.
 const { APOSTROPHE, DOUBLE_QUOTE, GREATER_THAN, LEFT_BRACKET, LEFT_PAREN, PERCENT, RIGHT_PAREN, VERTICAL_BAR } = Char;
-const { HYPHEN, UPPER_A, UPPER_E, UPPER_N } = Char;
 
 /** The keywords that name an attribute type (§3.3.1); NOTATION and enumerations are read apart. */
 const ATTRIBUTE_TYPE_KEYWORDS = new Set([
@@ -69,7 +68,7 @@ export class DtdParser {
           continue;
         }
         if (inConditionalSection)
-          this.#input.fail(ErrorCode.WF_CONDITIONAL_SECTION, 'Unterminated inConditionalSection section');
+          this.#input.fail(ErrorCode.WF_CONDITIONAL_SECTION, 'Unterminated conditional section');
         this.#input.pop();
         return;
       }
@@ -82,59 +81,40 @@ export class DtdParser {
     }
   }
 
-  /** Reads one markup declaration, comment, PI or conditional section, chosen by its third character. */
+  /** Reads one markup declaration, comment, PI or conditional section, chosen by how it opens. */
   #readMarkupDeclaration(): void {
     const input = this.#input;
-    switch (input.startsWith('<!') ? input.charAhead(DECLARATION_OPEN_LENGTH) : -1) {
-      case UPPER_E: {
-        if (input.startsWith('<!ENTITY')) return this.#readDeclaration('<!ENTITY', () => this.#readEntityDeclaration());
-        if (input.startsWith('<!ELEMENT'))
-          return this.#readDeclaration('<!ELEMENT', () => this.#readElementDeclaration());
-        break;
-      }
-      case UPPER_A: {
-        if (input.startsWith('<!ATTLIST'))
-          return this.#readDeclaration('<!ATTLIST', () => this.#readAttlistDeclaration());
-        break;
-      }
-      case HYPHEN: {
-        if (input.startsWith('<!--')) return this.#readComment();
-        break;
-      }
-      case LEFT_BRACKET: {
-        return this.#readConditionalSection();
-      }
-      case UPPER_N: {
-        if (input.startsWith('<!NOTATION'))
-          return this.#readDeclaration('<!NOTATION', () => this.#readNotationDeclaration());
-        break;
-      }
-      default: {
-        if (input.startsWith('<?')) return this.#readPi();
-      }
-    }
+    // Most common first, as counted in DocBook, FreeBSD and the W3C suites' DTDs and entity files.
+    if (input.startsWith('<!ENTITY')) return this.#readDeclaration('<!ENTITY', () => this.#readEntityDeclaration());
+    if (input.startsWith('<!--')) return this.#readComment();
+    if (input.startsWith('<!ELEMENT')) return this.#readDeclaration('<!ELEMENT', () => this.#readElementDeclaration());
+    if (input.startsWith('<!ATTLIST')) return this.#readDeclaration('<!ATTLIST', () => this.#readAttlistDeclaration());
+    if (input.startsWith('<![')) return this.#readConditionalSection();
+    if (input.startsWith('<?')) return this.#readPi();
+    if (input.startsWith('<!NOTATION'))
+      return this.#readDeclaration('<!NOTATION', () => this.#readNotationDeclaration());
     return input.fail(ErrorCode.WF_DECLARATION, 'Expected a markup declaration');
   }
 
-  /** Reads a declaration after its keyword, up to its `>`. */
+  /** Reads a declaration after its keyword, which whitespace must follow, up to its `>`. */
   #readDeclaration(keyword: string, body: () => void): void {
     const start = this.#input.currentFrame();
     this.#input.advance(keyword.length);
-    this.#input.openDeclaration();
+    this.#input.inDeclaration = true;
+    this.#input.requireWhitespace();
     body();
     this.#input.optionalWhitespace();
     if (this.#input.currentChar() !== GREATER_THAN)
       this.#input.fail(ErrorCode.WF_DECLARATION, 'Expected > to end the declaration');
     this.#input.checkSameEntity(start, 'A markup declaration');
     this.#input.advance();
-    this.#input.closeDeclaration();
+    this.#input.inDeclaration = false;
   }
 
   // Declarations
 
   /** `<!ELEMENT name contentspec>` (§3.2). */
   #readElementDeclaration(): void {
-    this.#input.requireWhitespace();
     const name = this.#input.readCheckedName('an element name', true);
     this.#input.requireWhitespace();
     let content: string;
@@ -151,7 +131,6 @@ export class DtdParser {
 
   /** `<!ATTLIST element (name type default)*>` (§3.3). */
   #readAttlistDeclaration(): void {
-    this.#input.requireWhitespace();
     const element = this.#input.readCheckedName('an element name', true);
     for (;;) {
       const skipped = this.#input.optionalWhitespace();
@@ -216,28 +195,23 @@ export class DtdParser {
     const fixed = input.readKeyword('#FIXED');
     if (fixed) input.requireWhitespace();
     const mode: DefaultMode = fixed ? 'FIXED' : 'DEFAULT';
-    const literal = input.readLiteral('default value');
-    const value = this.#normalizeDefaultValue(literal.value, literal.frame, literal.start);
+    const value = this.#normalizeDefaultValue(input.readLiteral('default value'));
     return { ...declared, mode, value: type === 'CDATA' ? value : normalizeTokens(value), declaredExternally };
   }
 
   /** Normalizes a default value as an attribute value is, failing at the literal. */
-  #normalizeDefaultValue(literalValue: string, frame: Frame, literalStart: number): string {
-    return expandAttributeValue(
-      literalValue,
-      {
-        ...this.#context,
-        fail: (code, message) =>
-          this.#context.fail(code, message, frame.locate(literalStart), this.#input.openEntityNames()),
-        error: (code, message) => this.#context.error(code, message, frame.locate(literalStart)),
-      },
-      true
-    );
+  #normalizeDefaultValue(literal: Literal): string {
+    const context = {
+      ...this.#context,
+      fail: (code: ErrorCode, message: string) => this.#input.failAtLiteral(code, message, literal),
+      error: (code: ErrorCode, message: string) =>
+        this.#context.error(code, message, literal.frame.locate(literal.start)),
+    };
+    return expandAttributeValue(literal.value, context, true);
   }
 
   /** `<!ENTITY name value>`, `<!ENTITY name ExternalID NDATA n>` or `<!ENTITY % name …>` (§4.2). */
   #readEntityDeclaration(): void {
-    this.#input.requireWhitespace();
     let isParameterEntity = false;
     if (this.#input.currentChar() === PERCENT) {
       this.#input.advance();
@@ -285,7 +259,7 @@ export class DtdParser {
   /** Reads an entity value and builds its replacement text (§4.5). */
   #readEntityValue(): string {
     const literal = this.#input.readLiteral('entity value');
-    return expandEntityValue(this.#input, literal.value, literal.frame, literal.start, []);
+    return expandEntityValue(this.#input, literal.value, literal, []);
   }
 
   /** `SYSTEM "…"` or `PUBLIC "…" "…"`; for a notation the system literal may be absent (§4.2.2, §4.7). */
@@ -316,7 +290,6 @@ export class DtdParser {
 
   /** `<!NOTATION name ExternalID>` or `<!NOTATION name PUBLIC "…">` (§4.7). */
   #readNotationDeclaration(): void {
-    this.#input.requireWhitespace();
     const name = this.#input.readCheckedName('a notation name', false);
     this.#input.requireWhitespace();
     const baseURI = this.#input.currentFrame().baseURI;

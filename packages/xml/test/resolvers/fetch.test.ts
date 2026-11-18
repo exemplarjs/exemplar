@@ -1,5 +1,5 @@
-import { canonicalOfAsync } from '@test/helpers/canonical';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { canonicalOfAsync } from '@exemplarjs/test-support';
 import { XMLInputFactory } from '@/index';
 import { fetchResolver } from '@/resolvers/fetch';
 
@@ -63,6 +63,10 @@ describe('fetchResolver', () => {
       systemId: 'http://example.org/a.dtd',
     });
     expect(resolved).toMatchObject({ encoding: 'ISO-8859-1' });
+    const quoted = stubFetch(() => ({ headers: { 'content-type': 'application/xml; charset="utf-8"' } }));
+    expect(
+      await fetchResolver({ fetch: quoted.fetch }).resolveEntity({ name: 'e', systemId: 'http://x/e' })
+    ).toMatchObject({ encoding: 'utf-8' });
     const plain = stubFetch(() => ({ headers: { 'content-type': 'application/xml' } }));
     expect(
       await fetchResolver({ fetch: plain.fetch }).resolveEntity({ name: 'e', systemId: 'http://x/e' })

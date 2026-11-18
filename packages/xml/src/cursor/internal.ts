@@ -13,6 +13,8 @@ export const LISTEN_ENTITIES: unique symbol = Symbol('listenEntities');
 export const DTD_ITEMS: unique symbol = Symbol('dtdItems');
 /** Adds a filter that every event must pass. */
 export const ADD_FILTER: unique symbol = Symbol('addFilter');
+/** Whether the cursor has filters, which may keep an element's start or end tag from being reported. */
+export const HAS_FILTERS: unique symbol = Symbol('hasFilters');
 /** Has the factory create a cursor with some resolved options replaced. */
 export const CREATE_READER: unique symbol = Symbol('createReader');
 /** The current event's position, which an event object turns into a location only when asked. */
@@ -21,10 +23,6 @@ export const EVENT_POSITION: unique symbol = Symbol('eventPosition');
 export const EVENT_OFFSET: unique symbol = Symbol('eventOffset');
 /** Whether every declaration the DTD refers to was read. */
 export const DTD_COMPLETE: unique symbol = Symbol('dtdComplete');
-/** The encoding detection chose for the document. */
-export const INPUT_ENCODING: unique symbol = Symbol('inputEncoding');
-/** The encoding the XML declaration names. */
-export const XML_ENCODING: unique symbol = Symbol('xmlEncoding');
 /** The unparsed entities and notations included content has added, which XInclude reports. */
 export const INCLUDED_DECLARATIONS: unique symbol = Symbol('includedDeclarations');
 /** The options the cursor reads with, which consumers given a reader check. */

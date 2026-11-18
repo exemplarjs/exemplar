@@ -1,7 +1,7 @@
 import { fc, test } from '@fast-check/vitest';
-import { write } from '@test/helpers/canonical';
 import { canonical, parseEveryWay } from '@test/helpers/parse';
 import { expect } from 'vitest';
+import { write } from '@exemplarjs/test-support';
 import { EventType, XMLInputFactory } from '@/index';
 
 // The nightly run scales the number of runs up.

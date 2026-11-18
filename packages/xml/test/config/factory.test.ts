@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { UpperCaseText } from '@exemplarjs/test-support';
 import { RESIDENT_READERS } from '@/config/factory';
 import type { XIncludeProcessor } from '@/config/options';
-import { StreamReaderDelegate } from '@/filters/index';
 import { AsyncEventReader, EventReader, EventType, type XMLEvent, XMLInputFactory } from '@/index';
 import { CREATE_READER, StreamReader } from '@/internal';
 
@@ -78,14 +78,8 @@ describe('XMLInputFactory (JAXP XMLInputFactory)', () => {
   });
 
   it('createEventReader reads a delegate it is given, through the delegate', () => {
-    class Upper extends StreamReaderDelegate {
-      override text(): string {
-        return super.text().toUpperCase();
-      }
-    }
-
     const factory = new XMLInputFactory();
-    const events = [...factory.createEventReader(new Upper(factory.createStreamReader('<a>x</a>')))];
+    const events = [...factory.createEventReader(new UpperCaseText(factory.createStreamReader('<a>x</a>')))];
     expect(events[2]?.type === EventType.CHARACTERS && events[2].text).toBe('X');
   });
 

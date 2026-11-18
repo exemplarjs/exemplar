@@ -1,4 +1,4 @@
-import { canonicalOf, write, writeEvent } from '@test/helpers/canonical';
+import { canonicalOf, write, writeEvent, chunks } from '@exemplarjs/test-support';
 import {
   type AsyncStreamReader,
   EventType,
@@ -26,11 +26,6 @@ export function reader(source: Source, options: InputOptions = {}): StreamReader
 /** Returns a document's canonical form, or throws the XMLError it raises. */
 export function canonical(source: Source, options: InputOptions = {}): string {
   return canonicalOf(reader(source, options));
-}
-
-/** Splits bytes into chunks of one size. */
-function* chunks(bytes: Uint8Array, size: number): Generator<Uint8Array> {
-  for (let i = 0; i < bytes.length; i += size) yield bytes.subarray(i, i + size);
 }
 
 /** Feeds bytes to an async reader a chunk at a time, reading what each chunk completes; returns the canonical form. */

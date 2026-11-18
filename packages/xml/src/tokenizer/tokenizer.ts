@@ -333,7 +333,7 @@ export class Tokenizer implements ScanState {
     const text = this.buffer;
     if (this.isReplacementText || !startsWithDeclaration(text)) return true;
     this.tokenStart = 0;
-    const parser = new DeclarationParser(text, 0);
+    const parser = new DeclarationParser(text);
     this.declaration = parser.parse(this.#options.textDeclaration === true ? 'text' : 'xml');
     this.nextTokenStart = parser.end;
     if (this.declaration.version === '1.1' && this.#options.version11 === undefined) this.#useVersion11();
@@ -382,11 +382,6 @@ export class Tokenizer implements ScanState {
     this.buffer += chunk;
     if (this.#allOneByte && ABOVE_LATIN_1.test(chunk)) this.#allOneByte = false;
     this.#search.clear();
-  }
-
-  /** Notes that the source has no more text. */
-  markFinal(): void {
-    this.final = true;
   }
 
   /** Records the name a scan has just read, from `start` to `end`, with the colons the scan counted in it. */
@@ -649,13 +644,16 @@ export class Tokenizer implements ScanState {
     }
   }
 
-  /** Skips the whitespace before an attribute or the tag's end; a single space takes the quick path. */
+  /** Skips the whitespace before an attribute or the tag's end; a single space before anything but whitespace takes the quick path. */
   private [SKIP_ATTRIBUTE_SEPARATOR](start: number): number {
     const text = this.buffer;
     // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
     const first = text.charCodeAt(start);
     // eslint-disable-next-line prefer-code-point -- spaces and line ends are single code units
-    if (first === SPACE && text.charCodeAt(start + 1) > SPACE) return start + 1;
+    const second = text.charCodeAt(start + 1);
+    // Most names are ASCII, which one comparison tells from the XML 1.1 line ends.
+    const isLineEnd = second >= NEXT_LINE && (second === NEXT_LINE || second === LINE_SEPARATOR);
+    if (first === SPACE && second > SPACE && !isLineEnd) return start + 1;
     if (first <= SPACE || first === NEXT_LINE || first === LINE_SEPARATOR) return skipWhitespace(this, start);
     return start;
   }

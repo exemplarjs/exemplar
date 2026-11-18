@@ -123,8 +123,7 @@ export function holdsAt(text: string, start: number, expected: string): boolean 
     // The last character rejects most mismatches before a slice.
     // eslint-disable-next-line prefer-code-point -- compares code units
     const lastCharEqual = text.charCodeAt(start + length - 1) === expected.charCodeAt(length - 1);
-    const sliceEqual = text.slice(start, start + length) === expected;
-    return lastCharEqual && sliceEqual;
+    return lastCharEqual && text.slice(start, start + length) === expected;
   }
   for (let i = 0; i < length; i++) {
     // eslint-disable-next-line prefer-code-point -- compares code units

@@ -1,7 +1,7 @@
 import { cursor, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 import { EventType, type InputOptions, type StreamReader, type XMLError, XMLInputFactory } from '@/index';
-import { DTD_COMPLETE, DTD_ITEMS, EVENT_OFFSET, INCLUDED_DECLARATIONS, INPUT_ENCODING, XML_ENCODING } from '@/internal';
+import { DTD_COMPLETE, DTD_ITEMS, EVENT_OFFSET, INCLUDED_DECLARATIONS } from '@/internal';
 
 const encoder = new TextEncoder();
 
@@ -482,6 +482,10 @@ describe('after a failure, and what a reader says of its encoding and errors', (
     expect([text.encoding(), text.declaredEncoding()]).toEqual([undefined, 'ISO-8859-1']);
     const undeclared = factory.createStreamReader(new TextEncoder().encode('<a/>'));
     expect([undeclared.encoding(), undeclared.declaredEncoding()]).toEqual(['utf-8', undefined]);
+    const declared = factory.createStreamReader(encoder.encode('<?xml version="1.0" encoding="ISO-8859-1"?><a/>'));
+    expect([declared.encoding(), declared.declaredEncoding()]).toEqual(['iso-8859-1', 'ISO-8859-1']);
+    const plain = factory.createStreamReader('<a/>');
+    expect([plain.encoding(), plain.declaredEncoding()]).toEqual([undefined, undefined]);
   });
 
   it('reports a broken xml:id as a warning, and reads on without a handler', () => {
@@ -680,13 +684,6 @@ describe('internal hooks', () => {
     const offsets: number[] = [];
     for (let e = r.next(); e !== EventType.END_DOCUMENT; e = r.next()) offsets.push(r[EVENT_OFFSET]);
     expect(offsets).toEqual([0, 3, 4, 4, 8]);
-  });
-
-  it('give the encoding detection chose and the one the declaration names', () => {
-    const bytes = cursor(encoder.encode('<?xml version="1.0" encoding="ISO-8859-1"?><a/>'));
-    expect([bytes[INPUT_ENCODING], bytes[XML_ENCODING]]).toEqual(['iso-8859-1', 'ISO-8859-1']);
-    const text = cursor('<a/>');
-    expect([text[INPUT_ENCODING], text[XML_ENCODING]]).toEqual([undefined, undefined]);
   });
 
   it('say whether every declaration the DTD refers to was read', () => {

@@ -1,16 +1,9 @@
-import { streamOf } from '@test/helpers/resolver';
 import { at, labels } from '@test/helpers/trees';
 import { describe, expect, it } from 'vitest';
+import { streamOf, utf8, UpperCaseText } from '@exemplarjs/test-support';
 import { EventType, InvalidArgumentError, type Source, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
+import { createFilteredReader } from '@exemplarjs/xml/filters';
 import { NodeKind, XdmDocumentBuilder } from '@/index';
-
-/** A delegate that upper-cases text. */
-class Upper extends StreamReaderDelegate {
-  override text(): string {
-    return super.text().toUpperCase();
-  }
-}
 
 describe('XdmDocumentBuilder', () => {
   it('parses a document into a tree and returns its document node', () => {
@@ -32,7 +25,7 @@ describe('XdmDocumentBuilder', () => {
 
   it('parses streams, awaiting input as it arrives', async () => {
     const text = `<a>${'<b x="1">text</b>'.repeat(200)}</a>`;
-    const document = await new XdmDocumentBuilder().parseAsync(streamOf(text, 7));
+    const document = await new XdmDocumentBuilder().parseAsync(streamOf(utf8(text), 7));
     expect(at(document, 0).children()).toHaveLength(200);
     expect(document.stringValue).toBe('text'.repeat(200));
   });
@@ -76,7 +69,7 @@ describe('XdmDocumentBuilder', () => {
   it('builds a whole document from a reader at its start, through its filters and delegates', () => {
     const factory = new XMLInputFactory();
     const reader = createFilteredReader(
-      new Upper(factory.createStreamReader({ systemId: 'http://example.com/d.xml', text: '<a>x<!--c--></a>' })),
+      new UpperCaseText(factory.createStreamReader({ systemId: 'http://example.com/d.xml', text: '<a>x<!--c--></a>' })),
       (r) => r.eventType() !== EventType.COMMENT
     );
     const document = new XdmDocumentBuilder().parse(reader);
@@ -108,8 +101,8 @@ describe('XdmDocumentBuilder', () => {
   });
 
   it('builds from an asynchronous reader, awaiting input as it arrives', async () => {
-    const reader = new XMLInputFactory().createAsyncStreamReader(streamOf('<a><b>x</b><b>y</b></a>', 3));
-    const document = await new XdmDocumentBuilder().parseAsync(new Upper(reader));
+    const reader = new XMLInputFactory().createAsyncStreamReader(streamOf(utf8('<a><b>x</b><b>y</b></a>'), 3));
+    const document = await new XdmDocumentBuilder().parseAsync(new UpperCaseText(reader));
     expect(document.stringValue).toBe('XY');
   });
 

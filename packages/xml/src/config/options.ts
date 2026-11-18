@@ -37,6 +37,13 @@ export const DEFAULT_LIMITS: Limits = {
   nameLength: 1000,
 };
 
+/** The default limits with the given ones in their place; a limit given as undefined keeps its default. */
+function mergeLimits(given: Partial<Limits> = {}): Limits {
+  const limits = { ...DEFAULT_LIMITS };
+  for (const name of Object.keys(DEFAULT_LIMITS) as (keyof Limits)[]) limits[name] = given[name] ?? limits[name];
+  return limits;
+}
+
 /** Performs XInclude processing; `xincludeProcessor()` from `@exemplarjs/xinclude` makes one. */
 export interface XIncludeProcessor {
   /** Creates a reader that carries out the inclusions in the document it reads. @internal */
@@ -169,6 +176,6 @@ export function resolveOptions(options: InputOptions): ResolvedOptions {
     entities: new Map(Object.entries(options.entities ?? {})),
     errorHandler: options.errorHandler ?? {},
     decoders: options.decoders ?? {},
-    limits: { ...DEFAULT_LIMITS, ...options.limits },
+    limits: mergeLimits(options.limits),
   };
 }

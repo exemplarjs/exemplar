@@ -1,8 +1,9 @@
 import { catalog, file, type Files, ROOT } from '@test/helpers/catalog';
 import { describe, expect, it } from 'vitest';
 import { DocumentBuilder } from '@exemplarjs/dom';
+import { errorOf } from '@exemplarjs/test-support';
 import { xincludeProcessor } from '@exemplarjs/xinclude';
-import { ErrorCode, EventType, ResolutionError, XMLError, XMLInputFactory } from '@exemplarjs/xml';
+import { ErrorCode, EventType, ResolutionError, XMLInputFactory } from '@exemplarjs/xml';
 
 const CATALOG: Files = {
   [ROOT]: file(
@@ -30,17 +31,6 @@ function text(factory: XMLInputFactory, xml: string): string {
     if (event === EventType.START_ELEMENT) out += `<${reader.localName()}>`;
   }
   return out;
-}
-
-/** The XMLError reading a document fails with. */
-function errorOf(read: () => unknown): XMLError {
-  try {
-    read();
-  } catch (error) {
-    if (error instanceof XMLError) return error;
-    throw error;
-  }
-  throw new Error('Expected an XMLError');
 }
 
 describe('XML Catalogs for DTDs and external entities', () => {

@@ -5,7 +5,6 @@ import {
   Char,
   highSurrogateOf,
   isHighSurrogate,
-  isLowSurrogate,
   isSurrogate,
   lowSurrogateOf,
   SURROGATE_PAIR_LENGTH,
@@ -21,7 +20,7 @@ const { NON_ASCII } = Char;
 export const UNDEFINED_CHARACTER = 0xff_ff;
 
 /** How many bytes a code unit takes in UTF-32 and in UTF-16. */
-export const UTF32_UNIT_BYTES = 4;
+const UTF32_UNIT_BYTES = 4;
 export const UTF16_UNIT_BYTES = 2;
 
 /** Thrown by exemplar's own decoders at bytes their encoding doesn't allow. */
@@ -39,6 +38,35 @@ export class DecodeError extends TypeError {
 /** The bytes a decoder carried over from the last chunk, an incomplete character, followed by the new ones. */
 export function withCarry(carry: Uint8Array, bytes: Uint8Array = NO_BYTES): Uint8Array {
   return carry.length === 0 ? bytes : concatBytes(carry, bytes);
+}
+
+/** How many bytes are decoded at a time to find the block that holds bad bytes. */
+const SEARCH_BLOCK_BYTES = 4096;
+
+/**
+ * The text before the first bytes a fatal `TextDecoder` refuses: what a streaming decoder made by
+ * `fatalDecoder` gives for the longest start of `bytes` it decodes without failing.
+ */
+export function textBeforeBadBytes(bytes: Uint8Array, fatalDecoder: () => TextDecoder): string {
+  // Whole blocks, up to the one that holds the bad bytes.
+  let text = '';
+  let blockStart = 0;
+  try {
+    const decoder = fatalDecoder();
+    for (; blockStart < bytes.length; blockStart += SEARCH_BLOCK_BYTES) {
+      text += decoder.decode(bytes.subarray(blockStart, blockStart + SEARCH_BLOCK_BYTES), { stream: true });
+    }
+  } catch {
+    // The decoder is spent; another reads up to the block again, then the block a byte at a time.
+  }
+  try {
+    const decoder = fatalDecoder();
+    decoder.decode(bytes.subarray(0, blockStart), { stream: true });
+    for (let i = blockStart; i < bytes.length; i++) text += decoder.decode(bytes.subarray(i, i + 1), { stream: true });
+  } catch {
+    // The byte the decoder refused ends the text.
+  }
+  return text;
 }
 
 /** Turns code units into a string, a block at a time, natively. */
@@ -107,10 +135,9 @@ export class Utf32Decoder implements Decoder {
     const input = withCarry(this.#carry, bytes);
     const wholeUnitsEnd = input.length - (input.length % UTF32_UNIT_BYTES);
     this.#carry = input.slice(wholeUnitsEnd);
-    if (options?.stream !== true && this.#carry.length > 0) {
-      throw ErrorFactory.create(DecodeError, this.#name, this.#decodeWholeUnits(input, wholeUnitsEnd));
-    }
-    return this.#decodeWholeUnits(input, wholeUnitsEnd);
+    const text = this.#decodeWholeUnits(input, wholeUnitsEnd);
+    if (options?.stream !== true && this.#carry.length > 0) throw ErrorFactory.create(DecodeError, this.#name, text);
+    return text;
   }
 
   /** Decodes the whole units before `end`; a surrogate or a value above U+10FFFF is an error. */
@@ -151,7 +178,12 @@ export class Utf16Decoder implements Decoder {
   constructor(name: 'UTF-16LE' | 'UTF-16BE') {
     this.#name = name;
     this.#littleEndian = name === 'UTF-16LE';
-    this.#native = new TextDecoder(this.#littleEndian ? 'utf-16le' : 'utf-16be', { fatal: true, ignoreBOM: true });
+    this.#native = this.#createNative();
+  }
+
+  /** A fatal native decoder in this decoder's byte order, which keeps U+FEFF. */
+  #createNative(): TextDecoder {
+    return new TextDecoder(this.#littleEndian ? 'utf-16le' : 'utf-16be', { fatal: true, ignoreBOM: true });
   }
 
   decode(bytes?: Uint8Array, options?: { stream?: boolean }): string {
@@ -168,8 +200,11 @@ export class Utf16Decoder implements Decoder {
     try {
       return this.#native.decode(whole);
     } catch {
-      const valid = whole.subarray(0, this.#validLength(whole));
-      throw ErrorFactory.create(DecodeError, this.#name, this.#native.decode(valid));
+      throw ErrorFactory.create(
+        DecodeError,
+        this.#name,
+        textBeforeBadBytes(whole, () => this.#createNative())
+      );
     }
   }
 
@@ -178,27 +213,6 @@ export class Utf16Decoder implements Decoder {
     const first = bytes[pos] as number;
     const second = bytes[pos + 1] as number;
     return this.#littleEndian ? first | (second << BYTE_BITS) : (first << BYTE_BITS) | second;
-  }
-
-  /** How many bytes from the start hold whole characters, up to the first lone surrogate or odd byte. */
-  #validLength(bytes: Uint8Array): number {
-    let pos = 0;
-    while (pos + UTF16_UNIT_BYTES <= bytes.length) {
-      const length = this.#characterLength(bytes, pos);
-      if (length === 0) return pos;
-      pos += length;
-    }
-    return pos;
-  }
-
-  /** How many bytes the character at `pos` takes: one unit, or a surrogate pair; 0 for a lone surrogate. */
-  #characterLength(bytes: Uint8Array, pos: number): number {
-    const unit = this.#codeUnitAt(bytes, pos);
-    if (isLowSurrogate(unit)) return 0;
-    if (!isHighSurrogate(unit)) return UTF16_UNIT_BYTES;
-    const low = pos + UTF16_UNIT_BYTES;
-    const paired = low + UTF16_UNIT_BYTES <= bytes.length && isLowSurrogate(this.#codeUnitAt(bytes, low));
-    return paired ? SURROGATE_PAIR_LENGTH * UTF16_UNIT_BYTES : 0;
   }
 }
 

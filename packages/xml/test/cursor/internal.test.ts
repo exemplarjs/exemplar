@@ -8,14 +8,13 @@ import {
   DTD_ITEMS,
   EVENT_OFFSET,
   EVENT_POSITION,
+  HAS_FILTERS,
   INCLUDED_DECLARATIONS,
-  INPUT_ENCODING,
   isIndex,
   LISTEN_ENTITIES,
   NAMESPACES_IN_SCOPE,
   outOfRange,
   READER_OPTIONS,
-  XML_ENCODING,
 } from '@/cursor/internal';
 
 describe('copyString', () => {
@@ -55,12 +54,11 @@ describe('the cursor hooks', () => {
       DTD_ITEMS,
       EVENT_OFFSET,
       EVENT_POSITION,
+      HAS_FILTERS,
       INCLUDED_DECLARATIONS,
-      INPUT_ENCODING,
       LISTEN_ENTITIES,
       NAMESPACES_IN_SCOPE,
       READER_OPTIONS,
-      XML_ENCODING,
     ];
     for (const hook of hooks) expect(typeof hook).toBe('symbol');
     expect(new Set(hooks).size).toBe(hooks.length);

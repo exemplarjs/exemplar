@@ -1,4 +1,5 @@
-import { canonicalHandler, canonicalOf, namesHandler, namesOf } from '@test/helpers/canonical';
+import { canonicalHandler, namesHandler, namesOf } from '@test/helpers/canonical';
+import { canonicalOf } from '@exemplarjs/test-support';
 import { type InputOptions, type Source, XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import { SAXParser } from '@/index';
 
@@ -129,16 +130,6 @@ export function namesEveryWay(doc: Document | string, options: InputOptions = {}
     throw new Error(`SAX gave ${names.join(' ')}, but the cursor ${cursor.join(' ')}`);
   }
   return cursor;
-}
-
-/** Encodes text as UTF-16 code units in one byte order, with or without a byte order mark. */
-export function utf16(text: string, littleEndian: boolean, bom = true): Uint8Array {
-  const units = (bom ? '\uFEFF' : '') + text;
-  const bytes = new Uint8Array(units.length * 2);
-  const view = new DataView(bytes.buffer);
-  // eslint-disable-next-line prefer-code-point -- UTF-16 is code units
-  for (let i = 0; i < units.length; i++) view.setUint16(i * 2, units.charCodeAt(i), littleEndian);
-  return bytes;
 }
 
 /** Encodes text one byte per character; every character must be below U+0100. */

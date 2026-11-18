@@ -1,5 +1,6 @@
 import { validating, validity, validityErrors, withFiles, withSubset } from '@test/helpers/validity';
 import { describe, expect, it } from 'vitest';
+import { chunks, utf8 } from '@exemplarjs/test-support';
 import { ErrorCode, EventType, type InputOptions, type XMLError } from '@exemplarjs/xml';
 
 const SUBSET =
@@ -29,12 +30,6 @@ function fedErrors(xml: string, size: number, options: InputOptions = {}): XMLEr
   return errors;
 }
 
-/** A document's bytes in chunks of one size. */
-function* chunks(xml: string, size: number): Generator<Uint8Array> {
-  const bytes = new TextEncoder().encode(xml);
-  for (let i = 0; i < bytes.length; i += size) yield bytes.subarray(i, i + size);
-}
-
 describe('validating through every reader', () => {
   const expected = summary(validityErrors(INVALID));
 
@@ -51,7 +46,7 @@ describe('validating through every reader', () => {
 
   it.each([1, 2, 3, 7, 64])('reports the same from bytes in chunks of %i', (size) => {
     const errors: XMLError[] = [];
-    const reader = validating(errors).createStreamReader(chunks(INVALID, size));
+    const reader = validating(errors).createStreamReader(chunks(utf8(INVALID), size));
     while (reader.next() !== EventType.END_DOCUMENT);
     expect(summary(errors)).toEqual(expected);
   });

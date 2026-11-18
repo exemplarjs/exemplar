@@ -1,6 +1,7 @@
 import { canonical, names } from '@test/helpers/canonical';
 import { written, writtenBytes } from '@test/helpers/write';
 import { describe, expect, it } from 'vitest';
+import { utf16 } from '@exemplarjs/test-support';
 import { EventType, type InputOptions, XMLInputFactory } from '@exemplarjs/xml';
 import { BytesSink, type OutputOptions, type StreamWriter, StringSink, XMLOutputFactory } from '@/index';
 
@@ -21,12 +22,6 @@ function reread(source: string | Uint8Array): { attributes: Record<string, strin
       text += reader.text();
   }
   return { attributes, text };
-}
-
-/** Encodes text as UTF-16BE code units after a byte order mark. */
-function utf16(text: string): Uint8Array {
-  const units = Array.from(`\uFEFF${text}`, (c) => c.charCodeAt(0));
-  return Uint8Array.from(units.flatMap((u) => [u >> 8, u & 0xff]));
 }
 
 /** Writes one root element with an attribute and text of the same value. */
@@ -367,7 +362,7 @@ describe('the event writer read back: copies give the same canonical form', () =
   });
 
   it.each([
-    ['UTF-16', utf16('<r>é€</r>')],
+    ['UTF-16', utf16('<r>é€</r>', false)],
     ['ISO-8859-1', Uint8Array.from('<?xml version="1.0" encoding="ISO-8859-1"?><r>é</r>', (c) => c.charCodeAt(0))],
   ])('copies a document read from %s bytes', (_encoding, bytes) => {
     expect(canonical(copy(bytes))).toBe(canonical(bytes));

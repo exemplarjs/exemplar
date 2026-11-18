@@ -1,6 +1,6 @@
 import { verdict } from '@test/helpers/lexical';
 import { canonical, errorOf, parseEveryWay } from '@test/helpers/parse';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TABLES_REPLACEMENT_TEXT, TABLES_XML_10, TABLES_XML_11 } from '@/scan/classes';
 import {
   holdsAt,
@@ -58,6 +58,16 @@ describe('span comparison', () => {
     expect(holdsAt(long.slice(0, -1), 0, long)).toBe(false);
     expect(holdsAt('ab', 1, 'bc')).toBe(false);
     expect(holdsAt('ab', 1, '')).toBe(true);
+  });
+
+  it('rejects a long string by its last character without slicing', () => {
+    const long = 'http://www.w3.org/2000/xmlns/';
+    const text = ` ${long.slice(0, -1)}x`;
+    const slice = vi.spyOn(String.prototype, 'slice');
+    const held = holdsAt(text, 1, long);
+    const slices = slice.mock.calls.length;
+    slice.mockRestore();
+    expect([held, slices]).toEqual([false, 0]);
   });
 
   it('compares two spans of one buffer', () => {

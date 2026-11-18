@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type CatalogProcessor, type InputOptions, resolveOptions } from '@/config/options';
-import {
-  ExternalReader,
-  lineLocator,
-  locationIn,
-  ResolutionPendingError,
-  unmatchedByCatalog,
-} from '@/entities/external';
+import { ExternalReader, lineLocator, ResolutionPendingError, unmatchedByCatalog } from '@/entities/external';
 import { InvalidArgumentError } from '@/index';
 import { DecoderRegistry } from '@/input/decoders';
 import { type OpenedSource, PENDING, UnsupportedEncodingError } from '@/input/source';
@@ -408,13 +402,11 @@ describe('locator', () => {
     ]);
     expect(locate(8)).toEqual({ line: 4, column: 2, offset: 8, systemId: 'urn:x' });
   });
-});
 
-describe('locationIn', () => {
   it('counts lines and columns in text whose line ends are LF', () => {
-    expect(locationIn('ab\ncd\n\nef', 8, 'urn:x')).toEqual({ line: 4, column: 2, offset: 8, systemId: 'urn:x' });
-    expect(locationIn('ab', 0, undefined)).toEqual({ line: 1, column: 1, offset: 0 });
-    expect(locationIn('ab\n', 3, undefined)).toEqual({ line: 2, column: 1, offset: 3 });
+    expect(lineLocator('ab\ncd\n\nef', 'urn:x')(8)).toEqual({ line: 4, column: 2, offset: 8, systemId: 'urn:x' });
+    expect(lineLocator('ab', undefined)(0)).toEqual({ line: 1, column: 1, offset: 0 });
+    expect(lineLocator('ab\n', undefined)(3)).toEqual({ line: 2, column: 1, offset: 3 });
   });
 });
 

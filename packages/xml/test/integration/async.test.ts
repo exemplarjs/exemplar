@@ -1,6 +1,6 @@
-import { canonicalOfAsync } from '@test/helpers/canonical';
 import { canonical } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { canonicalOfAsync } from '@exemplarjs/test-support';
 import { IllegalStateError } from '@/index';
 import {
   AsyncReaderRequiredError,

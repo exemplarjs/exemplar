@@ -1,5 +1,6 @@
-import { build, buildAsync, children, serialize, streamOf, utf16, utf8 } from '@test/helpers/dom';
+import { build, buildAsync, children, serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
+import { streamOf, utf16, utf8 } from '@exemplarjs/test-support';
 import { XMLError } from '@exemplarjs/xml';
 import { type Attr, type CDATASection, DOMParser, type Element, type Node, type Text } from '@/index';
 

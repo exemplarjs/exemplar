@@ -1,8 +1,10 @@
 import { parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
 import { AttributeList } from '@/cursor/attributes';
+import { NamespaceScopes } from '@/cursor/namespace-scopes';
 import { EventType, XMLInputFactory } from '@/index';
-import { NamespaceBindings } from '@/namespaces/namespaces';
+import type { NamespaceBindings } from '@/namespaces/namespaces';
+import type { Tokenizer } from '@/tokenizer/tokenizer';
 
 /** Reads to the first start tag. */
 function start(xml: string, options = {}) {
@@ -195,10 +197,10 @@ describe('xml:id names', () => {
   });
 });
 
-/** A fail callback that throws an error carrying the code, as the reader's does. */
-const fail = (code: string, message: string): never => {
-  throw Object.assign(new Error(message), { code });
-};
+/** What the list reads of the tokenizer that holds the start tag: its version, and an empty buffer. */
+function tokenizerOf(version11 = false): Tokenizer {
+  return { version11, buffer: '', bufferOffset: 0, tokenStart: 0 } as Tokenizer;
+}
 
 /** An attribute list holding the given attributes, all specified CDATA. */
 function listOf(...attributes: [string, string][]): AttributeList {
@@ -207,12 +209,12 @@ function listOf(...attributes: [string, string][]): AttributeList {
   return list;
 }
 
-/** Declares and resolves a list's namespaces against fresh bindings; returns the bindings. */
+/** Declares and resolves a list's namespaces in fresh scopes; returns their bindings. */
 function process(list: AttributeList, { version11 = false, prefixesShown = false } = {}): NamespaceBindings {
-  const bindings = new NamespaceBindings();
-  list.declareNamespaces(bindings, version11, () => undefined, fail);
-  list.resolveNamespaces(bindings, '', 0, prefixesShown, fail);
-  return bindings;
+  const scopes = new NamespaceScopes();
+  list.declareNamespaces(scopes, tokenizerOf(version11));
+  list.resolveNamespaces(scopes.bindings, tokenizerOf(version11), prefixesShown);
+  return scopes.bindings;
 }
 
 describe('AttributeList', () => {
@@ -262,10 +264,10 @@ describe('AttributeList', () => {
 
   it('applies declarations, putting them in the xmlns namespace and making the default the default', () => {
     const list = listOf(['xmlns', 'urn:d'], ['xmlns:p', 'urn:p'], ['a', '1']);
-    const declared: number[] = [];
-    const bindings = new NamespaceBindings();
-    list.declareNamespaces(bindings, false, (k) => declared.push(k), fail);
-    expect(declared).toEqual([2, 3]);
+    const scopes = new NamespaceScopes();
+    const bindings = scopes.bindings;
+    list.declareNamespaces(scopes, tokenizerOf());
+    expect(scopes.declarations.slice(0, scopes.declarationCount)).toEqual([2, 3]);
     expect(bindings.defaultIndex).toBe(2);
     expect([bindings.uri(2, '', 0), bindings.prefix(3, '', 0), bindings.uri(3, '', 0)]).toEqual([
       'urn:d',

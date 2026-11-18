@@ -1,7 +1,7 @@
 import { DOCUMENTS } from '@test/helpers/documents';
-import { streamOf, utf8 } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
-import { EventType, type StreamReader, XMLInputFactory } from '@exemplarjs/xml';
+import { streamOf, utf8, readerAt } from '@exemplarjs/test-support';
+import { XMLInputFactory } from '@exemplarjs/xml';
 import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { type Attr, type Document, DocumentBuilder, type Element, type Node, NodeType } from '@/index';
 
@@ -34,14 +34,6 @@ function described(document: Document): string[] {
   ];
 }
 
-/** A cursor over a document, moved to its start tag number `index`, counting from 0. */
-function readerAt(xml: string, index: number): StreamReader {
-  const reader = factory.createStreamReader(xml);
-  let seen = -1;
-  while (reader.next() !== EventType.START_ELEMENT || ++seen < index);
-  return reader;
-}
-
 describe('DocumentBuilder: building from a reader agrees with building from a source', () => {
   it.each(Object.entries(DOCUMENTS))('through a cursor, a delegate and a filter: %s', (_name, xml) => {
     const expected = described(builder.parse(xml));
@@ -56,7 +48,7 @@ describe('DocumentBuilder: building from a reader agrees with building from a so
   it.each(Object.entries(DOCUMENTS))('one element at a time, with the namespaces it inherits: %s', (_name, xml) => {
     const elements = [...builder.parse(xml).getElementsByTagName('*')];
     for (const [index, element] of elements.entries()) {
-      const record = builder.parse(readerAt(xml, index)).documentElement as Element;
+      const record = builder.parse(readerAt(factory, xml, index)).documentElement as Element;
       expect(dump(record, false)).toEqual(dump(element, false));
       for (const prefix of [null, 'p', 'q']) {
         expect(record.lookupNamespaceURI(prefix), `${prefix}`).toBe(element.lookupNamespaceURI(prefix));

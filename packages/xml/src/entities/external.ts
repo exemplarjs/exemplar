@@ -248,7 +248,7 @@ export class ExternalReader {
     fail: ExternalFail
   ): number {
     if (!startsWithDeclaration(text)) return 0;
-    const parser = new DeclarationParser(text, 0);
+    const parser = new DeclarationParser(text);
     let declaration;
     try {
       declaration = parser.parse('text');
@@ -287,7 +287,7 @@ function readWholeText(
       const failure = ErrorFactory.expect(error, DecodingFailureError);
       // Its line and column count the normalized text, and its offset the text as given, as for every other error.
       const read = normalizeLineEnds(text, version11);
-      return fail(failure.code, failure.message, { ...locationIn(read, read.length, systemId), offset: text.length });
+      return fail(failure.code, failure.message, { ...lineLocator(read, systemId)(read.length), offset: text.length });
     }
     if (chunk === undefined) return text;
     if (chunk === PENDING)
@@ -329,11 +329,6 @@ function checkCharacters(
     const label = codePointLabel(text.codePointAt(pos) as number);
     fail(ErrorCode.WF_INVALID_CHARACTER, `${label} is not allowed here`, locate(pos));
   }
-}
-
-/** The line and column of an index in text whose line ends are already LF. */
-export function locationIn(text: string, index: number, systemId: string | undefined): Location {
-  return lineLocator(text, systemId)(index);
 }
 
 /** Locates indexes in text whose line ends are already LF, finding where its lines start the first time it is asked. */

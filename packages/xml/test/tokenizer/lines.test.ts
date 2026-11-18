@@ -1,5 +1,6 @@
-import { split, textSource, utf8 } from '@test/helpers/lexical';
+import { split, textSource } from '@test/helpers/lexical';
 import { describe, expect, it } from 'vitest';
+import { utf8 } from '@exemplarjs/test-support';
 import { EventType, type Location, type Source, XMLInputFactory } from '@/index';
 import { LineSegment } from '@/tokenizer/lines';
 import { Token, Tokenizer } from '@/tokenizer/tokenizer';

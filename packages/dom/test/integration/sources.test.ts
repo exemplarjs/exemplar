@@ -1,6 +1,7 @@
 import { DOCUMENTS } from '@test/helpers/documents';
-import { build, buildAsync, serialize, streamOf, utf16, utf8 } from '@test/helpers/dom';
+import { build, buildAsync, serialize } from '@test/helpers/dom';
 import { describe, expect, it } from 'vitest';
+import { streamOf, utf16, utf8 } from '@exemplarjs/test-support';
 import type { Source } from '@exemplarjs/xml';
 import { type Document, DocumentBuilder } from '@/index';
 

@@ -11,13 +11,14 @@ The repository is a pnpm workspace run by Turborepo:
 | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
 | `packages/xml`                                                                                                     | The reader, published as `@exemplarjs/xml`                     |
 | `packages/sax`, `writer`, `dom`, `xdm`, `xpath`, `canonical`, `validation`, `xinclude`, `catalog`, `encodings-cjk` | The rest of the library, one `@exemplarjs` package each        |
-| `configs/build-config`                                                                                             | The tsconfigs, tsdown and Vitest settings every package shares |
+| `support/build-config`                                                                                             | The tsconfigs, tsdown and Vitest settings every package shares |
+| `support/test-support`                                                                                             | The fixtures and helpers the packages' tests share             |
 | `examples`                                                                                                         | Worked examples, each tested against its expected result       |
 
-`@exemplarjs/build-config` is private and never published, so its dependencies never reach exemplar's users. The W3C
-suites, the consistency checks, the differential and fuzz tests against libxml2 and Xerces, and the benchmarks live in
-the [exemplar-tests](https://github.com/io-timeout/exemplar-tests) repository, which reads this checkout's built `dist`
-when it sits beside it, so compile here first.
+`@exemplarjs/build-config` and `@exemplarjs/test-support` are private and never published, so their dependencies never
+reach exemplar's users. The W3C suites, the consistency checks, the differential and fuzz tests against libxml2 and
+Xerces, and the benchmarks live in the [exemplar-tests](https://github.com/io-timeout/exemplar-tests) repository, which
+reads this checkout's built `dist` when it sits beside it, so compile here first.
 
 ## Commands
 

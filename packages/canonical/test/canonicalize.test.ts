@@ -1,5 +1,6 @@
 import { factoryFor, failure, tree } from '@test/helpers/c14n';
 import { describe, expect, it } from 'vitest';
+import { UpperCaseText } from '@exemplarjs/test-support';
 import { ErrorCode, EventType, InvalidArgumentError, XMLError, XMLInputFactory } from '@exemplarjs/xml';
 import { StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { canonicalize, canonicalizeAsync, type CanonicalMethod } from '@/index';
@@ -173,14 +174,8 @@ describe('canonicalize: input', () => {
   });
 
   it('canonicalizes through a delegate, writing what its accessors answer', () => {
-    /** Upper-cases every text node. */
-    class UpperCase extends StreamReaderDelegate {
-      override text(): string {
-        return super.text().toUpperCase();
-      }
-    }
     const reader = new XMLInputFactory().createStreamReader('<a><b>signed</b></a>');
-    expect(canonicalize(new UpperCase(reader))).toBe('<a><b>SIGNED</b></a>');
+    expect(canonicalize(new UpperCaseText(reader))).toBe('<a><b>SIGNED</b></a>');
   });
 
   it('reads a DTD through a delegate, applying its defaults', () => {

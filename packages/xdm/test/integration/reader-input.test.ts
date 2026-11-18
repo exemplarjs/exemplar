@@ -1,9 +1,9 @@
 import { fc, test } from '@fast-check/vitest';
 import { documents } from '@test/helpers/documents';
-import { streamOf } from '@test/helpers/resolver';
 import { dump } from '@test/helpers/trees';
 import { expect } from 'vitest';
-import { EventType, type StreamReader, XMLInputFactory } from '@exemplarjs/xml';
+import { streamOf, utf8, readerAt } from '@exemplarjs/test-support';
+import { EventType, XMLInputFactory } from '@exemplarjs/xml';
 import { createFilteredReader, StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { NodeKind, XdmDocumentBuilder, type XdmNode } from '@/index';
 
@@ -18,14 +18,6 @@ const builder = new XdmDocumentBuilder();
 function elementsOf(node: XdmNode): XdmNode[] {
   const children = node.children().filter((child) => child.kind === NodeKind.ELEMENT);
   return children.flatMap((child) => [child, ...elementsOf(child)]);
-}
-
-/** A cursor over a document, moved to its start tag number `index`, counting from 0. */
-function readerAt(xml: string, index: number): StreamReader {
-  const reader = factory.createStreamReader(xml);
-  let seen = -1;
-  while (reader.next() !== EventType.START_ELEMENT || ++seen < index);
-  return reader;
 }
 
 test.prop([documents], RUNS)(
@@ -44,7 +36,7 @@ test.prop([documents], RUNS)(
 test.prop([documents], RUNS)('builds each element from a cursor at its start tag as it is in the whole tree', (xml) => {
   const whole = elementsOf(builder.parse(xml));
   for (const [index, element] of whole.entries()) {
-    const reader = readerAt(xml, index);
+    const reader = readerAt(factory, xml, index);
     const record = builder.parse(reader);
     expect(dump(record.children()[0] as XdmNode)).toEqual(dump(element));
     expect([reader.eventType(), reader.localName()]).toEqual([EventType.END_ELEMENT, element.localName]);
@@ -54,7 +46,8 @@ test.prop([documents], RUNS)('builds each element from a cursor at its start tag
 test.prop([documents, fc.integer({ min: 1, max: 16 })], RUNS)(
   'builds the same tree from an asynchronous cursor over a stream, in chunks of any size',
   async (xml, size) => {
-    const reader = new StreamReaderDelegate(factory.createAsyncStreamReader(streamOf(xml, size)));
+    const stream = streamOf(utf8(xml), size);
+    const reader = new StreamReaderDelegate(factory.createAsyncStreamReader(stream));
     const built = await builder.parseAsync(reader);
     expect(dump(built)).toEqual(dump(builder.parse(xml)));
   }

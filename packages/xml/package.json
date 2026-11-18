@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@exemplarjs/build-config": "workspace:*",
+    "@exemplarjs/test-support": "workspace:*",
     "@fast-check/vitest": "catalog:"
   }
 }

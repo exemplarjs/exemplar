@@ -2,7 +2,7 @@ import { bytes, hex, splits } from '@test/helpers/bytes';
 import { cjkFactory, documentIn, errorOf, read, readFed } from '@test/helpers/documents';
 import { describe, expect, it } from 'vitest';
 import { ErrorCode, XMLInputFactory } from '@exemplarjs/xml';
-import { CREATE_READER, INPUT_ENCODING } from '@exemplarjs/xml/internal';
+import { CREATE_READER } from '@exemplarjs/xml/internal';
 
 /** A document in each charset: the declared name, the root's name, its attribute and its text, in hex and decoded. */
 const DOCUMENTS: [string, [string, string, string], [string, string, string]][] = [
@@ -57,7 +57,7 @@ describe('reading documents with the CJK decoders registered', () => {
     // The internal reader type has the decoder the reader chose.
     const reader = cjkFactory[CREATE_READER](bytes(`<?xml version="1.0" encoding="${declared}"?><a/>`), {}, false);
     reader.next();
-    expect(reader[INPUT_ENCODING]).toBe(canonical);
+    expect(reader.encoding()).toBe(canonical);
   });
 
   it('decodes with the encoding a source object names when the document declares none', () => {

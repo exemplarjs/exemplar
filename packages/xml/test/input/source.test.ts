@@ -1,7 +1,7 @@
-import { canonicalOfAsync } from '@test/helpers/canonical';
-import { bytes, framed, join, split, utf16, utf8, verdict } from '@test/helpers/lexical';
+import { bytes, framed, join, split, verdict } from '@test/helpers/lexical';
 import { canonical, errorOf, parseEveryWay, reader } from '@test/helpers/parse';
 import { describe, expect, it } from 'vitest';
+import { canonicalOfAsync, utf16, utf8 } from '@exemplarjs/test-support';
 import { DecodeError } from '@/encodings/decoders';
 import { InvalidArgumentError } from '@/index';
 import { XMLInputFactory } from '@/index';
@@ -166,6 +166,18 @@ describe('reading bytes as text', () => {
     const second = bytes(0xaf, 0x78, 0xed, 0xa0, 0x80);
     expect(decoded([bytes(0xe8, 0xaf), second])).toBe('误x!ENCODING_INVALID_BYTES');
     expect(decoded([utf8('<a>'), bytes(0xf0, 0x9f), bytes(0x98)])).toBe('<a>!ENCODING_INVALID_BYTES');
+  });
+
+  it('keeps a U+FEFF that starts the chunk with the bad bytes, whole or split from an earlier chunk', () => {
+    const second = join(BOM, utf8('x'), bytes(0xff));
+    expect(decoded([utf8('<a>'), second])).toBe('<a>\uFEFFx!ENCODING_INVALID_BYTES');
+    expect(decoded([utf8('<a>'), BOM.subarray(0, 1), second.subarray(1)])).toBe('<a>\uFEFFx!ENCODING_INVALID_BYTES');
+    const afterMark = join(BOM, BOM, utf8('<a>'), bytes(0xff));
+    expect(decoded([afterMark])).toBe('\uFEFF<a>!ENCODING_INVALID_BYTES');
+    const doc = join(utf8('<a>'), BOM, utf8('<b>'), bytes(0xff));
+    expect(() => canonical([doc.subarray(0, 3), doc.subarray(3)])).toThrow(
+      expect.objectContaining({ code: 'ENCODING_INVALID_BYTES', line: 1, column: 8 })
+    );
   });
 
   it('decodes UTF-8 split anywhere across chunks', () => {

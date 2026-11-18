@@ -1,4 +1,4 @@
-import { type AsyncStreamReader, EventType, type StreamReader, type XMLEvent } from '@/index';
+import { type AsyncStreamReader, EventType, type StreamReader, type XMLEvent } from '@exemplarjs/xml';
 
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -11,19 +11,25 @@ const ESCAPES: Readonly<Record<string, string>> = {
 };
 
 /** Escapes character data and attribute values as the suite's canonical form does. */
-function escape(text: string): string {
+export function escapeCanonical(text: string): string {
   return text.replaceAll(/[&<>"\t\n\r]/g, (c) => ESCAPES[c] ?? c);
 }
 
-/** Writes a start tag with its attributes sorted by name. */
-function startTag(reader: StreamReader | AsyncStreamReader): string {
-  const attributes: [string, string][] = [];
-  for (let i = 0; i < reader.attributeCount(); i++)
-    attributes.push([reader.attributeName(i), reader.attributeValue(i)]);
+/** Writes a start tag from a name and its attributes, sorted by name. */
+export function canonicalTag(name: string, attributes: readonly (readonly [string, string])[]): string {
   const written = attributes
     .toSorted(([a], [b]) => (a < b ? -1 : Number(a > b)))
-    .map(([name, value]) => ` ${name}="${escape(value)}"`);
-  return `<${reader.name()}${written.join('')}>`;
+    .map(([attribute, value]) => ` ${attribute}="${escapeCanonical(value)}"`);
+  return `<${name}${written.join('')}>`;
+}
+
+/** Writes the start tag a reader is at, with its attributes sorted by name. */
+function startTag(reader: StreamReader | AsyncStreamReader): string {
+  const attributes = Array.from(
+    { length: reader.attributeCount() },
+    (_, i) => [reader.attributeName(i), reader.attributeValue(i)] as const
+  );
+  return canonicalTag(reader.name(), attributes);
 }
 
 /** Writes one event in the first canonical form; comments, the DOCTYPE and skipped entities write nothing. */
@@ -38,7 +44,7 @@ export function write(reader: StreamReader | AsyncStreamReader, event: EventType
     case EventType.CHARACTERS:
     case EventType.SPACE:
     case EventType.CDATA: {
-      return escape(reader.text());
+      return escapeCanonical(reader.text());
     }
     case EventType.PROCESSING_INSTRUCTION: {
       return `<?${reader.piTarget()} ${reader.piData()}?>`;
@@ -67,19 +73,11 @@ export async function canonicalOfAsync(reader: AsyncStreamReader): Promise<strin
   return out;
 }
 
-/** Writes a start tag from a name and its attributes, sorted by name. */
-function tag(name: string, attributes: readonly (readonly [string, string])[]): string {
-  const written = attributes
-    .toSorted(([a], [b]) => (a < b ? -1 : Number(a > b)))
-    .map(([attribute, value]) => ` ${attribute}="${escape(value)}"`);
-  return `<${name}${written.join('')}>`;
-}
-
 /** Writes one event object in the first canonical form. */
 export function writeEvent(event: XMLEvent): string {
   switch (event.type) {
     case EventType.START_ELEMENT: {
-      return tag(
+      return canonicalTag(
         event.name.toString(),
         event.attributes.map((a) => [a.toString(), a.value] as const)
       );
@@ -90,7 +88,7 @@ export function writeEvent(event: XMLEvent): string {
     case EventType.CHARACTERS:
     case EventType.SPACE:
     case EventType.CDATA: {
-      return escape(event.text);
+      return escapeCanonical(event.text);
     }
     case EventType.PROCESSING_INSTRUCTION: {
       return `<?${event.target} ${event.data}?>`;
