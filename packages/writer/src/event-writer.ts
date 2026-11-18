@@ -2,6 +2,22 @@ import { AsyncEventReader, EventType, type StartElementEvent, type XMLEvent } fr
 import { XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
 import type { StreamWriter } from './stream-writer.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+  START_ENTITY,
+  END_ENTITY,
+} = EventType;
+
 /** How many of an async iterable's events are written between waits for the destination to have room. */
 const EVENTS_PER_DRAIN = 1024;
 
@@ -53,46 +69,46 @@ export class EventWriter {
   #write(event: XMLEvent): void {
     const writer = this.#writer;
     switch (event.type) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         this.#startElement(event);
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         // A name without a prefix is its local name, which needs no new string.
         writer.writeEndElement(event.name.prefix === '' ? event.name.localName : event.name.toString());
         break;
       }
-      case EventType.CHARACTERS:
-      case EventType.SPACE: {
+      case CHARACTERS:
+      case SPACE: {
         writer.writeCharacters(event.text);
         break;
       }
-      case EventType.CDATA: {
+      case CDATA: {
         writer.writeCData(event.text);
         break;
       }
-      case EventType.COMMENT: {
+      case COMMENT: {
         writer.writeComment(event.text);
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         writer.writeProcessingInstruction(event.target, event.data);
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         writer.writeDTD(event.text);
         break;
       }
-      case EventType.ENTITY_REFERENCE: {
+      case ENTITY_REFERENCE: {
         writer.writeEntityRef(event.name);
         break;
       }
-      case EventType.START_DOCUMENT: {
+      case START_DOCUMENT: {
         writer.writeStartDocument(event.version ?? '1.0', undefined, event.standalone);
         break;
       }
-      case EventType.START_ENTITY:
-      case EventType.END_ENTITY: {
+      case START_ENTITY:
+      case END_ENTITY: {
         // The expanded content is written; its boundaries add nothing.
         break;
       }

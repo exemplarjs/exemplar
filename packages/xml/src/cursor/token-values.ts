@@ -5,12 +5,16 @@ import { decodeReferences, normalizeLineEnds } from '@/util/normalize';
 import { copyString } from './internal.ts';
 import type { Doctype } from './stream-reader.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { TEXT: TEXT_TOKEN, CDATA: CDATA_TOKEN, COMMENT: COMMENT_TOKEN, DOCTYPE: DOCTYPE_TOKEN } = Token;
+const { CR: CR_FLAG, NEL: NEL_FLAG, REFERENCE: REFERENCE_FLAG } = ScanFlag;
+
 /** The text of `tokenizer`'s current token: character data, CDATA or a comment, normalized; a DOCTYPE's whole declaration; or `''` for any other token. */
 export function tokenText(tokenizer: Tokenizer): string {
   switch (tokenizer.kind) {
-    case Token.TEXT:
-    case Token.CDATA:
-    case Token.COMMENT: {
+    case TEXT_TOKEN:
+    case CDATA_TOKEN:
+    case COMMENT_TOKEN: {
       const start = tokenizer.valueStart;
       // A one-character span comes from V8's table of single-character strings, without a slice.
       const text =
@@ -18,15 +22,15 @@ export function tokenText(tokenizer: Tokenizer): string {
           ? tokenizer.buffer.charAt(start)
           : tokenizer.buffer.slice(start, tokenizer.valueEnd);
       // Only character data holds references; CDATA and comments are taken as written.
-      const hasReferences = tokenizer.kind === Token.TEXT;
-      const lineEndFlags = tokenizer.isReplacementText ? 0 : ScanFlag.CR | ScanFlag.NEL;
-      const flags = tokenizer.valueFlags & (lineEndFlags | (hasReferences ? ScanFlag.REFERENCE : 0));
+      const hasReferences = tokenizer.kind === TEXT_TOKEN;
+      const lineEndFlags = tokenizer.isReplacementText ? 0 : CR_FLAG | NEL_FLAG;
+      const flags = tokenizer.valueFlags & (lineEndFlags | (hasReferences ? REFERENCE_FLAG : 0));
       if (flags === 0) return text;
       // Replacement text's line ends were normalized when its entity was declared.
       const normalized = tokenizer.isReplacementText ? text : normalizeLineEnds(text, tokenizer.version11);
-      return (flags & ScanFlag.REFERENCE) === 0 ? normalized : decodeReferences(normalized);
+      return (flags & REFERENCE_FLAG) === 0 ? normalized : decodeReferences(normalized);
     }
-    case Token.DOCTYPE: {
+    case DOCTYPE_TOKEN: {
       return tokenizer.buffer.slice(tokenizer.tokenStart, tokenizer.nextTokenStart);
     }
     default: {
@@ -41,7 +45,7 @@ export function tokenText(tokenizer: Tokenizer): string {
  */
 export function piData(tokenizer: Tokenizer, copyStrings: boolean): string {
   const data = tokenizer.buffer.slice(tokenizer.valueStart, tokenizer.valueEnd);
-  if (tokenizer.isReplacementText || (tokenizer.valueFlags & (ScanFlag.CR | ScanFlag.NEL)) === 0)
+  if (tokenizer.isReplacementText || (tokenizer.valueFlags & (CR_FLAG | NEL_FLAG)) === 0)
     return copyStrings ? copyString(data) : data;
   return normalizeLineEnds(data, tokenizer.version11);
 }

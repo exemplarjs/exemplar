@@ -29,6 +29,21 @@ import {
 import { type CanonicalAttribute, Canonicalizer, type CanonicalXMLMethod } from './render.ts';
 import { type CanonicalNode, isNode, TreeCanonicalizer } from './tree.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  END_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+  NEED_INPUT,
+} = EventType;
+
 /** The canonical forms: Canonical XML 1.0 and 1.1, Exclusive Canonicalization, and the XML suite's first and second forms. */
 export type CanonicalMethod = 'c14n' | 'c14n11' | 'exc-c14n' | 'suite-first' | 'suite-second';
 
@@ -116,7 +131,7 @@ export async function canonicalizeAsync(
     const reader = isReader(input) ? (input as StreamReader) : readerFor(input, options, 'async');
     // The form needs the document's encoding and version, known once its start is read.
     // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
-    for (; reader.eventType() === EventType.NEED_INPUT; reader.next()) await reader.fill();
+    for (; reader.eventType() === NEED_INPUT; reader.next()) await reader.fill();
     text = await formOf(reader, method, options, 'async').writeAsync();
   }
   return options.output === 'bytes' ? new TextEncoder().encode(text) : text;
@@ -203,16 +218,16 @@ class CanonicalXML extends Canonicalizer {
   /** Reads the document, or the element, to its end and returns its canonical form. */
   write(): string {
     const input = this.#input;
-    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) this.#writeEvent(event);
+    for (let event = this.#first(); event !== END_DOCUMENT; event = input.next()) this.#writeEvent(event);
     return this.output;
   }
 
   /** As `write`, waiting for input as it is needed. */
   async writeAsync(): Promise<string> {
     const input = this.#input;
-    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) {
+    for (let event = this.#first(); event !== END_DOCUMENT; event = input.next()) {
       // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
-      if (event === EventType.NEED_INPUT) await this.#reader.fill();
+      if (event === NEED_INPUT) await this.#reader.fill();
       else this.#writeEvent(event);
     }
     return this.output;
@@ -231,34 +246,34 @@ class CanonicalXML extends Canonicalizer {
   #writeEvent(event: EventType): void {
     const reader = this.#reader;
     switch (event) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         this.#startElement();
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         this.#endElement();
         break;
       }
-      case EventType.CHARACTERS:
-      case EventType.CDATA:
-      case EventType.SPACE: {
+      case CHARACTERS:
+      case CDATA:
+      case SPACE: {
         // Only inside the root: the input passes over whitespace outside it.
         this.writeCharacters(reader.text());
         break;
       }
-      case EventType.COMMENT: {
+      case COMMENT: {
         if (this.keepsComments) this.#writeCommentOrPI(this.commentMarkup(reader.text()));
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         this.#writeCommentOrPI(this.piMarkup(reader.piTarget(), reader.piData()));
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         if (!cursorOf(reader)[DTD_COMPLETE]) fail(reader, ErrorCode.C14N_UNREAD, 'Part of the DTD could not be read');
         break;
       }
-      case EventType.ENTITY_REFERENCE: {
+      case ENTITY_REFERENCE: {
         fail(reader, ErrorCode.C14N_UNREAD, `The entity ${reader.name()} could not be read`);
         break;
       }
@@ -354,16 +369,16 @@ class SuiteForm {
   /** Reads the document to its end and returns its form; the forms are of whole documents only. */
   write(): string {
     const input = this.#input;
-    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) this.#writeEvent(event);
+    for (let event = this.#first(); event !== END_DOCUMENT; event = input.next()) this.#writeEvent(event);
     return this.#form();
   }
 
   /** As `write`, waiting for input as it is needed. */
   async writeAsync(): Promise<string> {
     const input = this.#input;
-    for (let event = this.#first(); event !== EventType.END_DOCUMENT; event = input.next()) {
+    for (let event = this.#first(); event !== END_DOCUMENT; event = input.next()) {
       // eslint-disable-next-line no-await-in-loop -- input arrives in order, each chunk before the next
-      if (event === EventType.NEED_INPUT) await this.#reader.fill();
+      if (event === NEED_INPUT) await this.#reader.fill();
       else this.#writeEvent(event);
     }
     return this.#form();
@@ -388,26 +403,26 @@ class SuiteForm {
   #writeEvent(event: EventType): void {
     const reader = this.#reader;
     switch (event) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         this.#startElement();
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         this.#output += `</${reader.name()}>`;
         break;
       }
-      case EventType.CHARACTERS:
-      case EventType.CDATA:
-      case EventType.SPACE: {
+      case CHARACTERS:
+      case CDATA:
+      case SPACE: {
         // Only inside the root: the input passes over whitespace outside it.
         this.#output += this.#escape(reader.text());
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         this.#output += `<?${reader.piTarget()} ${reader.piData()}?>`;
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         const doctype = reader.doctype();
         for (const { target, data } of doctype.processingInstructions) this.#output += `<?${target} ${data}?>`;
         for (const { name, publicId, systemId } of doctype.notations) this.#notations.set(name, { publicId, systemId });

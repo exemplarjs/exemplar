@@ -21,6 +21,20 @@ import {
   type XMLEvent,
 } from './events.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  END_DOCUMENT,
+  ENTITY_REFERENCE,
+  CDATA,
+} = EventType;
+
 /**
  * Makes event objects, as StAX's `XMLEventFactory` does, the same as those an event reader gives.
  * A generator that changes a document's events makes new ones with it:
@@ -48,12 +62,12 @@ export class XMLEventFactory {
   /** The start of a document, with what its XML declaration would say. */
   createStartDocument(encoding?: string, version?: string, standalone?: boolean): StartDocumentEvent {
     const details = { version, encoding, standalone };
-    return this.#event(EventType.START_DOCUMENT, undefined, '', details) as StartDocumentEvent;
+    return this.#event(START_DOCUMENT, undefined, '', details) as StartDocumentEvent;
   }
 
   /** The end of a document. */
   createEndDocument(): EndDocumentEvent {
-    return this.#event(EventType.END_DOCUMENT, undefined, '') as EndDocumentEvent;
+    return this.#event(END_DOCUMENT, undefined, '') as EndDocumentEvent;
   }
 
   /** A start tag, by name or by prefix, namespace URI and local name, with its attributes and the namespaces it declares. */
@@ -81,7 +95,7 @@ export class XMLEventFactory {
     const attributes = (byName ? second : fourth) as Iterable<Attribute> | undefined;
     const namespaces = (byName ? third : fifth) as Iterable<Namespace> | undefined;
     return this.#event(
-      EventType.START_ELEMENT,
+      START_ELEMENT,
       name,
       '',
       undefined,
@@ -108,7 +122,7 @@ export class XMLEventFactory {
     const name = byName ? first : new QName(second as string, third as string, first);
     const namespaces = (byName ? second : fourth) as Iterable<Namespace> | undefined;
     return this.#event(
-      EventType.END_ELEMENT,
+      END_ELEMENT,
       name,
       '',
       undefined,
@@ -137,32 +151,32 @@ export class XMLEventFactory {
 
   /** Text. */
   createCharacters(text: string): CharactersEvent {
-    return this.#event(EventType.CHARACTERS, undefined, text) as CharactersEvent;
+    return this.#event(CHARACTERS, undefined, text) as CharactersEvent;
   }
 
   /** A CDATA section. */
   createCData(text: string): CharactersEvent {
-    return this.#event(EventType.CDATA, undefined, text) as CharactersEvent;
+    return this.#event(CDATA, undefined, text) as CharactersEvent;
   }
 
   /** Whitespace in element content, which only a validator can tell apart from text. */
   createIgnorableSpace(text: string): CharactersEvent {
-    return this.#event(EventType.SPACE, undefined, text) as CharactersEvent;
+    return this.#event(SPACE, undefined, text) as CharactersEvent;
   }
 
   /** A comment. */
   createComment(text: string): CommentEvent {
-    return this.#event(EventType.COMMENT, undefined, text) as CommentEvent;
+    return this.#event(COMMENT, undefined, text) as CommentEvent;
   }
 
   /** A processing instruction. */
   createProcessingInstruction(target: string, data: string): ProcessingInstructionEvent {
-    return this.#event(EventType.PROCESSING_INSTRUCTION, target, data) as ProcessingInstructionEvent;
+    return this.#event(PROCESSING_INSTRUCTION, target, data) as ProcessingInstructionEvent;
   }
 
   /** A reference to an entity that is not expanded; `text` is its replacement text, when known. */
   createEntityReference(name: string, text = ''): EntityReferenceEvent {
-    return this.#event(EventType.ENTITY_REFERENCE, name, text) as EntityReferenceEvent;
+    return this.#event(ENTITY_REFERENCE, name, text) as EntityReferenceEvent;
   }
 
   /** An event, where `setLocation` last put them. */

@@ -23,10 +23,13 @@ export const EventType = {
   END_ENTITY: 259,
 } as const;
 
+// Module-level constants, so V8 can inline them; an object's members are read again on every use.
+const { CHARACTERS, SPACE, CDATA } = EventType;
+
 /** One of the event types. */
 export type EventType = (typeof EventType)[keyof typeof EventType];
 
 /** Whether an event is character data: text, CDATA or ignorable whitespace. */
 export function isCharacterData(event: EventType): boolean {
-  return event === EventType.CHARACTERS || event === EventType.CDATA || event === EventType.SPACE;
+  return event === CHARACTERS || event === CDATA || event === SPACE;
 }

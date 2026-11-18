@@ -6,6 +6,23 @@ import type { EntityListener } from './internal.ts';
 import type { StreamFilter, StreamReader } from './stream-reader.ts';
 import type { DocumentValidator } from './validation.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  END_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+  NEED_INPUT,
+  START_ENTITY,
+  END_ENTITY,
+} = EventType;
+
 /** An entity's start or end, reported as an event with `reportEntityBoundaries`. */
 interface Boundary {
   readonly type: typeof EventType.START_ENTITY | typeof EventType.END_ENTITY;
@@ -105,7 +122,7 @@ export class EventProcessing {
     for (;;) {
       let event = this.#coalescing ? this.#nextCoalesced() : this.#nextForCaller();
       if (this.validation !== undefined) event = this.#showToValidator(event);
-      if (this.#filters === undefined || event === EventType.NEED_INPUT || event === EventType.END_DOCUMENT) {
+      if (this.#filters === undefined || event === NEED_INPUT || event === END_DOCUMENT) {
         return event;
       }
       if (this.#accepts(event)) return event;
@@ -168,7 +185,7 @@ export class EventProcessing {
   /** The next event the caller sees; the events of an expansion only the validator sees go to it alone. */
   #nextForCaller(): EventType {
     let event = this.#nextWithBoundaries();
-    while (this.validatorOnlyDepth !== 0 && event !== EventType.NEED_INPUT) {
+    while (this.validatorOnlyDepth !== 0 && event !== NEED_INPUT) {
       this.#showToValidator(event);
       event = this.#nextWithBoundaries();
     }
@@ -179,7 +196,7 @@ export class EventProcessing {
   entityStarted(name: string): void {
     if (this.validatorOnlyDepth !== 0) return;
     this.listener?.startEntity(name);
-    this.#boundaries?.push({ type: EventType.START_ENTITY, name });
+    this.#boundaries?.push({ type: START_ENTITY, name });
   }
 
   /** Tells the listener that an entity's expansion has ended, and queues the boundary, located after the reference, when it is reported. */
@@ -189,7 +206,7 @@ export class EventProcessing {
     if (this.#boundaries === undefined) return;
     const referring = entities.current;
     const location = entities.locationIn(referring, referring.nextTokenStart);
-    this.#boundaries.push({ type: EventType.END_ENTITY, name, location });
+    this.#boundaries.push({ type: END_ENTITY, name, location });
   }
 
   /** The next event with coalescing on: a run of text, CDATA and entity text becomes one CHARACTERS event, and the event after it is held back. */
@@ -200,18 +217,18 @@ export class EventProcessing {
     let event = this.#nextForCaller();
     let text = this.#pendingText;
     if (text === undefined) {
-      if (event !== EventType.CHARACTERS && event !== EventType.CDATA) return event;
+      if (event !== CHARACTERS && event !== CDATA) return event;
       core.event = event;
       text = reader.text();
       this.#pendingLocation = reader.location();
       event = this.#nextForCaller();
     }
-    while (event === EventType.CHARACTERS || event === EventType.CDATA) {
+    while (event === CHARACTERS || event === CDATA) {
       core.event = event;
       text += reader.text();
       event = this.#nextForCaller();
     }
-    if (event === EventType.NEED_INPUT) {
+    if (event === NEED_INPUT) {
       this.#pendingText = text;
       return event;
     }
@@ -219,7 +236,7 @@ export class EventProcessing {
     this.#heldEvent = event;
     core.literalText = text;
     this.textLocation = this.#pendingLocation;
-    return EventType.CHARACTERS;
+    return CHARACTERS;
   }
 
   /** Reports the event held back behind merged text. */
@@ -235,17 +252,17 @@ export class EventProcessing {
   #showToValidator(event: EventType): EventType {
     const validation = this.validation as DocumentValidator;
     this.#core.event = event;
-    if (event === EventType.CHARACTERS || event === EventType.CDATA) {
+    if (event === CHARACTERS || event === CDATA) {
       // The validator sees every text event; character data it calls ignorable becomes SPACE.
-      if (validation.text(event) && event === EventType.CHARACTERS) return EventType.SPACE;
+      if (validation.text(event) && event === CHARACTERS) return SPACE;
       return event;
     }
-    if (event === EventType.START_ELEMENT) validation.startElement();
-    else if (event === EventType.END_ELEMENT) validation.endElement();
-    else if (event === EventType.DTD) validation.dtd();
-    else if (event === EventType.END_DOCUMENT) validation.endDocument();
-    else if (event === EventType.COMMENT || event === EventType.PROCESSING_INSTRUCTION) validation.markup(event);
-    else if (event === EventType.ENTITY_REFERENCE) validation.markup(event);
+    if (event === START_ELEMENT) validation.startElement();
+    else if (event === END_ELEMENT) validation.endElement();
+    else if (event === DTD) validation.dtd();
+    else if (event === END_DOCUMENT) validation.endDocument();
+    else if (event === COMMENT || event === PROCESSING_INSTRUCTION) validation.markup(event);
+    else if (event === ENTITY_REFERENCE) validation.markup(event);
     return event;
   }
 }

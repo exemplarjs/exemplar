@@ -42,6 +42,12 @@ import type { AsyncStreamReader, StreamReader as PublicStreamReader } from './re
 import { doctypeOf, piData, tokenText } from './token-values.ts';
 import type { ValidationContext } from './validation.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { START_ELEMENT, END_ELEMENT, CHARACTERS, SPACE, END_DOCUMENT, ENTITY_REFERENCE, CDATA, START_ENTITY } =
+  EventType;
+const { TEXT: TEXT_TOKEN } = Token;
+const { CR: CR_FLAG, NEL: NEL_FLAG, REFERENCE: REFERENCE_FLAG } = ScanFlag;
+
 // Keys of the private methods: symbols rather than #names, which V8 optimizes less well on the hot path.
 const VALIDATION_CONTEXT: unique symbol = Symbol('validationContext');
 const AS_RETURNED: unique symbol = Symbol('asReturned');
@@ -56,7 +62,7 @@ const FAILED: unique symbol = Symbol('failed');
 const LOCATION_AT: unique symbol = Symbol('locationAt');
 
 /** The ScanFlag bits that mean character data needs normalizing before it is returned: line ends and references. */
-const TEXT_NEEDS_NORMALIZING = ScanFlag.CR | ScanFlag.NEL | ScanFlag.REFERENCE;
+const TEXT_NEEDS_NORMALIZING = CR_FLAG | NEL_FLAG | REFERENCE_FLAG;
 
 /** The DOCTYPE's declarations, as the DTD event reports them. */
 export interface Doctype {
@@ -214,7 +220,7 @@ export class StreamReader {
       namespaceAware: this.#options.namespaceAware,
       standalone: () => this.#entities.document.declaration?.standalone === true,
       textHasReferences: () =>
-        this.#core.literalText === undefined && (this.#core.tokenizer.valueFlags & ScanFlag.REFERENCE) !== 0,
+        this.#core.literalText === undefined && (this.#core.tokenizer.valueFlags & REFERENCE_FLAG) !== 0,
       error: (code, message, location) =>
         this.#errors.error(
           code,
@@ -296,7 +302,7 @@ export class StreamReader {
 
   /** Whether there are more events after this one. */
   hasNext(): boolean {
-    return this.#core.event !== EventType.END_DOCUMENT && !this.#core.failed;
+    return this.#core.event !== END_DOCUMENT && !this.#core.failed;
   }
 
   /** The current event's type. */
@@ -327,15 +333,15 @@ export class StreamReader {
   /** The depth of the element the current START_ELEMENT or END_ELEMENT is about, or -1 for any other event. */
   private [CURRENT_ELEMENT_DEPTH](): number {
     const event = this.#core.event;
-    if (event === EventType.START_ELEMENT || event === EventType.END_ELEMENT) return this.#elements.depth - 1;
+    if (event === START_ELEMENT || event === END_ELEMENT) return this.#elements.depth - 1;
     return -1;
   }
 
   /** The current element's qualified name, or the entity's name for ENTITY_REFERENCE. */
   name(): string {
     const core = this.#core;
-    if (core.event === EventType.ENTITY_REFERENCE) return this.#expander.name;
-    if (core.event >= EventType.START_ENTITY) return this.#processing.boundaryName;
+    if (core.event === ENTITY_REFERENCE) return this.#expander.name;
+    if (core.event >= START_ENTITY) return this.#processing.boundaryName;
     const elementDepth = this[CURRENT_ELEMENT_DEPTH]();
     return elementDepth < 0 ? '' : this[AS_RETURNED](this.#elements.nameAt(elementDepth, this.#core.tokenizer));
   }
@@ -343,8 +349,8 @@ export class StreamReader {
   /** The current element's local name, read from the open element without going through name(). */
   localName(): string {
     const event = this.#core.event;
-    if (event === EventType.START_ELEMENT) return this[AS_RETURNED](this[START_LOCAL_NAME]());
-    if (event !== EventType.END_ELEMENT) return this.name();
+    if (event === START_ELEMENT) return this[AS_RETURNED](this[START_LOCAL_NAME]());
+    if (event !== END_ELEMENT) return this.name();
     const elementDepth = this.#elements.depth - 1;
     const name = this[AS_RETURNED](this.#elements.nameAt(elementDepth, this.#core.tokenizer));
     const colon = this.#options.namespaceAware ? (this.#elements.nameFirstColons[elementDepth] as number) : -1;
@@ -399,7 +405,7 @@ export class StreamReader {
 
   /** How many attributes the current start tag has, without `xmlns` attributes unless `namespacePrefixes` is on. */
   attributeCount(): number {
-    return this.#core.event === EventType.START_ELEMENT ? this.#attributes.count(this.#core.tokenizer) : 0;
+    return this.#core.event === START_ELEMENT ? this.#attributes.count(this.#core.tokenizer) : 0;
   }
 
   /**
@@ -407,8 +413,7 @@ export class StreamReader {
    * `xmlns` attributes are hidden. Throws a RangeError unless `attributeIndex` is an integer below attributeCount().
    */
   private [TAG_ATTRIBUTE_INDEX](attributeIndex: number): number {
-    if (this.#core.event !== EventType.START_ELEMENT || !isIndex(attributeIndex))
-      return outOfRange('Attribute', attributeIndex);
+    if (this.#core.event !== START_ELEMENT || !isIndex(attributeIndex)) return outOfRange('Attribute', attributeIndex);
     return this.#attributes.tagIndexOf(this.#core.tokenizer, attributeIndex);
   }
 
@@ -458,9 +463,9 @@ export class StreamReader {
     const tokenizer = core.tokenizer;
     // Plain text, with no entity or merged text, line ends, references or copying, needs none of the general path.
     const plain =
-      tokenizer.kind === Token.TEXT &&
+      tokenizer.kind === TEXT_TOKEN &&
       core.literalText === undefined &&
-      core.event !== EventType.ENTITY_REFERENCE &&
+      core.event !== ENTITY_REFERENCE &&
       (tokenizer.valueFlags & TEXT_NEEDS_NORMALIZING) === 0 &&
       !this.#copyStrings;
     if (!plain) return this[AS_RETURNED](this[GENERAL_TEXT]());
@@ -474,7 +479,7 @@ export class StreamReader {
   private [GENERAL_TEXT](): string {
     const core = this.#core;
     if (core.literalText !== undefined) return core.literalText;
-    if (core.event === EventType.ENTITY_REFERENCE) return this.#expander.text;
+    if (core.event === ENTITY_REFERENCE) return this.#expander.text;
     return tokenText(this.#core.tokenizer);
   }
 
@@ -483,8 +488,8 @@ export class StreamReader {
     const { event, literalText, tokenizer } = this.#core;
     if (literalText !== undefined) return isAllWhitespace(literalText);
     return (
-      event === EventType.SPACE ||
-      ((event === EventType.CHARACTERS || event === EventType.CDATA) &&
+      event === SPACE ||
+      ((event === CHARACTERS || event === CDATA) &&
         isWhitespaceSpan(tokenizer.buffer, tokenizer.valueStart, tokenizer.valueEnd, tokenizer.version11))
     );
   }

@@ -25,6 +25,9 @@ const ENTITY_FLAG = ScanFlag.ENTITY;
 /** What an attribute is to namespaces; the values are bits, so the kinds a start tag holds can be or-ed together. */
 const AttributeKind = { PLAIN: 0, DECLARATION: 1, PREFIXED: 2, XMLID: 4 } as const;
 
+// Module-level constants, so V8 can inline them; an object's members are read again on every use.
+const { PLAIN: PLAIN_KIND, DECLARATION: DECLARATION_KIND, PREFIXED: PREFIXED_KIND, XMLID: XMLID_KIND } = AttributeKind;
+
 /** Reports a recoverable error at an index in the tokenizer's buffer. */
 type Report = (code: ErrorCode, message: string, index: number) => void;
 
@@ -134,12 +137,12 @@ export class AttributeCollector {
           ? plainKind(buffer, start, tokenizer.attributeNameEnd[i] as number)
           : prefixedKind(buffer, start, colon);
       present |= kind;
-      if (kind === (AttributeKind.PREFIXED | AttributeKind.XMLID)) {
+      if (kind === (PREFIXED_KIND | XMLID_KIND)) {
         this.#xmlIdCandidate = i;
-        kind = AttributeKind.PREFIXED;
+        kind = PREFIXED_KIND;
       }
       this.#kinds[i] = kind;
-      if (kind !== AttributeKind.DECLARATION) this.#visible[visibleCount++] = i;
+      if (kind !== DECLARATION_KIND) this.#visible[visibleCount++] = i;
     }
     this.#visibleCount = visibleCount;
     return present;
@@ -149,21 +152,21 @@ export class AttributeCollector {
   #resolveNamespaces(tokenizer: Tokenizer, elementDepth: number): void {
     const scopes = this.#scopes;
     const present = this.#classify(tokenizer);
-    const declarations = (present & AttributeKind.DECLARATION) !== 0;
+    const declarations = (present & DECLARATION_KIND) !== 0;
     if (declarations) {
       scopes.markBindings(elementDepth);
       this.#declareAll(tokenizer);
     }
     if (tokenizer.nameFirstColon >= 0) scopes.bindElement(tokenizer, elementDepth);
-    if ((present & AttributeKind.PREFIXED) !== 0) this.#resolveAttributes(tokenizer, elementDepth);
+    if ((present & PREFIXED_KIND) !== 0) this.#resolveAttributes(tokenizer, elementDepth);
     this.#declarationsHidden = declarations && !this.#options.namespacePrefixes;
-    if ((present & AttributeKind.XMLID) !== 0) this.#checkSpanXmlId(tokenizer, elementDepth);
+    if ((present & XMLID_KIND) !== 0) this.#checkSpanXmlId(tokenizer, elementDepth);
   }
 
   /** Applies the start tag's `xmlns` declarations, binding their prefixes. */
   #declareAll(tokenizer: Tokenizer): void {
     for (let i = 0; i < tokenizer.attributeCount; i++) {
-      if (this.#kinds[i] !== AttributeKind.DECLARATION) continue;
+      if (this.#kinds[i] !== DECLARATION_KIND) continue;
       const normalized =
         ((tokenizer.attributeFlags[i] as number) & VALUE_FLAGS) === 0 ? undefined : spanValue(tokenizer, i);
       this.#scopes.declareFromAttribute(tokenizer, i, normalized);
@@ -182,7 +185,7 @@ export class AttributeCollector {
   #resolveAttributes(tokenizer: Tokenizer, elementDepth: number): void {
     const count = tokenizer.attributeCount;
     for (let i = 0; i < count; i++) {
-      if (this.#kinds[i] !== AttributeKind.PREFIXED) continue;
+      if (this.#kinds[i] !== PREFIXED_KIND) continue;
       const start = tokenizer.attributeNameStart[i] as number;
       const colon = tokenizer.attributeFirstColon[i] as number;
       checkQName(
@@ -216,8 +219,8 @@ export class AttributeCollector {
 
   /** Whether two attributes that are not declarations are in the same namespace. */
   #sameUri(tokenizer: Tokenizer, first: number, second: number): boolean {
-    const firstBinding = this.#kinds[first] === AttributeKind.PREFIXED ? (this.#bindings[first] as number) : -1;
-    const secondBinding = this.#kinds[second] === AttributeKind.PREFIXED ? (this.#bindings[second] as number) : -1;
+    const firstBinding = this.#kinds[first] === PREFIXED_KIND ? (this.#bindings[first] as number) : -1;
+    const secondBinding = this.#kinds[second] === PREFIXED_KIND ? (this.#bindings[second] as number) : -1;
     return (
       firstBinding === secondBinding ||
       (firstBinding >= 0 && secondBinding >= 0 && this.#uriOf(tokenizer, first) === this.#uriOf(tokenizer, second))
@@ -232,9 +235,9 @@ export class AttributeCollector {
       return;
     }
     for (let i = 1; i < count; i++) {
-      if (this.#kinds[i] === AttributeKind.DECLARATION) continue;
+      if (this.#kinds[i] === DECLARATION_KIND) continue;
       for (let j = 0; j < i; j++) {
-        if (this.#kinds[j] !== AttributeKind.DECLARATION && this.#sameExpanded(tokenizer, i, j))
+        if (this.#kinds[j] !== DECLARATION_KIND && this.#sameExpanded(tokenizer, i, j))
           this.#failExpandedDuplicate(tokenizer, i);
       }
     }
@@ -244,7 +247,7 @@ export class AttributeCollector {
   #checkExpandedDuplicatesByHash(tokenizer: Tokenizer): void {
     const seen = new Set<string>();
     for (let i = 0; i < tokenizer.attributeCount; i++) {
-      if (this.#kinds[i] === AttributeKind.DECLARATION) continue;
+      if (this.#kinds[i] === DECLARATION_KIND) continue;
       const key = `${this.#uriOf(tokenizer, i)}\u0000${this.#localOf(tokenizer, i)}`;
       if (seen.has(key)) this.#failExpandedDuplicate(tokenizer, i);
       seen.add(key);
@@ -413,23 +416,23 @@ export class AttributeCollector {
   #uriOf(tokenizer: Tokenizer, tagIndex: number): string {
     if (!this.#options.namespaceAware) return '';
     const kind = this.#kinds[tagIndex];
-    if (kind === AttributeKind.DECLARATION) return XMLNS_NAMESPACE;
-    if (kind !== AttributeKind.PREFIXED) return '';
+    if (kind === DECLARATION_KIND) return XMLNS_NAMESPACE;
+    if (kind !== PREFIXED_KIND) return '';
     return this.#scopes.bindings.uri(this.#bindings[tagIndex] as number, tokenizer.buffer, tokenizer.bufferOffset);
   }
 }
 
 /** What an attribute without a prefix is to namespaces: `xmlns` declares one. */
 function plainKind(buffer: string, start: number, end: number): number {
-  if (end - start === XMLNS_LENGTH && holdsAt(buffer, start, 'xmlns')) return AttributeKind.DECLARATION;
-  return AttributeKind.PLAIN;
+  if (end - start === XMLNS_LENGTH && holdsAt(buffer, start, 'xmlns')) return DECLARATION_KIND;
+  return PLAIN_KIND;
 }
 
 /** What a prefixed attribute is to namespaces: `xmlns:` declares one, and `xml:id` is marked as well. */
 function prefixedKind(buffer: string, start: number, colon: number): number {
-  if (colon - start === XMLNS_LENGTH && holdsAt(buffer, start, 'xmlns')) return AttributeKind.DECLARATION;
+  if (colon - start === XMLNS_LENGTH && holdsAt(buffer, start, 'xmlns')) return DECLARATION_KIND;
   const xmlId = colon - start === XML_LENGTH && holdsAt(buffer, start, 'xml:id');
-  return xmlId ? AttributeKind.PREFIXED | AttributeKind.XMLID : AttributeKind.PREFIXED;
+  return xmlId ? PREFIXED_KIND | XMLID_KIND : PREFIXED_KIND;
 }
 
 /** An attribute's qualified name, by its index in the start tag. */

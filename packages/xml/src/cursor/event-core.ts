@@ -19,6 +19,33 @@ import { fail } from './internal.ts';
 import type { NamespaceScopes } from './namespace-scopes.ts';
 import { tokenText } from './token-values.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  END_DOCUMENT,
+  DTD,
+  CDATA,
+  NEED_INPUT,
+} = EventType;
+const {
+  START_TAG: START_TAG_TOKEN,
+  END_TAG: END_TAG_TOKEN,
+  TEXT: TEXT_TOKEN,
+  CDATA: CDATA_TOKEN,
+  COMMENT: COMMENT_TOKEN,
+  PI: PI_TOKEN,
+  DOCTYPE: DOCTYPE_TOKEN,
+  ENTITY_REFERENCE: ENTITY_REFERENCE_TOKEN,
+  NEED_INPUT: NEED_INPUT_TOKEN,
+} = Token;
+const { REFERENCE: REFERENCE_FLAG, ENTITY: ENTITY_FLAG } = ScanFlag;
+
 // Keys of the private methods: symbols rather than #names, which V8 optimizes less well on the hot path.
 const CHECK_ENCODING: unique symbol = Symbol('checkEncoding');
 const ADVANCE_AFTER: unique symbol = Symbol('advanceAfter');
@@ -101,7 +128,7 @@ export class EventCore {
   readonly #validating: boolean;
 
   /** The current event, which the reader's accessors describe. */
-  event: EventType = EventType.START_DOCUMENT;
+  event: EventType = START_DOCUMENT;
   /** The tokenizer being read: the entity stack's current one, kept here because every token reads it. */
   tokenizer: Tokenizer;
   /** The document offset where the current event's token starts, in the text `tokenizer` reads. */
@@ -139,7 +166,7 @@ export class EventCore {
     this.#validating = parts.validating;
     this.tokenizer = parts.entities.current;
     if (async) {
-      this.event = EventType.NEED_INPUT;
+      this.event = NEED_INPUT;
       this.#resumeToken = RESUME_START;
     }
   }
@@ -162,7 +189,7 @@ export class EventCore {
 
   /** Reads tokens until one makes an event, and returns it; first finishes what the last event left to do. */
   advance(): EventType {
-    if (this.event === EventType.END_DOCUMENT || this.literalText !== undefined || this.#resumeToken !== 0) {
+    if (this.event === END_DOCUMENT || this.literalText !== undefined || this.#resumeToken !== 0) {
       return this[ADVANCE_AFTER]();
     }
     if (this.#leavePending) this[LEAVE_ELEMENT]();
@@ -173,7 +200,7 @@ export class EventCore {
   /** Moves on from the end of the document, an entity's text, or a token that waited for a resolver. */
   private [ADVANCE_AFTER](): EventType {
     if (this.#resumeToken === RESUME_FAILED) throw this.#endedBy;
-    if (this.event === EventType.END_DOCUMENT) throw ErrorFactory.create(IllegalStateError, 'There are no more events');
+    if (this.event === END_DOCUMENT) throw ErrorFactory.create(IllegalStateError, 'There are no more events');
     if (this.literalText !== undefined) this[END_LITERAL]();
     if (this.#resumeToken !== 0) {
       const event = this[RESUME_OR_START]();
@@ -184,7 +211,7 @@ export class EventCore {
 
   /** As in StAX, a call that fails leaves the reader at its last event, so an element whose end it was comes back. */
   recover(): void {
-    if (this.event === EventType.END_ELEMENT && !this.#leavePending && this.#elements.justLeft) this[REENTER_ELEMENT]();
+    if (this.event === END_ELEMENT && !this.#leavePending && this.#elements.justLeft) this[REENTER_ELEMENT]();
   }
 
   /** Whether an error has ended the document. */
@@ -211,7 +238,7 @@ export class EventCore {
       this.offset = tokenizer.bufferOffset + tokenizer.tokenStart;
       const event = this[TO_EVENT](kind);
       if (event === undefined) continue;
-      if (this.#entities.depth > 0 && event !== EventType.NEED_INPUT) this.#expander.countNode();
+      if (this.#entities.depth > 0 && event !== NEED_INPUT) this.#expander.countNode();
       return event;
     }
   }
@@ -222,11 +249,11 @@ export class EventCore {
     if (kind === RESUME_START) {
       if (!this.begin()) return this.#input.needInput();
       this.#resumeToken = 0;
-      return EventType.START_DOCUMENT;
+      return START_DOCUMENT;
     }
     this.#resumeToken = 0;
     const event = this[TO_EVENT](kind);
-    if (event !== undefined && this.#entities.depth > 0 && event !== EventType.NEED_INPUT) this.#expander.countNode();
+    if (event !== undefined && this.#entities.depth > 0 && event !== NEED_INPUT) this.#expander.countNode();
     return event;
   }
 
@@ -247,34 +274,34 @@ export class EventCore {
     this.#selfClosedEndPending = false;
     this.#leavePending = true;
     if (this.#entities.depth > 0) this.#expander.countNode();
-    return EventType.END_ELEMENT;
+    return END_ELEMENT;
   }
 
   /** Turns a token into an event, or undefined for whitespace outside the root that is not reported. */
   private [TO_EVENT](kind: number): EventType | undefined {
-    if (kind === Token.TEXT) return this[TEXT_EVENT]();
-    if (kind === Token.START_TAG) return this[START_TAG_EVENT]();
-    if (kind === Token.END_TAG) return this[END_TAG_EVENT]();
+    if (kind === TEXT_TOKEN) return this[TEXT_EVENT]();
+    if (kind === START_TAG_TOKEN) return this[START_TAG_EVENT]();
+    if (kind === END_TAG_TOKEN) return this[END_TAG_EVENT]();
     return this[OTHER_EVENT](kind);
   }
 
   /** Turns a token other than text and tags into an event. */
   private [OTHER_EVENT](kind: number): EventType | undefined {
-    if (kind === Token.COMMENT) return EventType.COMMENT;
-    if (kind === Token.CDATA) {
+    if (kind === COMMENT_TOKEN) return COMMENT;
+    if (kind === CDATA_TOKEN) {
       if (this.#elements.depth === 0)
         this[FAIL](ErrorCode.WF_CONTENT_OUTSIDE_ROOT, 'CDATA is not allowed outside the root element');
-      return EventType.CDATA;
+      return CDATA;
     }
-    if (kind === Token.PI) {
+    if (kind === PI_TOKEN) {
       if (this.#options.namespaceAware && this.tokenizer.nameColonCount > 0) {
         this[FAIL](ErrorCode.NS_COLON, 'A processing instruction target must not contain a colon');
       }
-      return EventType.PROCESSING_INSTRUCTION;
+      return PROCESSING_INSTRUCTION;
     }
-    if (kind === Token.ENTITY_REFERENCE) return this[REFERENCE_EVENT]();
-    if (kind === Token.DOCTYPE) return this[DOCTYPE_EVENT]();
-    return kind === Token.NEED_INPUT ? this.#input.needInput() : this[END_OF_INPUT]();
+    if (kind === ENTITY_REFERENCE_TOKEN) return this[REFERENCE_EVENT]();
+    if (kind === DOCTYPE_TOKEN) return this[DOCTYPE_EVENT]();
+    return kind === NEED_INPUT_TOKEN ? this.#input.needInput() : this[END_OF_INPUT]();
   }
 
   /** Character data inside the root, or whitespace outside it. */
@@ -282,14 +309,14 @@ export class EventCore {
     if (this.#elements.depth === 0) return this[TEXT_OUTSIDE_ROOT]();
     const tokenizer = this.tokenizer;
     if (this.#options.checkNormalization && tokenizer.version11) this[CHECK_NORMALIZED](tokenText(tokenizer));
-    return EventType.CHARACTERS;
+    return CHARACTERS;
   }
 
   /** Whitespace outside the root, which is reported only when asked for; anything else fails. */
   private [TEXT_OUTSIDE_ROOT](): EventType | undefined {
     const tokenizer = this.tokenizer;
     if (
-      (tokenizer.valueFlags & ScanFlag.REFERENCE) !== 0 ||
+      (tokenizer.valueFlags & REFERENCE_FLAG) !== 0 ||
       !isWhitespaceSpan(tokenizer.buffer, tokenizer.valueStart, tokenizer.valueEnd, tokenizer.version11)
     ) {
       this[FAIL](
@@ -297,7 +324,7 @@ export class EventCore {
         'Only whitespace, comments and processing instructions may appear outside the root element'
       );
     }
-    return this.#options.reportPrologWhitespace ? EventType.SPACE : undefined;
+    return this.#options.reportPrologWhitespace ? SPACE : undefined;
   }
 
   /** Reports, once, text that is not fully normalized (XML 1.1 §2.13). */
@@ -324,10 +351,10 @@ export class EventCore {
     const store = this.store;
     const declared =
       store.attributes.size > 0 ? store.attributes.get(this.#elements.nameAt(elementDepth, tokenizer)) : undefined;
-    const listed = declared !== undefined || (tokenizer.allAttributeFlags & ScanFlag.ENTITY) !== 0 || this.#validating;
+    const listed = declared !== undefined || (tokenizer.allAttributeFlags & ENTITY_FLAG) !== 0 || this.#validating;
     this.#attributes.read(tokenizer, elementDepth, listed, declared);
     this.#selfClosedEndPending = tokenizer.selfClosing;
-    return EventType.START_ELEMENT;
+    return START_ELEMENT;
   }
 
   /** Throws for a start tag after the root element, or one past the depth or attribute limits. */
@@ -353,7 +380,7 @@ export class EventCore {
       this[FAIL_END_TAG](elementDepth);
     }
     this.#leavePending = true;
-    return EventType.END_ELEMENT;
+    return END_ELEMENT;
   }
 
   /** Throws for an end tag with no start tag, one that closes an element an entity didn't open, or one that doesn't match. */
@@ -392,9 +419,9 @@ export class EventCore {
     if (this.#options.disallowDoctype) {
       this[FAIL](ErrorCode.DOCTYPE_DISALLOWED, 'This parser does not accept a DOCTYPE');
     }
-    if (!this[READ_DTD]()) return this[AWAIT_RESOLVER](Token.DOCTYPE);
+    if (!this[READ_DTD]()) return this[AWAIT_RESOLVER](DOCTYPE_TOKEN);
     this.#doctypeRead = true;
-    return EventType.DTD;
+    return DTD;
   }
 
   /** Reads the DTD; an asynchronous reader reads it again each time a resolver answers, and returns false while one has yet to. */
@@ -423,7 +450,7 @@ export class EventCore {
       );
     }
     this.#entities.document.lines.finish();
-    return EventType.END_DOCUMENT;
+    return END_DOCUMENT;
   }
 
   /** A reference in content, which the expander expands or reports; NEED_INPUT waits for a resolver and reads it again. */
@@ -434,8 +461,8 @@ export class EventCore {
     } finally {
       this.tokenizer = this.#entities.current;
     }
-    if (event === EventType.CHARACTERS) this.literalText = this.#expander.literalText;
-    return event === EventType.NEED_INPUT ? this[AWAIT_RESOLVER](Token.ENTITY_REFERENCE) : event;
+    if (event === CHARACTERS) this.literalText = this.#expander.literalText;
+    return event === NEED_INPUT ? this[AWAIT_RESOLVER](ENTITY_REFERENCE_TOKEN) : event;
   }
 
   /** Reads on around an entity whose text has ended; the reference to it comes now if only the validator saw it expand. */

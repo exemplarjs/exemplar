@@ -2,6 +2,9 @@ import { EventType, type ResolvedSource, type StreamReader, XMLInputFactory } fr
 import { escapeAndResolveURI, XML_NAMESPACE } from '@exemplarjs/xml/internal';
 import { CATALOG_NAMESPACE, normalizePublicId, normalizeURI } from './normalize.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { START_ELEMENT, END_ELEMENT, END_DOCUMENT } = EventType;
+
 /** A rewrite entry: identifiers starting with `startString` start with `rewritePrefix` instead. */
 export interface Rewrite {
   readonly startString: string;
@@ -187,9 +190,9 @@ export function readCatalogFile(source: ResolvedSource, uri: string, preferPubli
   try {
     const reader = FACTORY.createStreamReader({ ...source, systemId: base });
     const scopes: Scope[] = [];
-    for (let event = reader.next(); event !== EventType.END_DOCUMENT; event = reader.next()) {
-      if (event === EventType.END_ELEMENT) scopes.pop();
-      if (event !== EventType.START_ELEMENT) continue;
+    for (let event = reader.next(); event !== END_DOCUMENT; event = reader.next()) {
+      if (event === END_ELEMENT) scopes.pop();
+      if (event !== START_ELEMENT) continue;
       const isRoot = scopes.length === 0;
       if (isRoot && (reader.namespaceURI() !== CATALOG_NAMESPACE || reader.localName() !== 'catalog')) return undefined;
       scopes.push(readElement(reader, isRoot ? { base, preferPublic } : (scopes.at(-1) as Scope), file, isRoot));

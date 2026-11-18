@@ -10,6 +10,20 @@ import {
 import { doctypeDeclaration } from './escape.ts';
 import type { StreamWriter } from './stream-writer.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  ELEMENT_NODE,
+  ATTRIBUTE_NODE,
+  TEXT_NODE,
+  CDATA_SECTION_NODE,
+  ENTITY_REFERENCE_NODE,
+  PROCESSING_INSTRUCTION_NODE,
+  COMMENT_NODE,
+  DOCUMENT_NODE,
+  DOCUMENT_TYPE_NODE,
+  DOCUMENT_FRAGMENT_NODE,
+} = NodeType;
+
 /** The parts of a DOM node the writer reads, so that any DOM Level 2 tree can be written. */
 export interface WritableNode extends NodeLike<WritableNode> {
   readonly prefix: string | null;
@@ -45,16 +59,16 @@ export function writeNode(writer: StreamWriter, node: WritableNode, namespaceAwa
 /** Writes a node, or the start of one that holds children; true when its children are to be written next. */
 function writeStart(writer: StreamWriter, node: WritableNode, namespaceAware: boolean): boolean {
   switch (node.nodeType) {
-    case NodeType.ELEMENT_NODE: {
+    case ELEMENT_NODE: {
       if (namespaceAware) writeStartTag(writer, node);
       else writeNamedStartTag(writer, node);
       return true;
     }
-    case NodeType.DOCUMENT_NODE: {
+    case DOCUMENT_NODE: {
       writer.writeStartDocument(node.xmlVersion ?? '1.0', undefined, node.xmlStandalone === true ? true : undefined);
       return true;
     }
-    case NodeType.DOCUMENT_FRAGMENT_NODE: {
+    case DOCUMENT_FRAGMENT_NODE: {
       return true;
     }
     default: {
@@ -67,28 +81,28 @@ function writeStart(writer: StreamWriter, node: WritableNode, namespaceAware: bo
 /** Writes a node whose children, if it has any, are not written: character data, a reference, a PI, a comment or a DOCTYPE. */
 function writeLeaf(writer: StreamWriter, node: WritableNode): void {
   switch (node.nodeType) {
-    case NodeType.ATTRIBUTE_NODE:
-    case NodeType.TEXT_NODE: {
+    case ATTRIBUTE_NODE:
+    case TEXT_NODE: {
       writer.writeCharacters(node.nodeValue ?? '');
       break;
     }
-    case NodeType.CDATA_SECTION_NODE: {
+    case CDATA_SECTION_NODE: {
       writer.writeCData(node.nodeValue ?? '');
       break;
     }
-    case NodeType.ENTITY_REFERENCE_NODE: {
+    case ENTITY_REFERENCE_NODE: {
       writer.writeEntityRef(node.nodeName);
       break;
     }
-    case NodeType.PROCESSING_INSTRUCTION_NODE: {
+    case PROCESSING_INSTRUCTION_NODE: {
       writer.writeProcessingInstruction(node.nodeName, node.nodeValue ?? '');
       break;
     }
-    case NodeType.COMMENT_NODE: {
+    case COMMENT_NODE: {
       writer.writeComment(node.nodeValue ?? '');
       break;
     }
-    case NodeType.DOCUMENT_TYPE_NODE: {
+    case DOCUMENT_TYPE_NODE: {
       writer.writeDTD(doctype(node));
       break;
     }
@@ -101,8 +115,8 @@ function writeLeaf(writer: StreamWriter, node: WritableNode): void {
 
 /** Ends an element or a document once its children are written. */
 function writeEnd(writer: StreamWriter, node: WritableNode): void {
-  if (node.nodeType === NodeType.ELEMENT_NODE) writer.writeEndElement();
-  else if (node.nodeType === NodeType.DOCUMENT_NODE) writer.writeEndDocument();
+  if (node.nodeType === ELEMENT_NODE) writer.writeEndElement();
+  else if (node.nodeType === DOCUMENT_NODE) writer.writeEndDocument();
 }
 
 /** A DOCTYPE from a document type node. */
@@ -121,7 +135,7 @@ function declaredURI(node: WritableNode, prefix: string): string {
   const name = declarationName(prefix);
   for (
     let element: WritableNode | null = node;
-    element !== null && element.nodeType === NodeType.ELEMENT_NODE;
+    element !== null && element.nodeType === ELEMENT_NODE;
     element = element.parentNode
   ) {
     const declaration = attributesOf(element).find((attr) => attr.nodeName === name);

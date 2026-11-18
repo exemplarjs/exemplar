@@ -2,6 +2,7 @@ import { isNameCharBmp, isNameStartCharBmp, NAME_CLASSES, NAME_LAST, NameClass }
 import { Char, Unicode } from './chars.ts';
 
 // Module-level constants, so V8 can inline them.
+const { NONE: NOT_IN_NAMES, NAME_CHAR, NAME_START_CHAR } = NameClass;
 const { NON_ASCII } = Char;
 const { SUPPLEMENTARY_FIRST } = Unicode;
 
@@ -43,20 +44,20 @@ function isAsciiNameOrToken(text: string, nameStartFirst: boolean): boolean {
     const char = text.charCodeAt(i);
     if (char >= NON_ASCII) return false;
     const kind = NAME_CLASSES[char] as number;
-    if (kind === NameClass.NONE || (i === 0 && nameStartFirst && kind === NameClass.NAME_CHAR)) return false;
+    if (kind === NOT_IN_NAMES || (i === 0 && nameStartFirst && kind === NAME_CHAR)) return false;
   }
   return true;
 }
 
 /** Whether a code point is a NameStartChar (§2.3 [4]), which may start a name. */
 export function isNameStartChar(codePoint: number): boolean {
-  if (codePoint < NON_ASCII) return (NAME_CLASSES[codePoint] as number) >= NameClass.NAME_START_CHAR;
+  if (codePoint < NON_ASCII) return (NAME_CLASSES[codePoint] as number) >= NAME_START_CHAR;
   return codePoint >= SUPPLEMENTARY_FIRST ? codePoint <= NAME_LAST : isNameStartCharBmp(codePoint);
 }
 
 /** Whether a code point is a NameChar (§2.3 [4a]), which may appear in a name after its first character. */
 export function isNameChar(codePoint: number): boolean {
-  if (codePoint < NON_ASCII) return (NAME_CLASSES[codePoint] as number) !== NameClass.NONE;
+  if (codePoint < NON_ASCII) return (NAME_CLASSES[codePoint] as number) !== NOT_IN_NAMES;
   return codePoint >= SUPPLEMENTARY_FIRST ? codePoint <= NAME_LAST : isNameCharBmp(codePoint);
 }
 
