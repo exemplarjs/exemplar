@@ -21,6 +21,11 @@ jobs:
   test:
     name: Tests on ${{ matrix.target }}
     runs-on: ubuntu-26.04
+    # The browser jobs run in Playwright's image, which has the system libraries; apt on the runner is slow and stalls.
+    container:
+      ${{ matrix.browser &&
+      fromJSON('{"image":"mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe","options":"--init
+      --ipc=host"}') || null }}
     strategy:
       fail-fast: false
       matrix:
@@ -45,8 +50,14 @@ jobs:
         with:
           bun: ${{ matrix.bun || false }}
       - if: matrix.browser
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - run: ${{ matrix.command }}
+        run: pnpm exec playwright install ${{ matrix.browser }}
+      - if: ${{ !matrix.browser }}
+        run: ${{ matrix.command }}
+      # Firefox will not start when the container's HOME is not owned by the current user.
+      - if: ${{ matrix.browser }}
+        env:
+          HOME: /root
+        run: ${{ matrix.command }}
       - if: matrix.target == 'Node'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
