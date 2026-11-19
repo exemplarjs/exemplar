@@ -160,12 +160,13 @@ jobs:
       - uses: ./exemplar/.github/actions/setup-tests
         with:
           java: true
-      - name: Conformance, for the report's correctness columns
+      - name: Score every library, for the report's conformance columns
         working-directory: exemplar-tests
-        run: pnpm conformance
+        run: pnpm --filter @exemplarjs/conformance exec node src/cli.ts
+      # The bench script sets the heap limit and exposes the garbage collector.
       - name: Full benchmark matrix
         working-directory: exemplar-tests
-        run: pnpm --filter @exemplarjs/bench exec node --expose-gc src/index.ts full
+        run: pnpm --filter @exemplarjs/bench bench full
       # The benchmark report, as exemplar-docs publishes it.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
