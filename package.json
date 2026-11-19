@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "clean:output": "pnpm -r run clean:output && rimraf .turbo coverage api",
+    "clean:output": "pnpm -r --no-sort run clean:output && rimraf .turbo coverage api",
     "typecheck": "turbo run typecheck",
     "compile": "turbo run compile",
     "test": "turbo run compile && vitest run",

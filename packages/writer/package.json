@@ -1,9 +1,17 @@
 {
   "name": "@exemplarjs/writer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "XML stream and event writers, following StAX, and their sinks",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",
+  "keywords": [
+    "xml",
+    "writer",
+    "builder",
+    "serializer",
+    "stax",
+    "streaming"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/exemplarjs/exemplar.git",

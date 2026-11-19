@@ -1,9 +1,14 @@
 {
   "name": "@exemplarjs/xinclude",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "XInclude 1.0 for @exemplarjs/xml, with XPointer's element() scheme and shorthand pointers",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",
+  "keywords": [
+    "xml",
+    "xinclude",
+    "xpointer"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/exemplarjs/exemplar.git",

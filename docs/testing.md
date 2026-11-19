@@ -40,13 +40,14 @@ type-checks every sample and the `examples` package.
 2. The full benchmark matrix, on the fixed machine, starts when `checks` passes, so that a broken change never uses it.
 3. `publish` runs on `main` once they pass, after a reviewer approves the `release` environment. It publishes every
    package, then tags the commit and creates the GitHub release.
-4. `docs-report` opens a pull request on exemplar-docs that adds the benchmark report for the version, using a GitHub
-   App's token held in the `docs` environment.
+4. `docs-release`, which is `docs-release.yaml`, opens a pull request on exemplar-docs that adds the benchmark report
+   for the version, using a GitHub App's token held in the `docs` environment. It can also be started by hand with a
+   version and the release run's ID, for a report that failed or needs adding again.
 
 Its inputs: `dry-run` runs from any branch and changes nothing outside the run: `publish-dry-run` stands in for
-`publish` with `pnpm publish --dry-run`, and `docs-report` stops at a local commit. `skip-extended` and
+`publish` with `pnpm publish --dry-run`, and `docs-release` stops at a local commit. `skip-extended` and
 `skip-benchmarks` leave out the long jobs or the benchmarks. A real release runs from `main` only, and the skips are for
-dry runs only. The `docs` environment decides which branches may run `docs-report`.
+dry runs only. The `docs` environment decides which branches may run `docs-release`.
 
 exemplar-tests and exemplar-docs are checked out on the branch named like the pull request, or on `main` when they have
 none, and run on this checkout's build. Their own pull requests check only their own format, lint and links.
