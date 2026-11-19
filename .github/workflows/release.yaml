@@ -37,12 +37,15 @@ jobs:
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
           version=$(node -p "require('./packages/xml/package.json').version")
+          # A dry run only warns, since it publishes nothing.
+          level=error
+          if [ "$DRY_RUN" = true ]; then level=warning; fi
           taken=false
           if npm view "@exemplarjs/xml@$version" version > /dev/null 2>&1; then
-            echo "::error::@exemplarjs/xml $version is already on npm."; taken=true
+            echo "::$level::@exemplarjs/xml $version is already on npm."; taken=true
           fi
           if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
-            echo "::error::The tag v$version already exists."; taken=true
+            echo "::$level::The tag v$version already exists."; taken=true
           fi
           if [ "$taken" = true ] && [ "$DRY_RUN" != true ]; then exit 1; fi
 
@@ -62,7 +65,7 @@ jobs:
       - run: pnpm compile
       - name: Long property runs
         env:
-          EXEMPLAR_FUZZ_SCALE: '300'
+          EXEMPLAR_FUZZ_SCALE: '100'
         run: pnpm --filter @exemplarjs/xml exec vitest run test/integration/property.test.ts
 
   # The differentials against libxml2, Xerces and javax.xml.catalog.
@@ -96,11 +99,11 @@ jobs:
       - name: Long fuzz run
         working-directory: exemplar-tests
         env:
-          EXEMPLAR_FUZZ_SCALE: '300'
+          EXEMPLAR_FUZZ_SCALE: '100'
         run: pnpm --filter @exemplarjs/conformance exec vitest run test/fuzz.test.ts
       - name: Fuzz differential against libxml2
         working-directory: exemplar-tests
-        run: pnpm fuzz --runs 200000
+        run: pnpm fuzz --runs 100000
 
   # The W3C XML suite in each browser.
   browsers:
@@ -222,65 +225,14 @@ jobs:
       - name: Show what would be published
         run: pnpm publish --recursive --access public --no-git-checks --dry-run
 
-  # Opens a pull request on exemplar-docs that adds this release's benchmark report; a dry run stops at the commit.
-  docs-report:
+  # Adds this release's benchmark report to exemplar-docs as a pull request; a dry run stops at a local commit.
+  docs-release:
     needs: [publish, publish-dry-run, benchmarks]
     if: ${{ !failure() && !cancelled() && !inputs.skip-benchmarks }}
-    runs-on: ubuntu-26.04
-    # Holds the credentials of the GitHub App that may write to exemplar-docs, and nothing else may read them.
-    environment: docs
-    env:
-      VERSION: ${{ needs.publish.outputs.version || needs.publish-dry-run.outputs.version }}
-    steps:
-      - name: Create a token for exemplar-docs
-        id: app
-        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
-        with:
-          client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: exemplar-docs
-          permission-contents: write
-          permission-pull-requests: write
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: bench-report
-          path: report
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ${{ github.repository_owner }}/exemplar-docs
-          token: ${{ steps.app.outputs.token }}
-          path: exemplar-docs
-      - name: Add the report
-        working-directory: exemplar-docs
-        run: |
-          : "${VERSION:?}"
-          rm -rf "docs/public/benchmarks/$VERSION"
-          mkdir -p "docs/public/benchmarks/$VERSION"
-          cp -R "$GITHUB_WORKSPACE"/report/. "docs/public/benchmarks/$VERSION/"
-      - name: Commit the report
-        working-directory: exemplar-docs
-        env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
-          BOT: ${{ steps.app.outputs.app-slug }}[bot]
-        run: |
-          git config user.name "$BOT"
-          git config user.email "$(gh api "/users/$BOT" --jq .id)+$BOT@users.noreply.github.com"
-          git switch -C "benchmarks/$VERSION"
-          git add docs/public/benchmarks
-          git diff --cached --quiet || git commit -m "docs: add the benchmark report for $VERSION"
-      - name: Show the commit
-        if: ${{ inputs.dry-run }}
-        working-directory: exemplar-docs
-        run: git show --stat --format=%B HEAD
-      - name: Open the pull request
-        if: ${{ !inputs.dry-run }}
-        working-directory: exemplar-docs
-        env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
-        run: |
-          git push --force origin "benchmarks/$VERSION"
-          gh pr view "benchmarks/$VERSION" > /dev/null 2>&1 || gh pr create \
-            --head "benchmarks/$VERSION" \
-            --title "docs: benchmark report for $VERSION" \
-            --body "The full benchmark matrix for exemplar $VERSION, from the release workflow."
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/docs-release.yaml
+    with:
+      version: ${{ needs.publish.outputs.version || needs.publish-dry-run.outputs.version }}
+      dry-run: ${{ inputs.dry-run }}

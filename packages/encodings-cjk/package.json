@@ -1,9 +1,22 @@
 {
   "name": "@exemplarjs/encodings-cjk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Japanese, Chinese and Korean decoders for @exemplarjs/xml",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",
+  "keywords": [
+    "xml",
+    "encoding",
+    "charset",
+    "cjk",
+    "shift-jis",
+    "euc-jp",
+    "iso-2022-jp",
+    "euc-kr",
+    "big5",
+    "gbk",
+    "gb2312"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/exemplarjs/exemplar.git",

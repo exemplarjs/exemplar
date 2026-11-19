@@ -8,11 +8,10 @@ The complete XML stack for JavaScript and TypeScript, and the best one. Everythi
 DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
-  [W3C conformance suites](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/testing.md), for XML or for
-  XPath.
+  [W3C conformance suites](https://exemplar.l47.net/reference/conformance), for XML or for XPath.
 - **The fastest.** Ahead of every other JavaScript XML library in
-  [the benchmarks](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
-  trees, querying and writing, with every check left on.
+  [the benchmarks](https://exemplar.l47.net/benchmarks/), for reading, building trees, querying and writing, with every
+  check left on.
 - **The best XPath in JavaScript.** A complete XPath 3.1 processor, compiled for speed, with typed variables your editor
   checks.
 - **Every standard that matters.** Full DTD support and validation, namespaces, XML 1.1, XInclude, catalogs, Canonical
@@ -175,8 +174,8 @@ On an Apple M3 Max with Node 24, reading every name, attribute and text, buildin
 | OpenStack manuals                        | 190 MB/s | 114 MB/s, 46 MB held  | 139 MB/s |
 | XMark, factors 0.1 and 1                 | 273 MB/s | 126 MB/s, 715 MB held | 237 MB/s |
 
-The [benchmarks](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md) also run on each release
-on a fixed Linux machine, on documents as published: internal subsets, entity references, eight encodings and all.
+The [benchmarks](https://exemplar.l47.net/benchmarks/) also run on each release on a fixed Linux machine, on documents
+as published: internal subsets, entity references, eight encodings and all.
 
 ## See also
 

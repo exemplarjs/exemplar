@@ -292,7 +292,7 @@ export function localTimezone(): number {
  */
 export function timezoneFromOption(zone: number | string | undefined): number {
   if (zone === undefined) return localTimezone();
-  let minutes: number | undefined = undefined;
+  let minutes: number | undefined;
   if (typeof zone === 'number') minutes = zone;
   else if (/^(?:Z|[+-]\d{2}:\d{2})$/.test(zone)) minutes = timezoneMinutes(zone);
   if (minutes === undefined || !isTimezone(minutes))

@@ -1,9 +1,16 @@
 {
   "name": "@exemplarjs/canonical",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Canonical XML 1.0 and 1.1 and Exclusive Canonicalization for @exemplarjs/xml",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",
+  "keywords": [
+    "xml",
+    "c14n",
+    "canonical",
+    "canonicalization",
+    "exclusive-c14n"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/exemplarjs/exemplar.git",

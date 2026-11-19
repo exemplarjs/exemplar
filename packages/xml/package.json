@@ -1,9 +1,22 @@
 {
   "name": "@exemplarjs/xml",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A fast, W3C-conformant XML reader for TypeScript",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",
+  "keywords": [
+    "xml",
+    "parser",
+    "sax",
+    "stax",
+    "streaming",
+    "namespaces",
+    "dtd",
+    "validator",
+    "entities",
+    "resolver",
+    "w3c"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/exemplarjs/exemplar.git",
