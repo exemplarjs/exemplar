@@ -1,5 +1,5 @@
 import { HANDLER_METHODS, recorder } from '@test/helpers/recorder';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { XMLError } from '@exemplarjs/xml';
 import { type Attributes, type SAXHandler, SAXParser, XMLFilterImpl } from '@/index';
 
@@ -39,6 +39,9 @@ const ARGUMENTS: Readonly<Record<string, readonly unknown[]>> = {
 function call(handler: SAXHandler, name: string, args: readonly unknown[]): void {
   (handler as Record<string, (...a: unknown[]) => void>)[name]?.(...args);
 }
+
+/** Every handler method, each of which a filter passes on. */
+const EVERY_METHOD: readonly (keyof SAXHandler)[] = [...HANDLER_METHODS, 'startElement', 'setDocumentLocator'];
 
 /** How many filters the chain tests stack. */
 const CHAIN_LENGTH = 4;
@@ -179,20 +182,19 @@ describe('XMLFilterImpl (SAX2 XMLFilterImpl)', () => {
     );
   });
 
-  it.each([...HANDLER_METHODS, 'startElement', 'setDocumentLocator'])(
-    'reaches the handler for %s in one call, however many filters pass it on',
-    (name) => {
-      let filterFrames = 0;
-      const handler = {
-        [name]: () => {
-          const frames = (new Error('frames').stack ?? '').split('\n');
-          filterFrames = frames.filter((frame) => frame.includes(`XMLFilterImpl.${name} `)).length;
-        },
-      };
+  it.each(EVERY_METHOD)('reaches the handler for %s in one call, however many filters pass it on', (name) => {
+    // Spied on before the chain is made, so the filters still see each other as only passing on.
+    const passOn = vi.spyOn(XMLFilterImpl.prototype, name);
+    try {
+      let reached = 0;
+      const handler = { [name]: () => reached++ };
       call(chainAround(handler), name, ARGUMENTS[name] ?? []);
-      expect(filterFrames).toBe(1);
+      expect(reached).toBe(1);
+      expect(passOn).toHaveBeenCalledTimes(1);
+    } finally {
+      passOn.mockRestore();
     }
-  );
+  });
 
   it('passes on through a chain linked from the outside in', () => {
     const outer = new XMLFilterImpl();
