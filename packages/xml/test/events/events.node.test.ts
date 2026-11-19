@@ -4,8 +4,22 @@ import { describe, expect, it } from 'vitest';
 import { createFilteredReader } from '@/filters/index';
 import { EventType, type XMLEvent, XMLInputFactory } from '@/index';
 
-setFlagsFromString('--expose-gc');
-const collectGarbage = runInNewContext('gc') as () => void;
+/** The engine's garbage collector; undefined on a runtime that does not expose it. */
+function exposedCollector(): (() => void) | undefined {
+  const bun = (globalThis as { Bun?: { gc(force: boolean): void } }).Bun;
+  if (bun !== undefined) return () => bun.gc(true);
+  try {
+    setFlagsFromString('--expose-gc');
+    return runInNewContext('gc') as () => void;
+  } catch {
+    return undefined;
+  }
+}
+
+const collector = exposedCollector();
+const collectGarbage = collector ?? (() => undefined);
+/** Whether to skip: these tests measure what a collection frees, so they need the collector. */
+const hasNoCollector = collector === undefined;
 
 /** The size of the comment that fills the document's one chunk. */
 const PADDING_LENGTH = 16 * 1024 * 1024;
@@ -40,7 +54,7 @@ function keptFromStartTag(pick: (event: StartElement) => string): string {
   return kept;
 }
 
-describe('event objects and the input they were read from', () => {
+describe.skipIf(hasNoCollector)('event objects and the input they were read from', () => {
   it.each<[string, (event: StartElement) => string]>([
     ['an element’s prefix', (event) => event.name.prefix],
     ['an element’s local name', (event) => event.name.localName],
@@ -56,7 +70,7 @@ describe('event objects and the input they were read from', () => {
   });
 });
 
-describe('an event reader behind a filter that drops every end tag', () => {
+describe.skipIf(hasNoCollector)('an event reader behind a filter that drops every end tag', () => {
   it('does not keep what the start tags declared', async () => {
     const factory = new XMLInputFactory();
     const cursor = factory.createStreamReader('<r><e xmlns:p="urn:p"/><e/><e/></r>');

@@ -59,13 +59,18 @@ export function fail(tokenizer: Tokenizer, code: ErrorCode, message: string, ind
   throw scanError(code, index, message);
 }
 
-/** The shortest slice V8 keeps as a view of its parent string; it copies shorter ones itself. */
-const SLICED_LENGTH = 13;
-
 /**
- * Copies a string so that it no longer holds the input chunk it was sliced from. A slice of 13 or
- * more characters is a view of its parent, which keeps the parent's memory alive.
+ * Copies a string so that it no longer holds the input chunk it was sliced from. A slice can be a view
+ * of its parent, which keeps the parent's memory alive: V8 makes one of 13 characters or more,
+ * JavaScriptCore of any length, so every string is copied.
  */
 export function copyString(text: string): string {
-  return text.length < SLICED_LENGTH ? text : (text + ' ').slice(0, -1);
+  if (text === '') return text;
+  // Joining gives a string that still refers to its parts, and JavaScriptCore slices straight through it.
+  const padded = text + ' ';
+  // Reading a character makes the engine write the joined string out, into memory apart from the input.
+  // eslint-disable-next-line no-ignored-return -- required to force engine to write joined string into memory
+  padded.charCodeAt(0);
+  // The slice is then a view of that copy, not of the input.
+  return padded.slice(0, -1);
 }

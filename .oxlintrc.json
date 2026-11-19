@@ -420,7 +420,7 @@
             "patterns": [
               {
                 "regex": "^(?:node:.+|assert|assert/strict|async_hooks|buffer|child_process|cluster|console|constants|crypto|dgram|diagnostics_channel|dns|dns/promises|domain|events|fs|fs/promises|http|http2|https|inspector|inspector/promises|module|net|os|path|path/posix|path/win32|perf_hooks|process|punycode|querystring|readline|readline/promises|repl|stream|stream/consumers|stream/promises|stream/web|string_decoder|sys|timers|timers/promises|tls|trace_events|tty|url|util|util/types|v8|vm|wasi|worker_threads|zlib)$",
-                "message": "exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
+                "message": "exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
               }
             ]
           }
@@ -429,32 +429,32 @@
           "error",
           {
             "name": "Buffer",
-            "message": "Buffer does not exist outside Node and Bun. Use Uint8Array. exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
+            "message": "Buffer does not exist outside Node and Bun. Use Uint8Array. exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
           },
           {
             "name": "__dirname",
-            "message": "exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
+            "message": "exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
           },
           {
             "name": "__filename",
-            "message": "exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
+            "message": "exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
           },
           {
             "name": "process",
-            "message": "exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
+            "message": "exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only. Runtime-specific code goes behind a dedicated subpath export."
           },
           {
             "name": "global",
-            "message": "Use globalThis. exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only."
+            "message": "Use globalThis. exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only."
           },
           {
             "name": "setImmediate",
-            "message": "exemplar runs on Node, Deno, Bun and browsers, so its source uses web-standard APIs only. Use queueMicrotask or setTimeout."
+            "message": "exemplar runs on Node, Bun and browsers, so its source uses web-standard APIs only. Use queueMicrotask or setTimeout."
           }
         ]
       }
     },
-    // The one runtime-specific subpath: @exemplarjs/xml/resolvers/file reads files with the Node API, which Deno and Bun share.
+    // The one runtime-specific subpath: @exemplarjs/xml/resolvers/file reads files with the Node API, which Bun shares.
     { "files": ["packages/xml/src/resolvers/file.ts"], "rules": { "no-restricted-imports": "off" } },
     // Runtime environment variables are not turbo inputs.
     {

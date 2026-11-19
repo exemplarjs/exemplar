@@ -18,16 +18,12 @@ import {
 } from '@/cursor/internal';
 
 describe('copyString', () => {
-  it('returns a short string as it is, since V8 copies short slices itself', () => {
+  it('returns an equal string, whatever its length', () => {
     expect(copyString('')).toBe('');
-    expect(copyString('twelve chars')).toBe('twelve chars');
-  });
-
-  it('returns an equal string for 13 characters or more', () => {
-    const long = 'x'.repeat(13);
-    expect(copyString(long)).toBe(long);
+    expect(copyString('x')).toBe('x');
     const sliced = `${'a'.repeat(100)}${'b'.repeat(100)}`.slice(50, 150);
     expect(copyString(sliced)).toBe(sliced);
+    expect(copyString(sliced.slice(48, 52))).toBe('aabb');
   });
 });
 

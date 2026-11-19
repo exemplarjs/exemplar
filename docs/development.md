@@ -93,9 +93,8 @@ running them.
 
 ## Conventions
 
-- **Web-standard APIs only** in the library's sources, so it runs on Node, Deno, Bun and in browsers. The lint
-  configuration forbids Node's modules and globals there; `@exemplarjs/xml/resolvers/file` alone may import Node's
-  modules.
+- **Web-standard APIs only** in the library's sources, so it runs on Node, Bun and in browsers. The lint configuration
+  forbids Node's modules and globals there; `@exemplarjs/xml/resolvers/file` alone may import Node's modules.
 - **TypeScript** is strict, with `erasableSyntaxOnly`: no `enum`, so constants are `const` objects. Sources import each
   other with their `.ts` extensions.
 - **Comments** are short: a one- or two-line JSDoc on each function, and brief inline comments where they help.
@@ -190,8 +189,9 @@ Hot modules copy the constants they test against into module-local constants, su
 
 ### Strings
 
-- **Slices keep their source alive.** A slice of 13 characters or more points into its parent string. To copy one,
-  append a character and slice it off again, which makes V8 flatten the string into memory of its own.
+- **Slices keep their source alive.** In V8 a slice of 13 characters or more points into its parent string; in
+  JavaScriptCore a slice of any length can. To copy one, use `copyString`: it appends a character, reads one so that the
+  engine writes the joined string into memory of its own, and slices the character off again.
 - **`+=` builds ropes,** which hold far more memory until flattened. Gather pieces in an array and join them once.
 - **Reading an appended string flattens it.** Code that checks new text after each small append looks at the new chunk,
   not the whole buffer.

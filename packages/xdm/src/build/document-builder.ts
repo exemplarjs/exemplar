@@ -15,6 +15,7 @@ import {
   EventDispatcher,
   isReader,
   ReaderInput,
+  sourceObjectOf,
   type StreamReader,
 } from '@exemplarjs/xml/internal';
 import { NameTable } from '@/names/name-table';
@@ -216,9 +217,8 @@ function documentNode(tree: Tree): XdmNode {
 
 /** How many nodes a source probably holds, when it is a string. */
 function expectedNodes(source: Source): number | undefined {
-  let text: unknown = source;
-  if (typeof source === 'object' && 'text' in source) text = source.text;
-  if (typeof text !== 'string') return undefined;
+  const text = typeof source === 'string' ? source : sourceObjectOf(source)?.text;
+  if (text === undefined) return undefined;
   return Math.ceil(text.length / CHARACTERS_PER_NODE);
 }
 

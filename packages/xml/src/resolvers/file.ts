@@ -17,7 +17,7 @@ export interface FileResolverOptions {
   readonly root: string;
 }
 
-/** Reads `file:` entities, DTDs and other resources below a root directory, as the access list allows, for Node, Deno and Bun. */
+/** Reads `file:` entities, DTDs and other resources below a root directory, as the access list allows, for Node and Bun. */
 export function fileResolver(options: FileResolverOptions): EntityResolver & URIResolver {
   const root = path.resolve(options.root);
   /** The file a URI names below the root, read, or undefined. */

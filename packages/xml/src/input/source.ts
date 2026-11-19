@@ -457,6 +457,12 @@ export function openAsyncSource(source: Source | undefined, registry: DecoderReg
   return { opened: { ...originOf(source), text }, queue, pump: streamPump(source.stream, queue) };
 }
 
+/** The source object a source is; undefined for a string, bytes, an iterable of chunks or a stream. */
+export function sourceObjectOf(source: Source | undefined): SourceObject | undefined {
+  if (source === undefined || isStream(source) || !isSourceObject(source)) return undefined;
+  return source;
+}
+
 /** Whether a source that is not a stream is a source object, rather than a string, bytes or an iterable of chunks. */
 function isSourceObject(source: Source): source is SourceObject {
   return typeof source === 'object' && !(source instanceof Uint8Array) && !hasMethod(source, Symbol.iterator);

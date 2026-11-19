@@ -19,6 +19,7 @@ import {
   type ResolvedOptions,
   resolverMissingError,
   resolveURI,
+  sourceObjectOf,
   unmatchedByCatalog,
 } from '@exemplarjs/xml/internal';
 
@@ -66,9 +67,10 @@ export interface Waiting {
 export function contentOf(source: Source | undefined): ResolvedSource | undefined {
   if (typeof source === 'string') return { text: source };
   if (source instanceof Uint8Array) return { bytes: source };
-  if (typeof source !== 'object') return undefined;
-  if ('text' in source && source.text !== undefined) return { text: source.text };
-  if ('bytes' in source && source.bytes !== undefined) return { bytes: source.bytes };
+  // A stream may have text and bytes methods of its own, so it is ruled out first.
+  const object = sourceObjectOf(source);
+  if (object?.text !== undefined) return { text: object.text };
+  if (object?.bytes !== undefined) return { bytes: object.bytes };
   return undefined;
 }
 

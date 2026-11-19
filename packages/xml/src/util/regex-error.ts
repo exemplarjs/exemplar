@@ -12,14 +12,15 @@ export class RegexError extends Error {
   readonly reason: string;
   /** The pattern, or the flags when they are at fault. */
   readonly pattern: string;
-  /** Where in the pattern the problem lies, counting characters (not code units) from 0; undefined for flags. */
+  /** Where in the pattern the problem lies, counting characters (not code units) from 0; undefined for flags or the whole pattern. */
   readonly index: number | undefined;
 
   constructor(kind: RegexErrorKind, reason: string, pattern: string, index: number | undefined) {
+    const where = index === undefined ? '' : ` at character ${index + 1}`;
     super(
       kind === 'invalid-flags'
         ? `Invalid regular expression flags "${pattern}": ${reason}`
-        : `Invalid regular expression "${pattern}" at character ${(index as number) + 1}: ${reason}`
+        : `Invalid regular expression "${pattern}"${where}: ${reason}`
     );
     this.name = 'RegexError';
     this.kind = kind;

@@ -5,7 +5,7 @@ interface FileSystem {
   readFileSync(path: URL): Uint8Array;
 }
 
-/** Reads a `file:` URI where the runtime has a file system, as Node, Deno and Bun do; undefined elsewhere. */
+/** Reads a `file:` URI where the runtime has a file system, as Node and Bun do; undefined elsewhere. */
 export function readLocalFile(uri: string): ResolvedSource | undefined {
   if (!uri.startsWith('file:')) return undefined;
   const runtime = globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } };

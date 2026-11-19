@@ -5,7 +5,7 @@ The XML reader at the heart of exemplar: fast, W3C-conformant, and DTD-aware.
 ## Why exemplar
 
 The complete XML stack for JavaScript and TypeScript, and the best one. Everything Java developers rely on in StAX, SAX,
-DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Deno, Bun and every modern browser.
+DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
   [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
@@ -120,7 +120,7 @@ for (let type = book.next(); type !== EventType.END_DOCUMENT; type = book.next()
 }
 ```
 
-`fileResolver({ root })` from `@exemplarjs/xml/resolvers/file` reads files below a root on Node, Deno and Bun, and
+`fileResolver({ root })` from `@exemplarjs/xml/resolvers/file` reads files below a root on Node and Bun, and
 `fetchResolver()` from `@exemplarjs/xml/resolvers` reads over HTTP in async readers.
 
 ### Filters
@@ -162,7 +162,7 @@ Every error is an `XMLError` with a stable `code`, a line, a column, an offset a
 | Canonical XML              | The recommendations' examples that need no XPath pass under C14N 1.0 and 1.1                                                  |
 | XML Catalogs               | Agrees with `javax.xml.catalog` but where the JDK departs from the OASIS specification                                        |
 
-The XML suite also runs on Deno and Bun, and in Chromium, Firefox and WebKit.
+The XML suite also runs on Bun, and in Chromium, Firefox and WebKit.
 
 ## Performance
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { translateRegex } from '@/util/regex';
 import { RegexError } from '@/util/regex-error';
 
@@ -13,7 +13,33 @@ function failure(pattern: string, flags: string, dialect: 'xpath' | 'xsd'): Rege
   throw new Error(`"${pattern}" translated`);
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('translateRegex', () => {
+  it('gives a pattern the engine refuses as an invalid pattern, and other failures unchanged', () => {
+    /** An engine with a limit the translation does not know, as some have on quantifiers. */
+    const refusing = (error: Error) =>
+      vi.stubGlobal(
+        'RegExp',
+        class {
+          constructor() {
+            throw error;
+          }
+        }
+      );
+    refusing(new SyntaxError('number too large in {} quantifier'));
+    const refused = failure('a{99999999999999999999}', '', 'xpath');
+    expect([refused.kind, refused.index, refused.message]).toEqual([
+      'invalid-pattern',
+      undefined,
+      'Invalid regular expression "a{99999999999999999999}": the JavaScript engine does not accept it (number too large in {} quantifier)',
+    ]);
+    refusing(new RangeError('out of memory'));
+    expect(() => translateRegex('a{88888888888888888888}', '', 'xpath')).toThrow(RangeError);
+  });
+
   it('translates XPath patterns, which match anywhere', () => {
     const { regex, groupCount, groupParents } = translateRegex('(a)(?:b)(c)', '', 'xpath');
     expect([regex.flags, groupCount, regex.test('xabcx')]).toEqual(['v', 2, true]);

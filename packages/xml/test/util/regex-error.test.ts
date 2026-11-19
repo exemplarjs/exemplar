@@ -15,6 +15,11 @@ describe('RegexError', () => {
     expect(error).toBeInstanceOf(Error);
   });
 
+  it('leaves out the character when the whole pattern is at fault', () => {
+    const error = new RegexError('invalid-pattern', 'the engine does not accept it', 'a{9}', undefined);
+    expect(error.message).toBe('Invalid regular expression "a{9}": the engine does not accept it');
+  });
+
   it('names the flags when they are at fault', () => {
     const error = new RegexError('invalid-flags', 'XML Schema patterns take no flags', 'i', undefined);
     expect(error.message).toBe('Invalid regular expression flags "i": XML Schema patterns take no flags');

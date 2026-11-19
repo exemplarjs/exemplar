@@ -100,6 +100,7 @@ describe('@exemplarjs/xml/internal', () => {
       'resolveTargetURI',
       'resolveURI',
       'resolverMissingError',
+      'sourceObjectOf',
       'splitQName',
       'splitWhitespace',
       'startsWithBytes',
