@@ -1,7 +1,7 @@
 import { recorder } from '@test/helpers/recorder';
 import { describe, expect, it } from 'vitest';
 import { type ErrorHandler, XMLError, XMLInputFactory } from '@exemplarjs/xml';
-import { type SAXHandler, SAXParser } from '@/index';
+import { type SAXHandler, SAXParser, XMLFilterImpl } from '@/index';
 
 /** A document with a recoverable error: a parameter entity that is not declared (VC: Entity Declared). */
 const RECOVERABLE = '<!DOCTYPE a [%p;]><a/>';
@@ -105,6 +105,34 @@ describe('errors through SAX (ErrorHandler)', () => {
     expect(() => parser.parse('<a>', handler)).toThrow(XMLError);
     expect(own).toEqual(['VC_ENTITY_DECLARED']);
     expect(heard).toEqual(['fatal WF_UNCLOSED_ELEMENT']);
+  });
+
+  it("falls back on the factory's error handler behind filters whose handler lacks the methods", () => {
+    const { handler: errorHandler, heard } = errorRecorder();
+    const parser = new SAXParser(new XMLInputFactory({ errorHandler }));
+    const filters = (): SAXHandler => new XMLFilterImpl(new XMLFilterImpl({}));
+    parser.parse(RECOVERABLE, filters());
+    parser.parse(WARNS, filters());
+    expect(() => parser.parse('<a>', filters())).toThrow(XMLError);
+    expect(heard).toEqual(['error VC_ENTITY_DECLARED', 'warning ENCODING_CONFLICT', 'fatal WF_UNCLOSED_ELEMENT']);
+  });
+
+  it("prefers a handler behind filters, and a filter that overrides a method, to the factory's", () => {
+    const { handler: errorHandler, heard } = errorRecorder();
+    const parser = new SAXParser(new XMLInputFactory({ errorHandler }));
+    const { handler, calls } = recorder(['error']);
+    parser.parse(RECOVERABLE, new XMLFilterImpl(new XMLFilterImpl(handler)));
+    const dropped: string[] = [];
+    class DropErrors extends XMLFilterImpl {
+      override error(error: XMLError) {
+        dropped.push(error.code);
+      }
+    }
+
+    parser.parse(RECOVERABLE, new XMLFilterImpl(new DropErrors()));
+    expect(calls).toEqual(['error(VC_ENTITY_DECLARED)']);
+    expect(dropped).toEqual(['VC_ENTITY_DECLARED']);
+    expect(heard).toEqual([]);
   });
 
   it('throws a fatal error a handler with no fatalError never hears of', () => {

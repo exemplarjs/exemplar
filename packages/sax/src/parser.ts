@@ -27,6 +27,7 @@ import {
   StreamReader,
 } from '@exemplarjs/xml/internal';
 import { NoXmlnsURIAttributes, ReaderAttributes } from './attributes.ts';
+import { XMLFilterImpl } from './filter.ts';
 import type { Locator, SAXHandler } from './handler.ts';
 
 // Module-level constants, so V8 can inline them; imported bindings are read again on every use.
@@ -217,11 +218,17 @@ class ErrorReporting {
   error: XMLError | undefined;
 }
 
+/** Whether a handler does something with one kind of error, looking past filters that would only pass it on. */
+function hears(handler: SAXHandler, name: keyof ErrorHandler): boolean {
+  const passesOn = handler instanceof XMLFilterImpl && handler[name] === XMLFilterImpl.prototype[name];
+  return passesOn ? hears(handler.handler, name) : handler[name] !== undefined;
+}
+
 /** The handler's error methods, each falling back on the factory's, with the error noted while each runs. */
 function errorHandlerFor(handler: SAXHandler, fallback: ErrorHandler, reporting: ErrorReporting): ErrorHandler {
   const combined: { -readonly [K in keyof ErrorHandler]: ErrorHandler[K] } = {};
   for (const name of ['warning', 'error', 'fatalError'] as const) {
-    const from = handler[name] === undefined ? fallback : handler;
+    const from = hears(handler, name) ? handler : fallback;
     if (from[name] === undefined) continue;
     combined[name] = (error: XMLError) => {
       reporting.error = error;
@@ -297,6 +304,10 @@ class ReaderDispatcher {
   readonly #openElementNames: string[] = [];
   /** How many elements are open. */
   #depth = 0;
+  /** The depth of the innermost open element that declares namespaces; 0 when none does. */
+  #mappedDepth = 0;
+  /** That depth for each declaring element further out, innermost last. */
+  readonly #outerMappedDepths: number[] = [];
   /** Whether XInclude may add declarations as it includes content. */
   readonly #including: boolean;
   /** How many of those declarations the handler has heard of. */
@@ -402,10 +413,9 @@ class ReaderDispatcher {
       handler.startElement?.('', '', qName, this.#attributes);
       return;
     }
-    if (handler.startPrefixMapping !== undefined) {
-      for (let i = 0; i < reader.namespaceCount(); i++) {
-        handler.startPrefixMapping(reader.namespacePrefix(i), reader.namespaceURI(i));
-      }
+    if (handler.startPrefixMapping !== undefined || handler.endPrefixMapping !== undefined) {
+      const declared = reader.namespaceCount();
+      if (declared > 0) this.#startPrefixMappings(declared);
     }
     const uri = reader.namespaceURI();
     const localName = reader.localName();
@@ -416,8 +426,7 @@ class ReaderDispatcher {
   /** Reports an end tag, then the end of the prefix mappings its start tag declared. */
   #endElement(): void {
     const handler = this.#handler;
-    const reader = this.reader;
-    this.#depth--;
+    const depth = this.#depth--;
     const open = this.#openElementNames;
     if (!this.#namespaceAware) {
       handler.endElement?.('', '', open.pop() as string);
@@ -426,9 +435,25 @@ class ReaderDispatcher {
     const qName = open.pop() as string;
     const localName = open.pop() as string;
     handler.endElement?.(open.pop() as string, localName, qName);
-    if (handler.endPrefixMapping !== undefined) {
-      for (let i = 0; i < reader.namespaceCount(); i++) handler.endPrefixMapping(reader.namespacePrefix(i));
-    }
+    if (depth === this.#mappedDepth) this.#endPrefixMappings();
+  }
+
+  /** Reports the prefix mappings a start tag declares, and notes its depth for its end tag. */
+  #startPrefixMappings(declared: number): void {
+    const handler = this.#handler;
+    const reader = this.reader;
+    this.#outerMappedDepths.push(this.#mappedDepth);
+    this.#mappedDepth = this.#depth;
+    for (let i = 0; i < declared; i++) handler.startPrefixMapping?.(reader.namespacePrefix(i), reader.namespaceURI(i));
+  }
+
+  /** Reports the end of the prefix mappings the element now ending declared. */
+  #endPrefixMappings(): void {
+    const handler = this.#handler;
+    const reader = this.reader;
+    this.#mappedDepth = this.#outerMappedDepths.pop() as number;
+    const declared = reader.namespaceCount();
+    for (let i = 0; i < declared; i++) handler.endPrefixMapping?.(reader.namespacePrefix(i));
   }
 
   /** Reports the declarations XInclude has added since the last start tag, as it includes the content naming them. */
