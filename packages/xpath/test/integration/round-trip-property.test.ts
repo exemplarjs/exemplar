@@ -5,7 +5,7 @@ import { printXPath } from '../helpers/print-syntax.ts';
 import { expression } from '../helpers/syntax-arbitraries.ts';
 import { shape } from '../helpers/syntax.ts';
 
-// The nightly run scales the number of runs up.
+// The release run scales the number of runs up.
 const SCALE = Number(globalThis.process?.env['EXEMPLAR_FUZZ_SCALE'] ?? 1);
 const RUNS = { numRuns: 1000 * SCALE };
 

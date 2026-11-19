@@ -1,0 +1,286 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Run everything from any branch, but publish nothing, tag nothing and push nothing to exemplar-docs.
+        type: boolean
+        default: false
+      skip-extended:
+        description: Skip the long property and fuzz runs, the differentials, the browser suite and QT3. Dry runs only.
+        type: boolean
+        default: false
+      skip-benchmarks:
+        description: Skip the benchmarks, and so the report for exemplar-docs. Dry runs only.
+        type: boolean
+        default: false
+
+# Every job only reads the repositories it checks out, unless it says otherwise.
+permissions:
+  contents: read
+
+jobs:
+  # Stops a release that cannot succeed before any time is spent on it.
+  guard:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: A real release runs from main
+        if: ${{ !inputs.dry-run && github.ref != 'refs/heads/main' }}
+        run: echo "::error::Only a dry run may run from a branch."; exit 1
+      - name: Skips are for dry runs
+        if: ${{ !inputs.dry-run && (inputs.skip-extended || inputs.skip-benchmarks) }}
+        run: echo "::error::Only a dry run may skip checks."; exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The version is new
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          version=$(node -p "require('./packages/xml/package.json').version")
+          taken=false
+          if npm view "@exemplarjs/xml@$version" version > /dev/null 2>&1; then
+            echo "::error::@exemplarjs/xml $version is already on npm."; taken=true
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "::error::The tag v$version already exists."; taken=true
+          fi
+          if [ "$taken" = true ] && [ "$DRY_RUN" != true ]; then exit 1; fi
+
+  # The checks every change passes, which the benchmarks wait for so that a broken change never uses the benchmark machine.
+  checks:
+    needs: guard
+    uses: ./.github/workflows/checks.yaml
+
+  # The long property runs.
+  properties:
+    needs: guard
+    if: ${{ !inputs.skip-extended }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm compile
+      - name: Long property runs
+        env:
+          EXEMPLAR_FUZZ_SCALE: '300'
+        run: pnpm --filter @exemplarjs/xml exec vitest run test/integration/property.test.ts
+
+  # The differentials against libxml2, Xerces and javax.xml.catalog.
+  differentials:
+    needs: guard
+    if: ${{ !inputs.skip-extended }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          java: true
+          xmllint: true
+      - name: Differentials
+        working-directory: exemplar-tests
+        run: pnpm differential
+
+  fuzz:
+    needs: guard
+    if: ${{ !inputs.skip-extended }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          xmllint: true
+      - name: Long fuzz run
+        working-directory: exemplar-tests
+        env:
+          EXEMPLAR_FUZZ_SCALE: '300'
+        run: pnpm --filter @exemplarjs/conformance exec vitest run test/fuzz.test.ts
+      - name: Fuzz differential against libxml2
+        working-directory: exemplar-tests
+        run: pnpm fuzz --runs 200000
+
+  # The W3C XML suite in each browser.
+  browsers:
+    needs: guard
+    if: ${{ !inputs.skip-extended }}
+    name: The XML suite in Chromium, Firefox and WebKit
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+      - name: Install the browsers
+        working-directory: exemplar-tests/tools/conformance
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - working-directory: exemplar-tests
+        run: pnpm conformance:browser
+
+  # QT3, the W3C's XPath 3.1 suite, whose data is pinned in exemplar-tests and cached between runs.
+  qt3:
+    needs: guard
+    if: ${{ !inputs.skip-extended }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: exemplar-tests/data/conformance/qt3
+          key: w3c-qt3-${{ hashFiles('exemplar-tests/tools/conformance/suites.json') }}
+      - name: QT3's XPath 3.1 expressions, through exemplar's parser
+        working-directory: exemplar-tests
+        run: pnpm qt3:parse
+      - name: QT3 as an XPath 3.1 suite, against the XPath processors
+        working-directory: exemplar-tests
+        run: pnpm qt3
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: qt3
+          path: exemplar-tests/tools/conformance/reports/qt3.*
+
+  # The full benchmark matrix, on the fixed machine whose numbers exemplar publishes.
+  benchmarks:
+    needs: checks
+    if: ${{ !inputs.skip-benchmarks }}
+    runs-on: [self-hosted, exemplar-bench]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          java: true
+      - name: Conformance, for the report's correctness columns
+        working-directory: exemplar-tests
+        run: pnpm conformance
+      - name: Full benchmark matrix
+        working-directory: exemplar-tests
+        run: pnpm --filter @exemplarjs/bench exec node --expose-gc src/index.ts full
+      # The benchmark report, as exemplar-docs publishes it.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-report
+          path: exemplar-tests/tools/bench/reports/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: conformance-reports
+          path: exemplar-tests/tools/conformance/reports/
+
+  # Publishes every public package at the version in the checkout, and tags it.
+  publish:
+    needs: [checks, properties, differentials, fuzz, browsers, qt3, benchmarks]
+    # Runs when nothing failed, so a skipped job does not stop a release; only main may run it.
+    if: ${{ !inputs.dry-run && !failure() && !cancelled() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-26.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    # Needs a reviewer's approval, and is named in each package's trusted publisher on npmjs.com.
+    environment: release
+    permissions:
+      # The tag and release, and npm's OIDC login, which also signs provenance.
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm compile
+      - name: Read the version
+        id: version
+        run: echo "version=$(node -p "require('./packages/xml/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publish to npm
+        env:
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: pnpm publish --recursive --access public --no-git-checks $DRY_RUN
+      - name: Tag and release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
+
+  # A dry run's stand-in for publish, from any branch: it needs no approval and no credentials.
+  publish-dry-run:
+    needs: [checks, properties, differentials, fuzz, browsers, qt3, benchmarks]
+    if: ${{ inputs.dry-run && !failure() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm compile
+      - name: Read the version
+        id: version
+        run: echo "version=$(node -p "require('./packages/xml/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Show what would be published
+        run: pnpm publish --recursive --access public --no-git-checks --dry-run
+
+  # Opens a pull request on exemplar-docs that adds this release's benchmark report; a dry run stops at the commit.
+  docs-report:
+    needs: [publish, publish-dry-run, benchmarks]
+    if: ${{ !failure() && !cancelled() && !inputs.skip-benchmarks }}
+    runs-on: ubuntu-26.04
+    # Holds the credentials of the GitHub App that may write to exemplar-docs, and nothing else may read them.
+    environment: docs
+    env:
+      VERSION: ${{ needs.publish.outputs.version || needs.publish-dry-run.outputs.version }}
+    steps:
+      - name: Create a token for exemplar-docs
+        id: app
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: exemplar-docs
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bench-report
+          path: report
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/exemplar-docs
+          token: ${{ steps.app.outputs.token }}
+          path: exemplar-docs
+      - name: Add the report
+        working-directory: exemplar-docs
+        run: |
+          : "${VERSION:?}"
+          rm -rf "docs/public/benchmarks/$VERSION"
+          mkdir -p "docs/public/benchmarks/$VERSION"
+          cp -R "$GITHUB_WORKSPACE"/report/. "docs/public/benchmarks/$VERSION/"
+      - name: Commit the report
+        working-directory: exemplar-docs
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BOT: ${{ steps.app.outputs.app-slug }}[bot]
+        run: |
+          git config user.name "$BOT"
+          git config user.email "$(gh api "/users/$BOT" --jq .id)+$BOT@users.noreply.github.com"
+          git switch -C "benchmarks/$VERSION"
+          git add docs/public/benchmarks
+          git diff --cached --quiet || git commit -m "docs: add the benchmark report for $VERSION"
+      - name: Show the commit
+        if: ${{ inputs.dry-run }}
+        working-directory: exemplar-docs
+        run: git show --stat --format=%B HEAD
+      - name: Open the pull request
+        if: ${{ !inputs.dry-run }}
+        working-directory: exemplar-docs
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          git push --force origin "benchmarks/$VERSION"
+          gh pr view "benchmarks/$VERSION" > /dev/null 2>&1 || gh pr create \
+            --head "benchmarks/$VERSION" \
+            --title "docs: benchmark report for $VERSION" \
+            --body "The full benchmark matrix for exemplar $VERSION, from the release workflow."

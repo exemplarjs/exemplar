@@ -8,10 +8,10 @@ The complete XML stack for JavaScript and TypeScript, and the best one. Everythi
 DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
-  [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
+  [W3C conformance suites](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/testing.md), for XML or for
   XPath.
 - **The fastest.** Ahead of every other JavaScript XML library in
-  [the benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
+  [the benchmarks](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
   trees, querying and writing, with every check left on.
 - **The best XPath in JavaScript.** A complete XPath 3.1 processor, compiled for speed, with typed variables your editor
   checks.
@@ -175,8 +175,8 @@ On an Apple M3 Max with Node 24, reading every name, attribute and text, buildin
 | OpenStack manuals                        | 190 MB/s | 114 MB/s, 46 MB held  | 139 MB/s |
 | XMark, factors 0.1 and 1                 | 273 MB/s | 126 MB/s, 715 MB held | 237 MB/s |
 
-The [benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md) also run nightly on a
-fixed Linux machine, on documents as published: internal subsets, entity references, eight encodings and all.
+The [benchmarks](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md) also run on each release
+on a fixed Linux machine, on documents as published: internal subsets, entity references, eight encodings and all.
 
 ## See also
 
@@ -191,8 +191,8 @@ fixed Linux machine, on documents as published: internal subsets, entity referen
 - [`@exemplarjs/canonical`](../canonical/README.md): Canonical XML 1.0 and 1.1, and Exclusive Canonicalization
 - [`@exemplarjs/encodings-cjk`](../encodings-cjk/README.md): Japanese, Chinese and Korean encodings
 
-The [documentation](https://github.com/io-timeout/exemplar-docs) shows every part at work through common tasks, with a
-reference for the details.
+The [documentation](https://exemplar.l47.net) shows every part at work through common tasks, with a reference for the
+details.
 
 ## License
 

@@ -8,10 +8,10 @@ The complete XML stack for JavaScript and TypeScript, and the best one. Everythi
 DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
-  [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
+  [W3C conformance suites](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/testing.md), for XML or for
   XPath.
 - **The fastest.** Ahead of every other JavaScript XML library in
-  [the benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
+  [the benchmarks](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
   trees, querying and writing, with every check left on.
 - **The best XPath in JavaScript.** A complete XPath 3.1 processor, compiled for speed, with typed variables your editor
   checks.
@@ -107,8 +107,8 @@ and catalog.
 - [`@exemplarjs/xinclude`](../xinclude/README.md): XInclude 1.0, with XPointer
 - [`@exemplarjs/encodings-cjk`](../encodings-cjk/README.md): Japanese, Chinese and Korean encodings
 
-The [documentation](https://github.com/io-timeout/exemplar-docs) shows every part at work through common tasks, with a
-reference for the details.
+The [documentation](https://exemplar.l47.net) shows every part at work through common tasks, with a reference for the
+details.
 
 ## License
 

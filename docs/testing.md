@@ -8,23 +8,48 @@ exemplar's tests have four jobs:
 - keep speed visible.
 
 [design.md](design.md) describes how what is tested is built, and
-[exemplar-docs](https://github.com/io-timeout/exemplar-docs) how it behaves.
+[exemplar-docs](https://github.com/exemplarjs/exemplar-docs) how it behaves.
 
 Each library package keeps its tests in `test/`. The W3C suites, the consistency checks, the differential tests against
-libxml2 and Xerces, and the benchmarks live in the [exemplar-tests](https://github.com/io-timeout/exemplar-tests)
+libxml2 and Xerces, and the benchmarks live in the [exemplar-tests](https://github.com/exemplarjs/exemplar-tests)
 repository, which runs them on the build of an exemplar checkout beside it; its
-[`docs/testing.md`](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md) and
-[`docs/benchmarking.md`](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md) describe them.
+[`docs/testing.md`](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/testing.md) and
+[`docs/benchmarking.md`](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md) describe them.
 
 ## Layers
 
-| Layer       | Tool                                     | Runs                                          | Proves                                           |
-| ----------- | ---------------------------------------- | --------------------------------------------- | ------------------------------------------------ |
-| Unit        | vitest, in each package's `test/`        | Every change                                  | Each module against the rules it implements      |
-| Property    | vitest with fast-check                   | Briefly on every change, at length on release | No crash or hang on any input; round trips       |
-| Browsers    | vitest browser mode                      | Every change                                  | The same results in Chromium, Firefox and WebKit |
-| Conformance | exemplar-tests, on this checkout's build | Every change; differentials on release        | The W3C suites, consistency and differentials    |
-| Performance | exemplar-tests                           | Locally against `main`; nightly               | No regressions; comparisons with other libraries |
+| Layer        | Tool                                     | Runs                                              | Proves                                                |
+| ------------ | ---------------------------------------- | ------------------------------------------------- | ----------------------------------------------------- |
+| Unit         | vitest, in each package's `test/`        | Every change                                      | Each module against the rules it implements           |
+| Property     | vitest with fast-check                   | Briefly on every change, at length on release     | No crash or hang on any input; round trips            |
+| Browsers     | vitest browser mode                      | Every change                                      | The same results in Chromium, Firefox and WebKit      |
+| Conformance  | exemplar-tests, on this checkout's build | Node and Bun on every change; the rest on release | The W3C suites, consistency and differentials         |
+| Performance  | exemplar-tests                           | Locally against `main`; on release                | No regressions; comparisons with other libraries      |
+| Docs samples | exemplar-docs                            | Every change                                      | Every sample in the guide compiles against this build |
+
+## Workflows
+
+`checks.yaml` runs on every pull request and at the start of a release: format, lint and types, the unit tests on Node,
+Bun and each browser, exemplar-tests' lint, types and conformance on Node and Bun, and exemplar-docs' build, which
+type-checks every sample and the `examples` package.
+
+`release.yaml` is started by hand. A guard stops it when the version is already on npm or tagged. Then:
+
+1. `checks` and the long property and fuzz runs, the differentials, the XML suite in each browser and QT3 start
+   together, on hosted runners.
+2. The full benchmark matrix, on the fixed machine, starts when `checks` passes, so that a broken change never uses it.
+3. `publish` runs on `main` once they pass, after a reviewer approves the `release` environment. It publishes every
+   package, then tags the commit and creates the GitHub release.
+4. `docs-report` opens a pull request on exemplar-docs that adds the benchmark report for the version, using a GitHub
+   App's token held in the `docs` environment.
+
+Its inputs: `dry-run` runs from any branch and changes nothing outside the run: `publish-dry-run` stands in for
+`publish` with `pnpm publish --dry-run`, and `docs-report` stops at a local commit. `skip-extended` and
+`skip-benchmarks` leave out the long jobs or the benchmarks. A real release runs from `main` only, and the skips are for
+dry runs only. The `docs` environment decides which branches may run `docs-report`.
+
+exemplar-tests and exemplar-docs are checked out on the branch named like the pull request, or on `main` when they have
+none, and run on this checkout's build. Their own pull requests check only their own format, lint and links.
 
 The commands run through Turborepo from the repository root:
 

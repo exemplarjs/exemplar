@@ -1,0 +1,28 @@
+name: Check out a sibling repository
+description:
+  Checks out a repository of this owner beside the exemplar checkout, on the branch named like the pull request's, or
+  else its default branch.
+
+inputs:
+  repository:
+    description: The repository's name, such as exemplar-tests.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Find the matching branch
+      id: branch
+      shell: bash
+      env:
+        BRANCH: ${{ github.head_ref }}
+        REMOTE: https://github.com/${{ github.repository_owner }}/${{ inputs.repository }}.git
+      run: |
+        if [ -n "$BRANCH" ] && git ls-remote --exit-code --heads "$REMOTE" "refs/heads/$BRANCH" > /dev/null; then
+          echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+        fi
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: ${{ github.repository_owner }}/${{ inputs.repository }}
+        ref: ${{ steps.branch.outputs.ref }}
+        path: ${{ inputs.repository }}

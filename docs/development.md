@@ -17,7 +17,7 @@ The repository is a pnpm workspace run by Turborepo:
 
 `@exemplarjs/build-config` and `@exemplarjs/test-support` are private and never published, so their dependencies never
 reach exemplar's users. The W3C suites, the consistency checks, the differential and fuzz tests against libxml2 and
-Xerces, and the benchmarks live in the [exemplar-tests](https://github.com/io-timeout/exemplar-tests) repository, which
+Xerces, and the benchmarks live in the [exemplar-tests](https://github.com/exemplarjs/exemplar-tests) repository, which
 reads this checkout's built `dist` when it sits beside it, so compile here first.
 
 ## Commands
@@ -119,7 +119,7 @@ running them.
 ## Performance
 
 How to measure a change, and what V8 rewards. [design.md](design.md) says why each module is built as it is, and
-exemplar-tests' [`docs/benchmarking.md`](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md)
+exemplar-tests' [`docs/benchmarking.md`](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md)
 describes the benchmarks.
 
 | Term         | Meaning                                                                                                                  |

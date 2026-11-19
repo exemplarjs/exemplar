@@ -1,7 +1,7 @@
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=io-timeout_exemplar&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=io-timeout_exemplar)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=io-timeout_exemplar&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=io-timeout_exemplar)
-[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=io-timeout_exemplar&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=io-timeout_exemplar)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=io-timeout_exemplar&metric=coverage)](https://sonarcloud.io/summary/new_code?id=io-timeout_exemplar)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=exemplarjs_exemplar&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=exemplarjs_exemplar)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=exemplarjs_exemplar&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=exemplarjs_exemplar)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=exemplarjs_exemplar&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=exemplarjs_exemplar)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=exemplarjs_exemplar&metric=coverage)](https://sonarcloud.io/summary/new_code?id=exemplarjs_exemplar)
 
 # exemplar
 
@@ -14,10 +14,10 @@ The complete XML stack for JavaScript and TypeScript, and the best one. Everythi
 DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
-  [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
+  [W3C conformance suites](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/testing.md), for XML or for
   XPath.
 - **The fastest.** Ahead of every other JavaScript XML library in
-  [the benchmarks](https://github.com/io-timeout/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
+  [the benchmarks](https://github.com/exemplarjs/exemplar-tests/blob/main/docs/benchmarking.md), for reading, building
   trees, querying and writing, with every check left on.
 - **The best XPath in JavaScript.** A complete XPath 3.1 processor, compiled for speed, with typed variables your editor
   checks.
@@ -50,8 +50,8 @@ Every package builds on `@exemplarjs/xml` and is released at the same version, s
 
 ## Documentation
 
-- [exemplar-docs](https://github.com/io-timeout/exemplar-docs): how to use exemplar, through common tasks, with a
-  reference for the details.
+- [Documentation](https://exemplar.l47.net) ([source](https://github.com/exemplarjs/exemplar-docs)): how to use
+  exemplar, through common tasks, with a reference for the details.
 - [examples](examples): worked examples, from reading a file to processing a large one record at a time, each tested
   against its expected result.
 - [docs/design.md](docs/design.md): how exemplar is built, and why.

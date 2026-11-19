@@ -1,12 +1,12 @@
 {
   "name": "@exemplarjs/xpath",
   "version": "0.1.0",
-  "private": true,
   "description": "An XPath 3.1 processor over @exemplarjs/xdm trees",
   "license": "Apache-2.0",
+  "homepage": "https://exemplar.l47.net",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/io-timeout/exemplar.git",
+    "url": "git+https://github.com/exemplarjs/exemplar.git",
     "directory": "packages/xpath"
   },
   "type": "module",

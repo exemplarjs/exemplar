@@ -11,7 +11,7 @@ jobs:
   static:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm format:check
       - run: pnpm lint:ci
@@ -40,7 +40,7 @@ jobs:
             command: pnpm test:browser --project '*(webkit)'
             browser: webkit
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           bun: ${{ matrix.bun || false }}
@@ -48,21 +48,40 @@ jobs:
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - run: ${{ matrix.command }}
       - if: matrix.target == 'Node'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: coverage/lcov.info
 
-  # The W3C suites and consistency checks, from exemplar-tests, on this change's build.
+  # exemplar-tests' branch of the same name, or else its main, run on this change's build.
   conformance:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: exemplar
       - uses: ./exemplar/.github/actions/setup-tests
         with:
+          bun: true
           xmllint: true
-      - name: Run the suites
+      - name: Lint and type-check exemplar-tests
+        working-directory: exemplar-tests
+        run: pnpm lint:ci && pnpm typecheck
+      - name: Run the suites on Node
         working-directory: exemplar-tests
         run: pnpm conformance
+      - name: Run the XML suite on Bun
+        working-directory: exemplar-tests
+        run: bun tools/conformance/src/cli.ts exemplar
+
+  # exemplar-docs' branch of the same name, or else its main: type-checks every sample against this change's build.
+  docs:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-docs
+      - name: Build the site
+        working-directory: exemplar-docs
+        run: pnpm build

@@ -12,7 +12,7 @@ import {
   XS,
 } from '@/index';
 
-// The nightly run scales the number of runs up.
+// The release run scales the number of runs up.
 const SCALE = Number(globalThis.process?.env['EXEMPLAR_FUZZ_SCALE'] ?? 1);
 const RUNS = { numRuns: 500 * SCALE };
 

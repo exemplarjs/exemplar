@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 import { write } from '@exemplarjs/test-support';
 import { EventType, XMLInputFactory } from '@/index';
 
-// The nightly run scales the number of runs up.
+// The release run scales the number of runs up.
 const SCALE = Number(globalThis.process?.env['EXEMPLAR_FUZZ_SCALE'] ?? 1);
 
 /** A document as the generator models it, with its text as the reader must report it. */
