@@ -6,12 +6,26 @@ import { ErrorFactory, IllegalStateError } from '@/util/errors';
 import { isAllWhitespace } from '@/util/whitespace';
 import { EventBuilder, type XMLEvent } from './events.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  END_DOCUMENT,
+  CDATA,
+  NEED_INPUT,
+} = EventType;
+
 /** Decides whether a filtered event reader yields an event, as StAX's `EventFilter` does. */
 export type EventFilter = (event: XMLEvent) => boolean;
 
 /** Whether every filter accepts an event; END_DOCUMENT always passes. */
 function accepts(filters: readonly EventFilter[], event: XMLEvent): boolean {
-  if (filters.length === 0 || event.type === EventType.END_DOCUMENT) return true;
+  if (filters.length === 0 || event.type === END_DOCUMENT) return true;
   for (const accept of filters) if (!accept(event)) return false;
   return true;
 }
@@ -19,17 +33,17 @@ function accepts(filters: readonly EventFilter[], event: XMLEvent): boolean {
 /** The cursor's first event: a sync reader starts at START_DOCUMENT, an async one has to read to it. */
 function firstEvent(reader: StreamReader): EventType {
   const type = reader.eventType();
-  return type === EventType.NEED_INPUT ? reader.next() : type;
+  return type === NEED_INPUT ? reader.next() : type;
 }
 
 /** Whether `nextTag()` may skip an event: whitespace, a comment or a PI, and START_DOCUMENT too, which the cursor's `nextTag()` also moves past. */
 function nextTagMaySkip(event: XMLEvent): boolean {
-  if (event.type === EventType.CHARACTERS) return isAllWhitespace(event.text);
+  if (event.type === CHARACTERS) return isAllWhitespace(event.text);
   return (
-    event.type === EventType.COMMENT ||
-    event.type === EventType.PROCESSING_INSTRUCTION ||
-    event.type === EventType.SPACE ||
-    event.type === EventType.START_DOCUMENT
+    event.type === COMMENT ||
+    event.type === PROCESSING_INSTRUCTION ||
+    event.type === SPACE ||
+    event.type === START_DOCUMENT
   );
 }
 
@@ -59,10 +73,10 @@ class EventPump {
         type = reader.next();
       } else {
         type = firstEvent(reader);
-        this.#readFirstEvent = type !== EventType.NEED_INPUT;
+        this.#readFirstEvent = type !== NEED_INPUT;
       }
-      if (type === EventType.NEED_INPUT) return undefined;
-      if (type === EventType.END_DOCUMENT) this.ended = true;
+      if (type === NEED_INPUT) return undefined;
+      if (type === END_DOCUMENT) this.ended = true;
       const event = this.#builder.build(reader, this.#cursor, type);
       if (accepts(this.filters, event)) return event;
     }
@@ -116,7 +130,7 @@ export class EventReader implements IterableIterator<XMLEvent> {
   nextTag(): XMLEvent {
     for (;;) {
       const event = this.nextEvent();
-      if (event.type === EventType.START_ELEMENT || event.type === EventType.END_ELEMENT) return event;
+      if (event.type === START_ELEMENT || event.type === END_ELEMENT) return event;
       if (!nextTagMaySkip(event)) throw ErrorFactory.create(IllegalStateError, 'Expected a start or end tag');
     }
   }
@@ -126,10 +140,10 @@ export class EventReader implements IterableIterator<XMLEvent> {
     let text = '';
     for (;;) {
       const event = this.nextEvent();
-      if (event.type === EventType.END_ELEMENT) return text;
-      if (event.type === EventType.START_ELEMENT)
+      if (event.type === END_ELEMENT) return text;
+      if (event.type === START_ELEMENT)
         throw ErrorFactory.create(IllegalStateError, 'elementText() found a child element');
-      if (event.type === EventType.CHARACTERS || event.type === EventType.CDATA || event.type === EventType.SPACE) {
+      if (event.type === CHARACTERS || event.type === CDATA || event.type === SPACE) {
         text += event.text;
       }
     }

@@ -39,6 +39,9 @@ import {
   xmlnsAttribute,
 } from './tree-builder.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { TEXT_NODE } = NodeType;
+
 /**
  * A SAX handler that builds a DOM tree from the events it is given, as
  * `DocumentBuilder.createSAXHandler()` makes one. It ends a chain of SAX filters, so that what they
@@ -268,7 +271,7 @@ export class DOMBuildingHandler {
     const node = new Text(this.#started(), text);
     node._ignorable = kind === 'ignorable';
     const last = current._last;
-    if (last?.nodeType === NodeType.TEXT_NODE) joinText(last as Text, node);
+    if (last?.nodeType === TEXT_NODE) joinText(last as Text, node);
     else current._append(node);
   }
 

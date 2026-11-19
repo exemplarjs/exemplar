@@ -4,6 +4,22 @@ import type { Doctype, StreamReader } from '@/cursor/stream-reader';
 import type { Location } from '@/errors/xml-error';
 import { LineSegment } from '@/tokenizer/lines';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+  START_ENTITY,
+  END_ENTITY,
+} = EventType;
+
 /** A namespace-qualified name, as StAX's `QName` is: `xs:element` in the namespace `xs` is bound to. */
 export class QName {
   /** The namespace URI, `''` for none. */
@@ -224,32 +240,32 @@ export class Event {
 
   /** A PI's target; `''` for any other event. */
   get target(): string {
-    return this.type === EventType.PROCESSING_INSTRUCTION ? (this.name as string) : '';
+    return this.type === PROCESSING_INSTRUCTION ? (this.name as string) : '';
   }
 
   /** A PI's data; `''` for any other event. */
   get data(): string {
-    return this.type === EventType.PROCESSING_INSTRUCTION ? this.text : '';
+    return this.type === PROCESSING_INSTRUCTION ? this.text : '';
   }
 
   /** The DOCTYPE, for a DTD event. */
   get doctype(): Doctype | undefined {
-    return this.type === EventType.DTD ? (this.details as Doctype) : undefined;
+    return this.type === DTD ? (this.details as Doctype) : undefined;
   }
 
   /** For START_DOCUMENT, the version the XML declaration names. */
   get version(): string | undefined {
-    return this.type === EventType.START_DOCUMENT ? (this.details as DocumentDetails).version : undefined;
+    return this.type === START_DOCUMENT ? (this.details as DocumentDetails).version : undefined;
   }
 
   /** For START_DOCUMENT, the encoding the XML declaration names, or else the one detected from its bytes; undefined for text that names none. */
   get encoding(): string | undefined {
-    return this.type === EventType.START_DOCUMENT ? (this.details as DocumentDetails).encoding : undefined;
+    return this.type === START_DOCUMENT ? (this.details as DocumentDetails).encoding : undefined;
   }
 
   /** For START_DOCUMENT, the XML declaration's `standalone`. */
   get standalone(): boolean | undefined {
-    return this.type === EventType.START_DOCUMENT ? (this.details as DocumentDetails).standalone : undefined;
+    return this.type === START_DOCUMENT ? (this.details as DocumentDetails).standalone : undefined;
   }
 
   /** A start tag's attribute with a local name and namespace URI, `''` for none. */
@@ -290,7 +306,7 @@ export class EventBuilder {
     let text = '';
     let details: EventDetails;
     switch (type) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         const qname = this.#qname(reader);
         name = qname;
         namespaces = namespacesOf(reader);
@@ -301,7 +317,7 @@ export class EventBuilder {
         }
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         // A delegate or a filter may keep tags back, so the tags it gives are not known to pair up.
         if (reader === cursor && !cursor[HAS_FILTERS]) {
           name = this.#names.pop() as QName;
@@ -312,28 +328,28 @@ export class EventBuilder {
         }
         break;
       }
-      case EventType.CHARACTERS:
-      case EventType.CDATA:
-      case EventType.SPACE:
-      case EventType.COMMENT:
-      case EventType.DTD: {
-        details = type === EventType.DTD ? reader.doctype() : undefined;
+      case CHARACTERS:
+      case CDATA:
+      case SPACE:
+      case COMMENT:
+      case DTD: {
+        details = type === DTD ? reader.doctype() : undefined;
         text = copyString(reader.text());
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         text = copyString(reader.piData());
         name = copyString(reader.piTarget());
         break;
       }
-      case EventType.START_ENTITY:
-      case EventType.END_ENTITY:
-      case EventType.ENTITY_REFERENCE: {
-        if (type === EventType.ENTITY_REFERENCE) text = copyString(reader.text());
+      case START_ENTITY:
+      case END_ENTITY:
+      case ENTITY_REFERENCE: {
+        if (type === ENTITY_REFERENCE) text = copyString(reader.text());
         name = reader.name();
         break;
       }
-      case EventType.START_DOCUMENT: {
+      case START_DOCUMENT: {
         details = {
           version: reader.version(),
           encoding: reader.declaredEncoding() ?? reader.encoding(),

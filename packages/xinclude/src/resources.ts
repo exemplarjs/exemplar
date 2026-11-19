@@ -22,6 +22,9 @@ import {
   unmatchedByCatalog,
 } from '@exemplarjs/xml/internal';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { NEED_INPUT } = EventType;
+
 /** A resource that cannot be included, which a fallback may stand in for. */
 export class ResourceError extends Error {
   override name = 'ResourceError';
@@ -197,7 +200,7 @@ export class Pending {
         'The reader needs more input: await fill() before calling next() again'
       );
     this.#returnedNeedInput = true;
-    return EventType.NEED_INPUT;
+    return NEED_INPUT;
   }
 }
 

@@ -2,6 +2,9 @@ import type { AsyncOpenedSource, ChunkQueue } from '@/input/source';
 import { ErrorFactory, IllegalStateError } from '@/util/errors';
 import { EventType } from './event-type.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { NEED_INPUT } = EventType;
+
 /**
  * An asynchronous reader's input. The reader returns NEED_INPUT when the bytes it has run out; the
  * caller then awaits `fill()`, which waits for the next chunk of a stream or a resolver's answer, or
@@ -57,6 +60,6 @@ export class AsyncInput {
       );
     }
     this.#starved = true;
-    return EventType.NEED_INPUT;
+    return NEED_INPUT;
   }
 }

@@ -6,6 +6,23 @@ import { resolveTargetURI } from '@/util/uri';
 import { AsyncEventReader } from './event-reader.ts';
 import type { Attribute, CharactersEvent, EndElementEvent, StartElementEvent, XMLEvent } from './events.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  END_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+  START_ENTITY,
+  END_ENTITY,
+} = EventType;
+
 /** The events other than an element's start or end tag or character data. */
 type OtherEvent = Exclude<XMLEvent, StartElementEvent | EndElementEvent | CharactersEvent>;
 
@@ -129,30 +146,30 @@ export class EventDispatcher {
     this.#locator.event = event;
     if (!this.#started) this.#start(event);
     switch (event.type) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         for (const { prefix, namespaceURI } of event.namespaces) handler.startPrefixMapping?.(prefix, namespaceURI);
         this.#attributes.list = event.attributes;
         const { name } = event;
         handler.startElement?.(name.namespaceURI, name.localName, name.toString(), this.#attributes);
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         const { name } = event;
         handler.endElement?.(name.namespaceURI, name.localName, name.toString());
         for (const { prefix } of event.namespaces) handler.endPrefixMapping?.(prefix);
         break;
       }
-      case EventType.CHARACTERS: {
+      case CHARACTERS: {
         handler.characters?.(event.text);
         break;
       }
-      case EventType.CDATA: {
+      case CDATA: {
         handler.startCDATA?.();
         handler.characters?.(event.text);
         handler.endCDATA?.();
         break;
       }
-      case EventType.SPACE: {
+      case SPACE: {
         handler.ignorableWhitespace?.(event.text);
         break;
       }
@@ -173,7 +190,7 @@ export class EventDispatcher {
   /** Notes a START_DOCUMENT's version and encoding or, for events without one, starts the document itself. */
   #start(event: XMLEvent | undefined): void {
     this.#started = true;
-    if (event?.type !== EventType.START_DOCUMENT) {
+    if (event?.type !== START_DOCUMENT) {
       this.#handler.startDocument?.();
       return;
     }
@@ -184,36 +201,36 @@ export class EventDispatcher {
   #otherEvent(event: OtherEvent): void {
     const handler = this.#handler;
     switch (event.type) {
-      case EventType.START_DOCUMENT: {
+      case START_DOCUMENT: {
         handler.startDocument?.();
         break;
       }
-      case EventType.END_DOCUMENT: {
+      case END_DOCUMENT: {
         this.#ended = true;
         handler.endDocument?.();
         break;
       }
-      case EventType.COMMENT: {
+      case COMMENT: {
         handler.comment?.(event.text);
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         handler.processingInstruction?.(event.target, event.data);
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         this.#dtd(event.doctype);
         break;
       }
-      case EventType.ENTITY_REFERENCE: {
+      case ENTITY_REFERENCE: {
         handler.skippedEntity?.(event.name);
         break;
       }
-      case EventType.START_ENTITY: {
+      case START_ENTITY: {
         handler.startEntity?.(event.name);
         break;
       }
-      case EventType.END_ENTITY: {
+      case END_ENTITY: {
         handler.endEntity?.(event.name);
       }
     }

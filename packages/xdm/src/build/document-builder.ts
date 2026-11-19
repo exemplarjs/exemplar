@@ -25,7 +25,7 @@ import { CursorLoader } from './cursor-loader.ts';
 import { XdmBuildingHandler } from './sax-handler.ts';
 
 // Module-level constants, so V8 can inline them; an imported binding is read again on every use.
-const EventType = events.EventType;
+const { START_ELEMENT, END_ELEMENT, NEED_INPUT } = events.EventType;
 
 /** A few characters fewer than the markup and text a node usually takes, to size the tree's arrays from a string's length. */
 const CHARACTERS_PER_NODE = 22;
@@ -135,8 +135,8 @@ export class XdmDocumentBuilder {
     let depth = 0;
     for (let type = reader.eventType(); ; type = reader.next()) {
       // The wrapper's own start and end add nothing: its content becomes the document's.
-      if (type === EventType.START_ELEMENT && depth++ === 0) continue;
-      if (type === EventType.END_ELEMENT && --depth === 0) continue;
+      if (type === START_ELEMENT && depth++ === 0) continue;
+      if (type === END_ELEMENT && --depth === 0) continue;
       if (loader.add(type)) return documentNode(loader.finish());
     }
   }
@@ -151,7 +151,7 @@ export class XdmDocumentBuilder {
     const loader = this.#loader(source, 'async');
     const reader = loader.reader;
     for (let type = reader.eventType(); ; type = reader.next()) {
-      if (type === EventType.NEED_INPUT) await reader.fill();
+      if (type === NEED_INPUT) await reader.fill();
       else if (loader.add(type)) return documentNode(loader.finish());
     }
   }

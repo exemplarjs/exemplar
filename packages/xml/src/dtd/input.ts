@@ -13,6 +13,7 @@ import type { EntityDeclaration } from './declarations.ts';
 import type { DeclarationStore } from './store.ts';
 
 // Module-level constants, so V8 can inline them.
+const { NONE: NOT_IN_NAMES, NAME_START_CHAR } = NameClass;
 const {
   APOSTROPHE,
   CARRIAGE_RETURN,
@@ -437,13 +438,12 @@ export class DtdInput {
     const start = frame.pos;
     // eslint-disable-next-line prefer-code-point -- ASCII names only; others take the full check
     const first = text.charCodeAt(start);
-    if (start >= end || first >= NON_ASCII || (NAME_CLASSES[first] as number) < NameClass.NAME_START_CHAR)
-      return undefined;
+    if (start >= end || first >= NON_ASCII || (NAME_CLASSES[first] as number) < NAME_START_CHAR) return undefined;
     let pos = start + 1;
     while (pos < end) {
       // eslint-disable-next-line prefer-code-point -- ASCII names only
       const char = text.charCodeAt(pos);
-      if (char >= NON_ASCII || NAME_CLASSES[char] === NameClass.NONE) break;
+      if (char >= NON_ASCII || NAME_CLASSES[char] === NOT_IN_NAMES) break;
       pos++;
     }
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair

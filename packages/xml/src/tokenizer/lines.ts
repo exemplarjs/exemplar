@@ -5,6 +5,7 @@ import { Needle, type SearchCache } from './search.ts';
 import type { Tokenizer } from './tokenizer.ts';
 
 // Module-level constants, so V8 can inline them.
+const { CARRIAGE_RETURN: CARRIAGE_RETURN_NEEDLE, LINE_FEED: LINE_FEED_NEEDLE } = Needle;
 const { CARRIAGE_RETURN, LINE_FEED, LINE_SEPARATOR, NEXT_LINE } = Char;
 
 /**
@@ -183,9 +184,9 @@ export class LineCounter {
     let line = fromLine;
     let lineStart = fromLineStart;
     for (
-      let pos = search.find(text, Needle.LINE_FEED, from);
+      let pos = search.find(text, LINE_FEED_NEEDLE, from);
       pos < to;
-      pos = search.find(text, Needle.LINE_FEED, pos + 1)
+      pos = search.find(text, LINE_FEED_NEEDLE, pos + 1)
     ) {
       line++;
       lineStart = tokenizer.bufferOffset + pos + 1;
@@ -193,9 +194,9 @@ export class LineCounter {
     }
     let sawLoneCr = false;
     for (
-      let pos = search.find(text, Needle.CARRIAGE_RETURN, from);
+      let pos = search.find(text, CARRIAGE_RETURN_NEEDLE, from);
       pos < to;
-      pos = search.find(text, Needle.CARRIAGE_RETURN, pos + 1)
+      pos = search.find(text, CARRIAGE_RETURN_NEEDLE, pos + 1)
     ) {
       // A CR followed by LF is one line end, already counted with the LF.
       // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair

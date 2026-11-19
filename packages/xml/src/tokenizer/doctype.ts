@@ -17,6 +17,7 @@ import {
 import type { Tokenizer } from './tokenizer.ts';
 
 // Module-level constants, so V8 can inline them.
+const { COMMENT: COMMENT_TERMINATOR, PI: PI_TERMINATOR } = Terminator;
 const { APOSTROPHE, DOUBLE_QUOTE, GREATER_THAN, LEFT_BRACKET, LESS_THAN, PERCENT, RIGHT_BRACKET, SEMICOLON } = Char;
 
 /** The keywords that start an external identifier. */
@@ -190,12 +191,12 @@ function skipSubsetMarkup(tokenizer: Tokenizer, start: number): number {
   // Four characters tell `<!--` from `<?` and `<!`.
   if (text.length < start + COMMENT_OPEN_LENGTH && !tokenizer.final) return MORE;
   if (text.startsWith('<!--', start)) {
-    const hyphens = scanTo(tokenizer, start + COMMENT_OPEN_LENGTH, Terminator.COMMENT);
+    const hyphens = scanTo(tokenizer, start + COMMENT_OPEN_LENGTH, COMMENT_TERMINATOR);
     if (hyphens === MORE) return bufferEnded(tokenizer, start, 'Unterminated comment');
     return scanCommentClose(tokenizer, hyphens);
   }
   if (text.startsWith('<?', start)) {
-    const piClose = scanTo(tokenizer, start + PI_OPEN_LENGTH, Terminator.PI);
+    const piClose = scanTo(tokenizer, start + PI_OPEN_LENGTH, PI_TERMINATOR);
     if (piClose === MORE) return bufferEnded(tokenizer, start, 'Unterminated processing instruction');
     return piClose + PI_CLOSE_LENGTH;
   }

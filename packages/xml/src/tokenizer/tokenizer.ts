@@ -65,7 +65,7 @@ const SCAN_TOKEN: unique symbol = Symbol('scanToken');
 const SCAN_TEXT_TOKEN: unique symbol = Symbol('scanTextToken');
 const SCAN_TEXT_FROM: unique symbol = Symbol('scanTextFrom');
 const END_TEXT_TOKEN: unique symbol = Symbol('endTextToken');
-const ENTITY_REFERENCE_TOKEN: unique symbol = Symbol('entityReferenceToken');
+const SCAN_ENTITY_REFERENCE: unique symbol = Symbol('scanEntityReference');
 const SCAN_REFERENCE: unique symbol = Symbol('scanReference');
 const SCAN_CHARACTER_REFERENCE: unique symbol = Symbol('scanCharacterReference');
 const SCAN_MARKUP: unique symbol = Symbol('scanMarkup');
@@ -91,6 +91,16 @@ const SCAN_DOCTYPE: unique symbol = Symbol('scanDoctype');
 const { TAB, LINE_FEED, CARRIAGE_RETURN, SPACE, EXCLAMATION, DOUBLE_QUOTE, HASH, AMPERSAND } = Char;
 const { APOSTROPHE, SLASH, SEMICOLON, LESS_THAN, EQUALS, GREATER_THAN, QUESTION } = Char;
 const { LOWER_X, NON_ASCII, NEXT_LINE, LINE_SEPARATOR } = Char;
+const { CR: CR_FLAG, REFERENCE: REFERENCE_FLAG, ENTITY: ENTITY_FLAG } = ScanFlag;
+const {
+  LESS_THAN: LESS_THAN_NEEDLE,
+  AMPERSAND: AMPERSAND_NEEDLE,
+  CARRIAGE_RETURN: CARRIAGE_RETURN_NEEDLE,
+  CDATA_END: CDATA_END_NEEDLE,
+  DOUBLE_HYPHEN: DOUBLE_HYPHEN_NEEDLE,
+  PI_END: PI_END_NEEDLE,
+} = Needle;
+const { COMMENT: COMMENT_TERMINATOR, PI: PI_TERMINATOR, CDATA: CDATA_TERMINATOR } = Terminator;
 
 /** The kinds of token the tokenizer produces. */
 export const Token = {
@@ -113,8 +123,22 @@ export const Token = {
 /** One of the token kinds. */
 export type TokenKind = (typeof Token)[keyof typeof Token];
 
+// Module-level constants, so V8 can inline them; an object's members are read again on every use.
+const {
+  START_TAG: START_TAG_TOKEN,
+  END_TAG: END_TAG_TOKEN,
+  TEXT: TEXT_TOKEN,
+  CDATA: CDATA_TOKEN,
+  COMMENT: COMMENT_TOKEN,
+  PI: PI_TOKEN,
+  DOCTYPE: DOCTYPE_TOKEN,
+  ENTITY_REFERENCE: ENTITY_REFERENCE_TOKEN,
+  END: END_TOKEN,
+  NEED_INPUT: NEED_INPUT_TOKEN,
+} = Token;
+
 /** The needle that ends a comment, a PI and a CDATA section, by terminator. */
-const TERMINATOR_NEEDLES = [Needle.DOUBLE_HYPHEN, Needle.PI_END, Needle.CDATA_END];
+const TERMINATOR_NEEDLES = [DOUBLE_HYPHEN_NEEDLE, PI_END_NEEDLE, CDATA_END_NEEDLE];
 
 /** The attribute arrays before a start tag needs them; growing replaces it, so tokenizers can share it. */
 const NO_ATTRIBUTES = new Int32Array(0);
@@ -366,8 +390,8 @@ export class Tokenizer implements ScanState {
 
   /** Reports that the source has nothing more yet. */
   private [REPORT_NEED_INPUT](): TokenKind {
-    this.kind = Token.NEED_INPUT;
-    return Token.NEED_INPUT;
+    this.kind = NEED_INPUT_TOKEN;
+    return NEED_INPUT_TOKEN;
   }
 
   /** Fills the buffer to scan the current token again; false while the source has nothing yet. */
@@ -435,14 +459,14 @@ export class Tokenizer implements ScanState {
     const text = this.buffer;
     const search = this.#search;
     const stop = Math.min(
-      search.find(text, Needle.LESS_THAN, start),
-      search.find(text, Needle.AMPERSAND, start),
+      search.find(text, LESS_THAN_NEEDLE, start),
+      search.find(text, AMPERSAND_NEEDLE, start),
       text.length
     );
-    if (search.find(text, Needle.CDATA_END, start) < stop || hasForbiddenOrSurrogate(text, start, stop)) {
+    if (search.find(text, CDATA_END_NEEDLE, start) < stop || hasForbiddenOrSurrogate(text, start, stop)) {
       return this[FIND_ORDINARY_TEXT_END](start);
     }
-    if (!this.isReplacementText && search.find(text, Needle.CARRIAGE_RETURN, start) < stop) this.flags |= ScanFlag.CR;
+    if (!this.isReplacementText && search.find(text, CARRIAGE_RETURN_NEEDLE, start) < stop) this.flags |= CR_FLAG;
     return stop;
   }
 
@@ -478,14 +502,14 @@ export class Tokenizer implements ScanState {
   /** Checks content the quick test flagged: by the character scan if it holds something to check, else it only holds a CR. */
   private [CHECK_DATA_BEFORE](start: number, terminator: TerminatorKind, end: number): number {
     if (hasForbiddenOrSurrogate(this.buffer, start, end)) return scanTo(this, start, terminator);
-    this.flags |= ScanFlag.CR;
+    this.flags |= CR_FLAG;
     return end;
   }
 
   /** Recognizes the token at `nextTokenStart` from its first character. */
   private [SCAN_TOKEN](): TokenKind | typeof MORE {
     const start = this.nextTokenStart;
-    if (start >= this.buffer.length) return this.final ? Token.END : MORE;
+    if (start >= this.buffer.length) return this.final ? END_TOKEN : MORE;
     // eslint-disable-next-line prefer-code-point -- ASCII is never half a surrogate pair
     return this.buffer.charCodeAt(start) === LESS_THAN ? this[SCAN_MARKUP](start) : this[SCAN_TEXT_TOKEN](start);
   }
@@ -514,9 +538,9 @@ export class Tokenizer implements ScanState {
       if (afterReference < 0) {
         // An entity reference is a token of its own: end the text before it, or return it.
         if (pos > start) break;
-        return this[ENTITY_REFERENCE_TOKEN](pos, -afterReference);
+        return this[SCAN_ENTITY_REFERENCE](pos, -afterReference);
       }
-      this.flags |= ScanFlag.REFERENCE;
+      this.flags |= REFERENCE_FLAG;
       pos = afterReference;
     }
     return this[END_TEXT_TOKEN](pos);
@@ -527,14 +551,14 @@ export class Tokenizer implements ScanState {
     this.valueEnd = end;
     this.valueFlags = this.flags;
     this.nextTokenStart = end;
-    return Token.TEXT;
+    return TEXT_TOKEN;
   }
 
   /** Records the entity reference from the `&` at `ampersand` to `afterSemicolon`. */
-  private [ENTITY_REFERENCE_TOKEN](ampersand: number, afterSemicolon: number): TokenKind {
+  private [SCAN_ENTITY_REFERENCE](ampersand: number, afterSemicolon: number): TokenKind {
     this.recordName(ampersand + 1, afterSemicolon - 1);
     this.nextTokenStart = afterSemicolon;
-    return Token.ENTITY_REFERENCE;
+    return ENTITY_REFERENCE_TOKEN;
   }
 
   /**
@@ -622,7 +646,7 @@ export class Tokenizer implements ScanState {
   private [END_START_TAG](next: number, selfClosing: boolean): TokenKind {
     this.selfClosing = selfClosing;
     this.nextTokenStart = next;
-    return Token.START_TAG;
+    return START_TAG_TOKEN;
   }
 
   /** Scans a start tag's attributes from `nameEnd`, just after the element name, to the tag's end. */
@@ -663,7 +687,7 @@ export class Tokenizer implements ScanState {
     if (char === GREATER_THAN) {
       this.selfClosing = false;
       this.nextTokenStart = pos + 1;
-      return Token.START_TAG;
+      return START_TAG_TOKEN;
     }
     // eslint-disable-next-line prefer-code-point -- NaN past the end marks the end
     const afterSlash = this.buffer.charCodeAt(pos + 1);
@@ -671,7 +695,7 @@ export class Tokenizer implements ScanState {
     if (afterSlash !== GREATER_THAN) throw scanError(ErrorCode.WF_TAG, pos, 'Expected > after /');
     this.selfClosing = true;
     this.nextTokenStart = pos + EMPTY_TAG_CLOSE_LENGTH;
-    return Token.START_TAG;
+    return START_TAG_TOKEN;
   }
 
   /** Scans `name = "value"` at `nameStart` and records it; returns the index after it, or MORE. */
@@ -716,7 +740,7 @@ export class Tokenizer implements ScanState {
       if (this.buffer.charCodeAt(pos) === quote) return pos;
       const afterReference = this[SCAN_REFERENCE](pos);
       if (afterReference === MORE) return MORE;
-      this.flags |= afterReference < 0 ? ScanFlag.REFERENCE | ScanFlag.ENTITY : ScanFlag.REFERENCE;
+      this.flags |= afterReference < 0 ? REFERENCE_FLAG | ENTITY_FLAG : REFERENCE_FLAG;
       pos = Math.abs(afterReference);
     }
   }
@@ -780,7 +804,7 @@ export class Tokenizer implements ScanState {
         this.nameEnd = nameStart + openNameLength;
         this.endTagMatchesOpenElement = true;
         this.nextTokenStart = nameStart + openNameLength + 1;
-        return Token.END_TAG;
+        return END_TAG_TOKEN;
       }
     }
     this.endTagMatchesOpenElement = false;
@@ -821,7 +845,7 @@ export class Tokenizer implements ScanState {
     if (Number.isNaN(char)) return bufferEnded(this, closeAt, 'Unexpected end in an end tag');
     if (char !== GREATER_THAN) throw scanError(ErrorCode.WF_TAG, closeAt, 'Expected > to end the end tag');
     this.nextTokenStart = closeAt + 1;
-    return Token.END_TAG;
+    return END_TAG_TOKEN;
   }
 
   /** Scans `<?target data?>`; the target goes in the name fields and the data in the value fields. */
@@ -849,25 +873,25 @@ export class Tokenizer implements ScanState {
       if (dataStart === MORE) return MORE;
       if (dataStart === targetEnd) throw scanError(ErrorCode.WF_PI, targetEnd, 'Expected whitespace after the target');
     }
-    const dataEnd = this[FIND_DATA_END](dataStart, Terminator.PI);
+    const dataEnd = this[FIND_DATA_END](dataStart, PI_TERMINATOR);
     if (dataEnd === MORE) return bufferEnded(this, dataStart, 'Unterminated processing instruction');
-    return this[END_CONTENT_TOKEN](Token.PI, dataStart, dataEnd, dataEnd + PI_CLOSE_LENGTH);
+    return this[END_CONTENT_TOKEN](PI_TOKEN, dataStart, dataEnd, dataEnd + PI_CLOSE_LENGTH);
   }
 
   /** Scans `<!-- … -->`, where `--` may only end the comment. */
   private [SCAN_COMMENT](lessThan: number): TokenKind | typeof MORE {
-    const hyphens = this[FIND_DATA_END](lessThan + COMMENT_OPEN_LENGTH, Terminator.COMMENT);
+    const hyphens = this[FIND_DATA_END](lessThan + COMMENT_OPEN_LENGTH, COMMENT_TERMINATOR);
     if (hyphens === MORE) return bufferEnded(this, lessThan, 'Unterminated comment');
     const afterClose = scanCommentClose(this, hyphens);
     if (afterClose === MORE) return MORE;
-    return this[END_CONTENT_TOKEN](Token.COMMENT, lessThan + COMMENT_OPEN_LENGTH, hyphens, afterClose);
+    return this[END_CONTENT_TOKEN](COMMENT_TOKEN, lessThan + COMMENT_OPEN_LENGTH, hyphens, afterClose);
   }
 
   /** Scans `<![CDATA[ … ]]>`. */
   private [SCAN_CDATA](lessThan: number): TokenKind | typeof MORE {
-    const dataEnd = this[FIND_DATA_END](lessThan + CDATA_OPEN_LENGTH, Terminator.CDATA);
+    const dataEnd = this[FIND_DATA_END](lessThan + CDATA_OPEN_LENGTH, CDATA_TERMINATOR);
     if (dataEnd === MORE) return bufferEnded(this, lessThan, 'Unterminated CDATA section');
-    return this[END_CONTENT_TOKEN](Token.CDATA, lessThan + CDATA_OPEN_LENGTH, dataEnd, dataEnd + CDATA_CLOSE_LENGTH);
+    return this[END_CONTENT_TOKEN](CDATA_TOKEN, lessThan + CDATA_OPEN_LENGTH, dataEnd, dataEnd + CDATA_CLOSE_LENGTH);
   }
 
   /** Records the content of a PI, comment or CDATA section, and where the next token starts. */
@@ -884,6 +908,6 @@ export class Tokenizer implements ScanState {
     const end = this.doctype.scan(this, lessThan);
     if (end === MORE) return MORE;
     this.nextTokenStart = end;
-    return Token.DOCTYPE;
+    return DOCTYPE_TOKEN;
   }
 }

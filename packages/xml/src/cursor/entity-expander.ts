@@ -17,6 +17,9 @@ import type { EventProcessing } from './event-processing.ts';
 import { EventType } from './event-type.ts';
 import { fail } from './internal.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const { CHARACTERS, ENTITY_REFERENCE, NEED_INPUT } = EventType;
+
 /** The other parts of the reader that the expander works with; the stream reader hands them over. */
 export interface ExpanderParts {
   readonly entities: EntityStack;
@@ -150,7 +153,7 @@ export class EntityExpander {
       const location = this.#parts.entities.locationIn(tokenizer, tokenizer.nameStart);
       this.#parts.errors.error(ErrorCode.VC_ENTITY_DECLARED, `The entity ${name} is not declared`, location);
     }
-    return typeof found === 'string' ? EventType.ENTITY_REFERENCE : this.#expandEntity(found, offset);
+    return typeof found === 'string' ? ENTITY_REFERENCE : this.#expandEntity(found, offset);
   }
 
   /** Expands a declared entity in content, or reports it when expansion is off or it is not read. */
@@ -161,7 +164,7 @@ export class EntityExpander {
     }
     if (!this.#options.replaceEntityReferences) {
       this.text = value ?? '';
-      if (this.#parts.processing.validation === undefined) return EventType.ENTITY_REFERENCE;
+      if (this.#parts.processing.validation === undefined) return ENTITY_REFERENCE;
       if (this.#parts.processing.validatorOnlyDepth === 0) return this.#expandHidden(entity, offset);
     }
     if (this.#parts.entities.isOpen(name)) {
@@ -202,7 +205,7 @@ export class EntityExpander {
       this.countNode();
       this.literalText = value;
       if (processing.hearsEntities) this.#literalEntityName = name;
-      return EventType.CHARACTERS;
+      return CHARACTERS;
     }
     const source = stringSource(value);
     const tokenizer =
@@ -215,17 +218,17 @@ export class EntityExpander {
 
   /** Expands an external parsed entity a resolver supplies; one that is not read is reported as a skipped entity. */
   #expandExternal(entity: EntityDeclaration, offset: number): EventType | undefined {
-    if (!this.#options.supportExternalEntities) return EventType.ENTITY_REFERENCE;
+    if (!this.#options.supportExternalEntities) return ENTITY_REFERENCE;
     const { entities, errors } = this.#parts;
     const referringTokenizer = entities.current;
     let resolved;
     try {
       resolved = this.external.resolve(entityRequest(entity), this.#options.accessExternalEntities);
     } catch (error) {
-      if (error instanceof ResolutionPendingError) return EventType.NEED_INPUT;
+      if (error instanceof ResolutionPendingError) return NEED_INPUT;
       errors.reportRefused(error, entities.locationIn(referringTokenizer, referringTokenizer.tokenStart));
     }
-    if (resolved === undefined) return EventType.ENTITY_REFERENCE;
+    if (resolved === undefined) return ENTITY_REFERENCE;
     this.#failIfExceeded(this.counter.countExternalExpansion());
     const opened = this.external.openResolved(resolved.source, resolved.systemId);
     const version11 = entities.document.version11;
@@ -273,7 +276,7 @@ export class EntityExpander {
       processing.validatorOnlyDepth = 0;
       this.name = this.#hiddenName;
       this.text = this.#hiddenText;
-      return EventType.ENTITY_REFERENCE;
+      return ENTITY_REFERENCE;
     }
     processing.entityEnded(frame.entityName, entities);
     return undefined;

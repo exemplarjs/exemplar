@@ -3,6 +3,20 @@ import type { StreamReaderDelegate } from '@exemplarjs/xml/filters';
 import { ReaderInput, type StreamReader, XMLNS_NAMESPACE } from '@exemplarjs/xml/internal';
 import type { StreamWriter } from './stream-writer.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+} = EventType;
+
 /** A reader `StreamWriter.copy` can read: a cursor or a delegate. */
 export type CopiedReader = PublicStreamReader | AsyncStreamReader | StreamReaderDelegate;
 
@@ -27,40 +41,40 @@ class ReaderCopy {
     const reader = this.#reader;
     const writer = this.#writer;
     switch (type) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         this.#startElement();
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         writer.writeEndElement();
         break;
       }
-      case EventType.CHARACTERS:
-      case EventType.SPACE: {
+      case CHARACTERS:
+      case SPACE: {
         writer.writeCharacters(reader.text());
         break;
       }
-      case EventType.CDATA: {
+      case CDATA: {
         writer.writeCData(reader.text());
         break;
       }
-      case EventType.COMMENT: {
+      case COMMENT: {
         writer.writeComment(reader.text());
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         writer.writeProcessingInstruction(reader.piTarget(), reader.piData());
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         writer.writeDTD(reader.text());
         break;
       }
-      case EventType.ENTITY_REFERENCE: {
+      case ENTITY_REFERENCE: {
         writer.writeEntityRef(reader.name());
         break;
       }
-      case EventType.START_DOCUMENT: {
+      case START_DOCUMENT: {
         if (!this.#input.isElement)
           writer.writeStartDocument(reader.version() ?? '1.0', undefined, reader.standalone());
         break;

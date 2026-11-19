@@ -10,6 +10,16 @@ import type { Attr, Document, Element, Node, Text } from '@/nodes';
 import { DTD_TYPES, fail, orNull } from './names.ts';
 import { NodeType } from './node-type.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  ELEMENT_NODE,
+  TEXT_NODE,
+  CDATA_SECTION_NODE,
+  ENTITY_REFERENCE_NODE,
+  PROCESSING_INSTRUCTION_NODE,
+  COMMENT_NODE,
+} = NodeType;
+
 /** A live, read-only list of strings, following DOM Level 3's DOMStringList. */
 export class DOMStringList {
   readonly #items: readonly string[];
@@ -274,11 +284,11 @@ class Normalizer {
       // The next sibling is taken first, as normalizing a node may replace or remove it.
       at.next = node._next;
       const type = node.nodeType;
-      if (type === NodeType.ELEMENT_NODE) {
+      if (type === ELEMENT_NODE) {
         const bindingCount = this.#bindings.length;
         this.#element(node as Element);
         open.push({ parent: node, next: node.firstChild, bindingCount });
-      } else if (type === NodeType.ENTITY_REFERENCE_NODE) {
+      } else if (type === ENTITY_REFERENCE_NODE) {
         at.next = this.#reference(node) ?? at.next;
       } else {
         this.#node(node);
@@ -289,19 +299,19 @@ class Normalizer {
   /** Normalizes a node that holds no children, which may replace or remove itself. */
   #node(node: Node): void {
     switch (node.nodeType) {
-      case NodeType.TEXT_NODE: {
+      case TEXT_NODE: {
         this.#text(node as Text);
         break;
       }
-      case NodeType.CDATA_SECTION_NODE: {
+      case CDATA_SECTION_NODE: {
         this.#cdata(node as Text);
         break;
       }
-      case NodeType.PROCESSING_INSTRUCTION_NODE: {
+      case PROCESSING_INSTRUCTION_NODE: {
         this.#processingInstruction(node);
         break;
       }
-      case NodeType.COMMENT_NODE: {
+      case COMMENT_NODE: {
         this.#comment(node);
         break;
       }
@@ -313,7 +323,7 @@ class Normalizer {
   #joinText(parent: Node): void {
     for (let child = parent.firstChild; child !== null;) {
       const next = child._next;
-      if (child.nodeType === NodeType.TEXT_NODE) joinForward(parent, child as Text);
+      if (child.nodeType === TEXT_NODE) joinForward(parent, child as Text);
       child = next;
     }
   }
@@ -521,7 +531,7 @@ class Normalizer {
 /** Joins a text node to the text node after it, or drops it when it is empty. */
 function joinForward(parent: Node, text: Text): void {
   const next = text._next;
-  if (next?.nodeType === NodeType.TEXT_NODE) {
+  if (next?.nodeType === TEXT_NODE) {
     (next as Text)._data = text._data + (next as Text)._data;
     parent._unlink(text);
   } else if (text._data === '') {

@@ -11,9 +11,11 @@ import { AttributeFlag, type Tree } from '@/tree/tree';
 import type { TreeBuilder } from '@/tree/tree-builder';
 import { OpenEntities } from './open-entities.ts';
 
-// Module-level constants, so V8 can inline them; an imported binding is read again on every use.
-const EventType = events.EventType;
 type EventType = events.EventType;
+
+// Module-level constants, so V8 can inline them; an imported binding is read again on every use.
+const { START_ELEMENT, END_ELEMENT, PROCESSING_INSTRUCTION, CHARACTERS, COMMENT, SPACE, END_DOCUMENT, DTD, CDATA } =
+  events.EventType;
 const { ID, IDREFS, NONE } = AttributeFlag;
 
 /** The AttributeFlag bits for a DTD attribute type. */
@@ -50,17 +52,17 @@ export class CursorLoader implements EntityListener {
   /** Adds what one event reports; returns true at the end of the document. */
   add(type: EventType): boolean {
     switch (type) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         this.#startElement();
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         this.#builder.endElement();
         break;
       }
-      case EventType.CHARACTERS:
-      case EventType.SPACE:
-      case EventType.CDATA: {
+      case CHARACTERS:
+      case SPACE:
+      case CDATA: {
         this.#builder.text(this.reader.text());
         break;
       }
@@ -76,22 +78,22 @@ export class CursorLoader implements EntityListener {
     const reader = this.reader;
     const builder = this.#builder;
     switch (type) {
-      case EventType.COMMENT: {
+      case COMMENT: {
         builder.comment(copyString(reader.text()));
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         const parent = builder.current;
         const target = builder.names.code(reader.piTarget(), '');
         const instruction = builder.processingInstruction(target, copyString(reader.piData()));
         if (this.#entities.length > 0) this.#entityBase(instruction, parent);
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         this.#dtd();
         break;
       }
-      case EventType.END_DOCUMENT: {
+      case END_DOCUMENT: {
         builder.endDocument();
         return true;
       }

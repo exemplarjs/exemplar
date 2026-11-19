@@ -349,6 +349,9 @@ export function scanName(state: ScanState, start: number): number {
 /** What ends the content `scanTo` reads: `--` in a comment, `?>` in a PI, `]]>` in a CDATA section. */
 export const Terminator = { COMMENT: 0, PI: 1, CDATA: 2 } as const;
 
+// Module-level constants, so V8 can inline them; an object's members are read again on every use.
+const { COMMENT: COMMENT_TERMINATOR, PI: PI_TERMINATOR } = Terminator;
+
 /** One of the terminators. */
 export type TerminatorKind = (typeof Terminator)[keyof typeof Terminator];
 
@@ -363,8 +366,8 @@ function terminatorStartsAt(text: string, pos: number, terminator: TerminatorKin
   // eslint-disable-next-line prefer-code-point -- NaN past the end marks the end
   const second = text.charCodeAt(pos + 1);
   if (Number.isNaN(second)) return NEED_MORE;
-  if (terminator === Terminator.COMMENT) return second === HYPHEN ? pos : NOT_HERE;
-  if (terminator === Terminator.PI) return second === GREATER_THAN ? pos : NOT_HERE;
+  if (terminator === COMMENT_TERMINATOR) return second === HYPHEN ? pos : NOT_HERE;
+  if (terminator === PI_TERMINATOR) return second === GREATER_THAN ? pos : NOT_HERE;
   if (second !== RIGHT_BRACKET) return NOT_HERE;
   // eslint-disable-next-line prefer-code-point -- NaN past the end marks the end
   const third = text.charCodeAt(pos + CDATA_CLOSE_LAST_OFFSET);

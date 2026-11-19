@@ -29,7 +29,7 @@ const READER_OVERRIDES = {
 };
 
 // Module-level constants, so V8 can inline them; an imported binding is read again on every use.
-const EventType = events.EventType;
+const { NEED_INPUT } = events.EventType;
 
 /** What a DocumentBuilder adds to its factory's options, named as JAXP's `DocumentBuilderFactory` names them. */
 export interface BuilderOptions {
@@ -138,7 +138,7 @@ export class DocumentBuilder {
   async #parseSourceAsync(source: Source): Promise<Document> {
     const tree = this.#treeBuilder(source, 'async');
     for (let type = tree.reader.eventType(); ; type = tree.reader.next()) {
-      if (type === EventType.NEED_INPUT) await tree.reader.fill();
+      if (type === NEED_INPUT) await tree.reader.fill();
       else if (tree.add(type)) return tree.document;
     }
   }

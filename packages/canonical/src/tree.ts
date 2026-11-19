@@ -15,6 +15,18 @@ import type { CanonicalizeOptions } from './canonicalize.ts';
 import type { AncestorAttribute } from './inheritance.ts';
 import { type CanonicalAttribute, Canonicalizer, type CanonicalXMLMethod } from './render.ts';
 
+// Module-level constants, so V8 can inline them; imported bindings are read again on every use.
+const {
+  ELEMENT_NODE,
+  TEXT_NODE,
+  CDATA_SECTION_NODE,
+  ENTITY_REFERENCE_NODE,
+  PROCESSING_INSTRUCTION_NODE,
+  COMMENT_NODE,
+  DOCUMENT_NODE,
+  DOCUMENT_FRAGMENT_NODE,
+} = NodeType;
+
 /** The parts of a DOM node canonicalization reads, so that any DOM Level 2 tree can be canonicalized. */
 export interface CanonicalNode extends NodeLike<CanonicalNode> {
   readonly ownerDocument: CanonicalNode | null;
@@ -43,7 +55,7 @@ function fail(code: ErrorCode, message: string): never {
  */
 export class TreeCanonicalizer extends Canonicalizer {
   constructor(node: CanonicalNode, method: CanonicalXMLMethod, options: CanonicalizeOptions) {
-    const document = node.nodeType === NodeType.DOCUMENT_NODE ? node : node.ownerDocument;
+    const document = node.nodeType === DOCUMENT_NODE ? node : node.ownerDocument;
     if (document?.xmlVersion === '1.1') fail(ErrorCode.C14N_VERSION, 'Canonical XML is not defined for XML 1.1');
     // As for a source: the encoding declared, or else the one detected.
     super(method, options, document?.xmlEncoding ?? document?.inputEncoding);
@@ -52,8 +64,8 @@ export class TreeCanonicalizer extends Canonicalizer {
   /** The canonical form of a document, or of a node and everything below it. */
   write(node: CanonicalNode): string {
     const { nodeType } = node;
-    if (nodeType === NodeType.DOCUMENT_NODE) this.#writeDocument(node);
-    else if (nodeType === NodeType.ELEMENT_NODE) this.#writeApex(node);
+    if (nodeType === DOCUMENT_NODE) this.#writeDocument(node);
+    else if (nodeType === ELEMENT_NODE) this.#writeApex(node);
     else this.#writeChild(node, noNamespaces(), noNamespaces());
     return this.output;
   }
@@ -62,7 +74,7 @@ export class TreeCanonicalizer extends Canonicalizer {
   #writeDocument(node: CanonicalNode): void {
     let sawRoot = false;
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      if (child.nodeType === NodeType.ELEMENT_NODE) {
+      if (child.nodeType === ELEMENT_NODE) {
         sawRoot = true;
         this.#writeElement(child, noNamespaces(), noNamespaces(), 'apex');
         continue;
@@ -74,27 +86,24 @@ export class TreeCanonicalizer extends Canonicalizer {
 
   /** The markup of a comment or processing instruction; anything else outside the root element has no canonical form. */
   #commentOrPIMarkup(node: CanonicalNode): string {
-    if (node.nodeType === NodeType.COMMENT_NODE)
-      return this.keepsComments ? this.commentMarkup(node.nodeValue ?? '') : '';
-    return node.nodeType === NodeType.PROCESSING_INSTRUCTION_NODE
-      ? this.piMarkup(node.nodeName, node.nodeValue ?? '')
-      : '';
+    if (node.nodeType === COMMENT_NODE) return this.keepsComments ? this.commentMarkup(node.nodeValue ?? '') : '';
+    return node.nodeType === PROCESSING_INSTRUCTION_NODE ? this.piMarkup(node.nodeName, node.nodeValue ?? '') : '';
   }
 
   /** Writes a node inside the apex: an element, character data, or the children of a reference or fragment. */
   #writeChild(node: CanonicalNode, scope: ReadonlyMap<string, string>, rendered: ReadonlyMap<string, string>): void {
     switch (node.nodeType) {
-      case NodeType.ELEMENT_NODE: {
+      case ELEMENT_NODE: {
         this.#writeElement(node, scope, rendered, 'descendant');
         break;
       }
-      case NodeType.TEXT_NODE:
-      case NodeType.CDATA_SECTION_NODE: {
+      case TEXT_NODE:
+      case CDATA_SECTION_NODE: {
         this.writeCharacters(node.nodeValue ?? '');
         break;
       }
-      case NodeType.ENTITY_REFERENCE_NODE:
-      case NodeType.DOCUMENT_FRAGMENT_NODE: {
+      case ENTITY_REFERENCE_NODE:
+      case DOCUMENT_FRAGMENT_NODE: {
         for (let child = node.firstChild; child !== null; child = child.nextSibling)
           this.#writeChild(child, scope, rendered);
         break;
@@ -142,7 +151,7 @@ function canonicalAttribute(attr: CanonicalNode): CanonicalAttribute[] {
 /** The `xml:` attributes of a node's ancestors, outermost first. */
 function ancestorXmlAttributes(node: CanonicalNode): AncestorAttribute[] {
   const attributes: AncestorAttribute[] = [];
-  for (let ancestor = node.parentNode; ancestor?.nodeType === NodeType.ELEMENT_NODE; ancestor = ancestor.parentNode) {
+  for (let ancestor = node.parentNode; ancestor?.nodeType === ELEMENT_NODE; ancestor = ancestor.parentNode) {
     const own = attributesOf(ancestor).filter((attr) => prefixOf(attr.nodeName) === 'xml');
     attributes.unshift(...own.map((attr): AncestorAttribute => [attr.nodeName, attr.nodeValue ?? '']));
   }
@@ -174,7 +183,7 @@ function declareNamespaces(
 /** The namespaces in scope at a node, from its ancestors' declarations; the nearest wins. */
 function namespacesInScopeAt(node: CanonicalNode | null): Map<string, string> {
   const chain: CanonicalNode[] = [];
-  for (let element = node; element !== null && element.nodeType === NodeType.ELEMENT_NODE; element = element.parentNode)
+  for (let element = node; element !== null && element.nodeType === ELEMENT_NODE; element = element.parentNode)
     chain.unshift(element);
   const scope = new Map([['', '']]);
   for (const element of chain) {

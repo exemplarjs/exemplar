@@ -8,6 +8,7 @@ import { reservedBindingProblem, UNDECLARING_PROBLEM, XML_NAMESPACE, XMLNS_NAMES
 import { fail, isIndex, outOfRange } from './internal.ts';
 
 // Module-level constants, so V8 can inline them.
+const { NAME_START_CHAR } = NameClass;
 const { LOWER_X, NON_ASCII } = Char;
 
 /** The lengths of the reserved names, which names are compared with before their text. */
@@ -25,7 +26,7 @@ export function checkQName(tokenizer: Tokenizer, start: number, end: number, col
   const afterColon = buffer.charCodeAt(colon + 1);
   const startsName =
     afterColon < NON_ASCII
-      ? NAME_CLASSES[afterColon] === NameClass.NAME_START_CHAR
+      ? NAME_CLASSES[afterColon] === NAME_START_CHAR
       : isNameStartCharBmp(afterColon) || isHighSurrogate(afterColon);
   if (colonCount > 1 || colon === start || colon === end - 1 || !startsName) {
     fail(tokenizer, ErrorCode.NS_QNAME, `${buffer.slice(start, end)} is not a qualified name`, start);

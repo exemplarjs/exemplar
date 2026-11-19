@@ -30,9 +30,22 @@ import {
   TypeInfo,
 } from './nodes/index.ts';
 
-// Module-level constants, so V8 can inline them; an imported binding is read again on every use.
-const EventType = events.EventType;
 type EventType = events.EventType;
+
+// Module-level constants, so V8 can inline them; an imported binding is read again on every use.
+const {
+  START_ELEMENT,
+  END_ELEMENT,
+  PROCESSING_INSTRUCTION,
+  CHARACTERS,
+  COMMENT,
+  SPACE,
+  START_DOCUMENT,
+  END_DOCUMENT,
+  ENTITY_REFERENCE,
+  DTD,
+  CDATA,
+} = events.EventType;
 const { ENTITY_REFERENCE_NODE, TEXT_NODE } = NodeType;
 
 /** What `#elementContent` holds for an open element: whether the DTD gives it element content. */
@@ -109,25 +122,25 @@ export class TreeBuilder implements EntityListener {
   /** Adds what one event reports; returns true at the end of the document. */
   add(type: EventType): boolean {
     switch (type) {
-      case EventType.START_ELEMENT: {
+      case START_ELEMENT: {
         this.#startElement();
         break;
       }
-      case EventType.END_ELEMENT: {
+      case END_ELEMENT: {
         this.#current = this.#current._parent as Node;
         if (this.#elementOnly.size > 0) this.#elementContent.pop();
         break;
       }
-      case EventType.CHARACTERS: {
+      case CHARACTERS: {
         const isIgnorable = this.#inElementContent() && this.reader.isWhitespace();
         this.#characters(isIgnorable ? 'ignorable' : 'content');
         break;
       }
-      case EventType.SPACE: {
+      case SPACE: {
         this.#characters('ignorable');
         break;
       }
-      case EventType.CDATA: {
+      case CDATA: {
         if (this.#options.coalescing) this.#characters('content');
         else this.#current._append(new CDATASection(this.document, this.reader.text()));
         break;
@@ -143,27 +156,27 @@ export class TreeBuilder implements EntityListener {
   #otherEvent(type: EventType): boolean {
     const reader = this.reader;
     switch (type) {
-      case EventType.COMMENT: {
+      case COMMENT: {
         if (!this.#options.ignoringComments) this.#current._append(new Comment(this.document, reader.text()));
         break;
       }
-      case EventType.PROCESSING_INSTRUCTION: {
+      case PROCESSING_INSTRUCTION: {
         this.#current._append(new ProcessingInstruction(this.document, reader.piTarget(), reader.piData()));
         break;
       }
-      case EventType.ENTITY_REFERENCE: {
+      case ENTITY_REFERENCE: {
         this.#current._append(entityReference(this.document, reader.name()));
         break;
       }
-      case EventType.START_DOCUMENT: {
+      case START_DOCUMENT: {
         this.#startDocument();
         break;
       }
-      case EventType.DTD: {
+      case DTD: {
         this.#dtd();
         break;
       }
-      case EventType.END_DOCUMENT: {
+      case END_DOCUMENT: {
         this.#addIncluded();
         this.document._changed();
         return true;
