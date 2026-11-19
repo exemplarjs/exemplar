@@ -1,5 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreBinaries": ["conformance", "differential", "fuzz"],
+  "ignoreBinaries": ["build", "conformance", "differential", "fuzz", "qt3"],
   "workspaces": { "examples": { "entry": ["*/example.ts"] } }
 }

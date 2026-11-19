@@ -1,12 +1,12 @@
 {
   "name": "@exemplarjs/writer",
   "version": "0.1.0",
-  "private": true,
   "description": "XML stream and event writers, following StAX, and their sinks",
   "license": "Apache-2.0",
+  "homepage": "https://exemplar.l47.net",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/io-timeout/exemplar.git",
+    "url": "git+https://github.com/exemplarjs/exemplar.git",
     "directory": "packages/writer"
   },
   "type": "module",

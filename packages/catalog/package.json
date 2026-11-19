@@ -1,12 +1,12 @@
 {
   "name": "@exemplarjs/catalog",
   "version": "0.1.0",
-  "private": true,
   "description": "OASIS XML Catalogs 1.1 for @exemplarjs/xml",
   "license": "Apache-2.0",
+  "homepage": "https://exemplar.l47.net",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/io-timeout/exemplar.git",
+    "url": "git+https://github.com/exemplarjs/exemplar.git",
     "directory": "packages/catalog"
   },
   "type": "module",

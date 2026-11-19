@@ -1,7 +1,7 @@
 # exemplar design
 
 How exemplar is built, and why. What it does, as its users see it, is in the
-[documentation](https://github.com/io-timeout/exemplar-docs); how the repository is built, its conventions and how to
+[documentation](https://github.com/exemplarjs/exemplar-docs); how the repository is built, its conventions and how to
 measure a change are in [development.md](development.md), and the tests in [testing.md](testing.md).
 
 exemplar aims to be the most conformant XML library for JavaScript, the fastest, and as capable as the Java XML stack.

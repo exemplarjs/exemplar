@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/io-timeout/exemplar.git",
+    "url": "git+https://github.com/exemplarjs/exemplar.git",
     "directory": "examples"
   },
   "type": "module",
