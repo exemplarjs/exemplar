@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Run everything, but publish nothing and tag nothing.
+        type: boolean
+        default: false
+
+# Every job only reads the repositories it checks out, unless it says otherwise.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  # The long property runs.
+  properties:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm compile
+      - name: Long property runs
+        env:
+          EXEMPLAR_FUZZ_SCALE: '300'
+        run: pnpm --filter @exemplarjs/xml exec vitest run test/integration/property.test.ts
+
+  # The differentials against libxml2, Xerces and javax.xml.catalog.
+  differentials:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          java: true
+          xmllint: true
+      - name: Differentials
+        working-directory: exemplar-tests
+        run: pnpm differential
+
+  fuzz:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          xmllint: true
+      - name: Long fuzz run
+        working-directory: exemplar-tests
+        env:
+          EXEMPLAR_FUZZ_SCALE: '300'
+        run: pnpm --filter @exemplarjs/conformance exec vitest run test/fuzz.test.ts
+      - name: Fuzz differential against libxml2
+        working-directory: exemplar-tests
+        run: pnpm fuzz --runs 200000
+
+  bun-conformance:
+    name: The XML suite on Bun
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          bun: true
+      - working-directory: exemplar-tests
+        run: bun tools/conformance/src/cli.ts exemplar
+
+  # Publishes every public package at the version in the checkout, and tags it.
+  publish:
+    needs: [checks, properties, differentials, fuzz, bun-conformance]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    # Needs a reviewer's approval, and is named in each package's trusted publisher on npmjs.com.
+    environment: release
+    permissions:
+      # The tag and release, and npm's OIDC login, which also signs provenance.
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm compile
+      - name: Read the version
+        id: version
+        run: echo "version=$(node -p "require('./packages/xml/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publish to npm
+        env:
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: pnpm publish --recursive --access public --no-git-checks $DRY_RUN
+      - name: Tag and release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes

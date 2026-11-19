@@ -136,8 +136,9 @@ unfinished token is scanned again, `LineCounter` counts lines, `DoctypeToken` re
 
 Names, attribute values, text and namespace URIs stay spans of the source until asked for, and plain text, with nothing
 to normalize, is sliced in `text()` itself. A name the buffer is about to drop is sliced first. Event objects and
-`copyStrings` copy instead, by appending a character and slicing it off again, which makes V8 flatten the string into
-memory of its own.
+`copyStrings` copy instead, by appending a character, reading one so that the engine writes the joined string into
+memory of its own, and slicing the character off again. Strings of every length are copied, since JavaScriptCore keeps
+even a short slice as a view of its parent.
 
 A start tag whose element has declared attributes, or whose values refer to entities, is read into a list of strings;
 any other is read from spans of the buffer. A start tag with no attributes and no prefix needs no namespace work, and

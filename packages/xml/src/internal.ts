@@ -39,7 +39,14 @@ export { SINGLE_BYTE_TABLES } from './encodings/tables.ts';
 export { unmatchedByCatalog } from './entities/external.ts';
 export { type DecoderRegistry, canonicalEncoding } from './input/decoders.ts';
 export { detect } from './input/detect.ts';
-export { type AsyncOpenedSource, type ByteStream, type OpenedSource, openSource, readStream } from './input/source.ts';
+export {
+  type AsyncOpenedSource,
+  type ByteStream,
+  type OpenedSource,
+  openSource,
+  readStream,
+  sourceObjectOf,
+} from './input/source.ts';
 export { accessAllows, accessRefusedError, orElse, resolverMissingError } from './resolvers/resolver.ts';
 export type { LineSegment } from './tokenizer/lines.ts';
 

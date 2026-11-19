@@ -49,8 +49,20 @@ export function translateRegex(pattern: string, flags: string, dialect: RegexDia
   // Valid flags hold only letters, so the separators cannot be confused.
   return translations.get(`${dialect}/${flags}/${pattern}`, () => {
     const { source, groupCount, groupParents } = translatePattern(pattern, optionsFor(flags, dialect));
-    return { regex: new RegExp(source, 'v'), global: new RegExp(source, 'dgv'), groupCount, groupParents };
+    const regex = engineRegex(source, 'v', pattern);
+    return { regex, global: engineRegex(source, 'dgv', pattern), groupCount, groupParents };
   });
+}
+
+/** A translated pattern as a `RegExp`; one the engine refuses, such as a quantifier above its limit, is an invalid pattern. */
+function engineRegex(source: string, flags: string, pattern: string): RegExp {
+  try {
+    return new RegExp(source, flags);
+  } catch (error) {
+    const { message } = ErrorFactory.expect(error, SyntaxError);
+    const reason = `the JavaScript engine does not accept it (${message})`;
+    throw ErrorFactory.create(RegexError, 'invalid-pattern', reason, pattern, undefined);
+  }
 }
 
 /** Throws unless every flag is one XPath allows; XSD allows none. */

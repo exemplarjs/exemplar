@@ -1,0 +1,68 @@
+name: Checks
+
+# Every check a change must pass, shared by the pull request and release workflows.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm format:check
+      - run: pnpm lint:ci
+      - run: pnpm typecheck
+
+  # The unit tests, one job for each place the library runs.
+  test:
+    name: Tests on ${{ matrix.target }}
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Node
+            command: pnpm test:coverage
+          - target: Bun
+            command: pnpm test:bun
+            bun: true
+          - target: Chromium
+            command: pnpm test:browser --project '*(chromium)'
+            browser: chromium
+          - target: Firefox
+            command: pnpm test:browser --project '*(firefox)'
+            browser: firefox
+          - target: WebKit
+            command: pnpm test:browser --project '*(webkit)'
+            browser: webkit
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          bun: ${{ matrix.bun || false }}
+      - if: matrix.browser
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: ${{ matrix.command }}
+      - if: matrix.target == 'Node'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/lcov.info
+
+  # The W3C suites and consistency checks, from exemplar-tests, on this change's build.
+  conformance:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: exemplar
+      - uses: ./exemplar/.github/actions/setup-tests
+        with:
+          xmllint: true
+      - name: Run the suites
+        working-directory: exemplar-tests
+        run: pnpm conformance

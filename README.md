@@ -11,7 +11,7 @@ XDM trees, XPath 3.1, writers, DTD validation, XInclude, catalogs and canonical 
 ## Why exemplar
 
 The complete XML stack for JavaScript and TypeScript, and the best one. Everything Java developers rely on in StAX, SAX,
-DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Deno, Bun and every modern browser.
+DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
   [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for

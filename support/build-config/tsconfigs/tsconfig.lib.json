@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    // The library runs in browsers as well as on Node, Deno and Bun.
+    // The library runs in browsers as well as on Node and Bun.
     "lib": ["esnext", "dom"],
     "module": "esnext",
     "moduleResolution": "bundler",

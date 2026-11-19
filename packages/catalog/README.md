@@ -6,7 +6,7 @@ resolves them.
 ## Why exemplar
 
 The complete XML stack for JavaScript and TypeScript, and the best one. Everything Java developers rely on in StAX, SAX,
-DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Deno, Bun and every modern browser.
+DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
   [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
@@ -84,9 +84,9 @@ while (reader.next() !== EventType.END_DOCUMENT)
   if (reader.eventType() === EventType.CHARACTERS) console.log(reader.text()); // ACME Tea
 ```
 
-On Node, Deno and Bun the catalog reads local `file:` URIs itself, so `read` is needed only elsewhere, or to serve
-catalogs from memory as above. The access lists apply to the URI the catalog maps to, so a catalog that maps `http:`
-identifiers to `file:` copies needs only `'file'`.
+On Node and Bun the catalog reads local `file:` URIs itself, so `read` is needed only elsewhere, or to serve catalogs
+from memory as above. The access lists apply to the URI the catalog maps to, so a catalog that maps `http:` identifiers
+to `file:` copies needs only `'file'`.
 
 ### Everything the specification has
 

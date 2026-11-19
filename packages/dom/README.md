@@ -5,7 +5,7 @@ A W3C DOM Level 3 Core tree for JavaScript, built by the most conformant XML rea
 ## Why exemplar
 
 The complete XML stack for JavaScript and TypeScript, and the best one. Everything Java developers rely on in StAX, SAX,
-DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Deno, Bun and every modern browser.
+DOM and JAXP, plus XPath 3.1, with no dependencies, on Node, Bun and every modern browser.
 
 - **The most conformant.** Nothing in JavaScript passes more of the
   [W3C conformance suites](https://github.com/io-timeout/exemplar-tests/blob/main/docs/testing.md), for XML or for
@@ -47,7 +47,7 @@ Every package builds on `@exemplarjs/xml` and is released at the same version, s
 `@exemplarjs/dom` is the DOM the JDK's `org.w3c.dom` implements: every node type, entity references and the document
 type's entities and notations, attribute types and ID-ness from the DTD, `normalizeDocument()` with `domConfig`, and
 base URIs. It passes 1,405 of the 1,532 pages of the W3C DOM Conformance Test Suite; 87 more need XML Schema.
-Browser-style `DOMParser` and `XMLSerializer` let code written for browsers run unchanged on Node, Deno and Bun.
+Browser-style `DOMParser` and `XMLSerializer` let code written for browsers run unchanged on Node and Bun.
 
 It is fast and lean: on an Apple M3 Max it builds trees at up to 314 MB/s, from nodes that keep their fields few.
 

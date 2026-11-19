@@ -16,6 +16,7 @@ import {
   openSource,
   PENDING,
   readStream,
+  sourceObjectOf,
   stringSource,
   type TextSource,
   UnsupportedEncodingError,
@@ -321,6 +322,14 @@ describe('streams', () => {
     }
     expect(out.join('')).toBe('<a></a>');
     expect(out.filter((chunk) => chunk === null)).toHaveLength(3);
+  });
+
+  it('tells a source object from every other source, a stream with text and bytes methods included', () => {
+    const object = { text: '<a/>', systemId: 'a.xml' };
+    expect(sourceObjectOf(object)).toBe(object);
+    const methods = { text: () => Promise.resolve('<a/>'), bytes: () => Promise.resolve(utf8('<a/>')) };
+    const others = ['<a/>', utf8('<a/>'), [utf8('<a/>')], streamOf(), Object.assign(webStream(), methods), undefined];
+    expect(others.map((source) => sourceObjectOf(source))).toEqual(others.map(() => undefined));
   });
 
   it('refuses a source object that gives its content more than once', () => {

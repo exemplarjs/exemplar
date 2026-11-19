@@ -21,7 +21,7 @@ export function createLibraryConfig(options: UserConfig = {}): UserConfig {
     entry: ['src/**/*.ts'],
     outDir: 'dist',
     format: ['esm'],
-    // The library runs in browsers as well as on Node, Deno and Bun.
+    // The library runs in browsers as well as on Node and Bun.
     platform: 'neutral',
     dts: true,
     sourcemap: true,

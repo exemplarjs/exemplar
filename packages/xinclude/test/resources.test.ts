@@ -60,6 +60,12 @@ describe('contentOf', () => {
     expect(contentOf({ systemId: BASE })).toBeUndefined();
     expect(contentOf(undefined)).toBeUndefined();
   });
+
+  it('gives nothing for a stream with text and bytes methods of its own, as some runtimes have', () => {
+    const methods = { text: () => Promise.resolve('<a/>'), bytes: () => Promise.resolve(new Uint8Array()) };
+    const stream = Object.assign(streamOf('<a/>'), methods);
+    expect(contentOf(stream)).toBeUndefined();
+  });
 });
 
 describe('findResource', () => {

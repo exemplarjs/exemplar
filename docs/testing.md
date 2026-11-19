@@ -18,13 +18,13 @@ repository, which runs them on the build of an exemplar checkout beside it; its
 
 ## Layers
 
-| Layer       | Tool                                     | Runs                                       | Proves                                           |
-| ----------- | ---------------------------------------- | ------------------------------------------ | ------------------------------------------------ |
-| Unit        | vitest, in each package's `test/`        | Every change                               | Each module against the rules it implements      |
-| Property    | vitest with fast-check                   | Briefly on every change, at length nightly | No crash or hang on any input; round trips       |
-| Browsers    | vitest browser mode                      | Every change                               | The same results in Chromium, Firefox and WebKit |
-| Conformance | exemplar-tests, on this checkout's build | Every change; differentials nightly        | The W3C suites, consistency and differentials    |
-| Performance | exemplar-tests                           | Locally against `main`; nightly            | No regressions; comparisons with other libraries |
+| Layer       | Tool                                     | Runs                                          | Proves                                           |
+| ----------- | ---------------------------------------- | --------------------------------------------- | ------------------------------------------------ |
+| Unit        | vitest, in each package's `test/`        | Every change                                  | Each module against the rules it implements      |
+| Property    | vitest with fast-check                   | Briefly on every change, at length on release | No crash or hang on any input; round trips       |
+| Browsers    | vitest browser mode                      | Every change                                  | The same results in Chromium, Firefox and WebKit |
+| Conformance | exemplar-tests, on this checkout's build | Every change; differentials on release        | The W3C suites, consistency and differentials    |
+| Performance | exemplar-tests                           | Locally against `main`; nightly               | No regressions; comparisons with other libraries |
 
 The commands run through Turborepo from the repository root:
 
@@ -81,12 +81,12 @@ fast-check, with its vitest integration, generates inputs:
   them must stop with a limit's error code, quickly. Nesting deeper than `elementDepth`, written out or coming from an
   entity, must stop with `LIMIT_ELEMENT_DEPTH`.
 
-A short run is part of `pnpm test`, and a long run is nightly: `EXEMPLAR_FUZZ_SCALE` multiplies the number of runs. A
-failure prints its seed and path, which fast-check's `seed` and `path` parameters replay.
+A short run is part of `pnpm test`, and a long run is part of a release: `EXEMPLAR_FUZZ_SCALE` multiplies the number of
+runs. A failure prints its seed and path, which fast-check's `seed` and `path` parameters replay.
 
 ## Runtimes
 
 - **Browsers:** vitest's browser mode runs the unit tests in Chromium, Firefox and WebKit through Playwright, on every
   change: `pnpm test:browser`. Tests named `*.node.test.ts` need a file system, so they run on Node only.
-- **Deno and Bun:** exemplar-tests runs the XML suite on both nightly.
+- **Bun:** the unit tests run on every change: `pnpm test:bun`. exemplar-tests runs the XML suite on it at release.
 - **Node:** runs everything.

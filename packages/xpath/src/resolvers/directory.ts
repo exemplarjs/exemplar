@@ -30,7 +30,7 @@ function nameTest(pattern: string): RegExp {
 
 /**
  * A collection resolver that takes the `file:` URI of a directory below a root as the collection of
- * the files in it, in name order, for Node, Deno and Bun; reading them takes a URI resolver that
+ * the files in it, in name order, for Node and Bun; reading them takes a URI resolver that
  * reads files, such as `fileResolver`. It knows no default collection. A URI can choose the files
  * itself, as in `collection('file:///data/books/?select=*.xml')`, which the `select` option
  * otherwise does.
