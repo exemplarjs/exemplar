@@ -6,7 +6,7 @@ packages:
 # Every external dependency's version; packages refer to it with `catalog:`.
 catalog:
   '@fast-check/vitest': 0.5.0
-  '@types/node': 24.19.2
+  '@types/node': 26.6.6
   '@vitest/browser-playwright': 5.1.0
   '@vitest/coverage-v8': 5.1.0
   eslint-plugin-sonarjs: 4.2.2
