@@ -2,10 +2,14 @@ import type { XdmFunction, XdmMap } from '@exemplarjs/xdm';
 import { dynamicError, XPathErrorCode } from '@/api/xpath-exception';
 import { onlyItem, stringArgument, stringResult } from '@/functions/core/values';
 import { booleanOption, optionValue } from '@/functions/options';
+import { sequenceTypeOf } from '@/functions/signatures';
 import { callFunction } from '@/runtime/function-items';
 import { promiseNotAwaited } from '@/runtime/resources';
 import { type JsonValue, parseJson, type StringDecoder } from './json-parser.ts';
 import { decodeEscapes, keepEscapes } from './json-strings.ts';
+
+/** The type of the `fallback` option: a function from a string to a string. */
+const FALLBACK_FUNCTION = sequenceTypeOf('function(xs:string) as xs:string');
 
 /**
  * The string decoder the `escape` and `fallback` options ask for: escapes kept, or decoded with
@@ -14,7 +18,7 @@ import { decodeEscapes, keepEscapes } from './json-strings.ts';
  */
 function stringDecoder(options: XdmMap): StringDecoder {
   const escape = booleanOption(options, 'escape', false);
-  const fallback = optionValue(options, 'fallback', 'function(xs:string) as xs:string');
+  const fallback = optionValue(options, 'fallback', FALLBACK_FUNCTION);
   if (escape && fallback !== undefined)
     return dynamicError(XPathErrorCode.INVALID_OPTION, 'The options escape and fallback cannot be given together');
   if (escape) return keepEscapes;

@@ -9,13 +9,14 @@ import { defineFunction } from '@/functions/signatures';
 import type { DynamicContext } from '@/runtime/dynamic-context';
 import { after, attempt, type Pausable } from '@/runtime/pausing';
 import { isEvaluationSignal } from '@/runtime/resources';
+import type { CompilerStateKey } from '@/static/compiler-state';
 
-/** The builder for evaluations whose resources name none, made on first use. */
-let defaultBuilder: XdmDocumentBuilder | undefined;
+/** A compiler's own document builder, for evaluations whose resources name none. */
+const DOCUMENT_BUILDER: CompilerStateKey<XdmDocumentBuilder> = { make: () => new XdmDocumentBuilder() };
 
-/** The builder an evaluation reads documents with: the one its resources name, or the default. */
-function builderOf(context: DynamicContext): XdmDocumentBuilder {
-  return context.environment.resources.settings.builder ?? (defaultBuilder ??= new XdmDocumentBuilder());
+/** The builder an evaluation reads documents with: the one its resources name, or its compiler's own. */
+function builderOf({ environment }: DynamicContext): XdmDocumentBuilder {
+  return environment.resources.settings.builder ?? environment.staticContext.compilerState.get(DOCUMENT_BUILDER);
 }
 
 /** The reason an error gives, for the message of the error it becomes. */

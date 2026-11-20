@@ -82,7 +82,7 @@ function compileLazyCall(
   definition: FunctionDefinition,
   argumentEvaluators: readonly Evaluator[]
 ): Evaluator | undefined {
-  const { lazyFirst, implementation } = definition;
+  const { lazyFirst } = definition;
   if (lazyFirst === undefined || argumentEvaluators.length !== 1) return undefined;
   // An argument that may pause runs before the call, as its operand, so this one cannot.
   const first = argumentEvaluators[0] as Evaluator;
@@ -91,6 +91,7 @@ function compileLazyCall(
     return (context) => [XdmAtomicValue.integer(count(context))];
   }
   const items = firstItemsReader(first, lazyFirst);
+  const implementation = definition.implementationForCall();
   return (context) => implementation([items(context)], context) as XdmValue;
 }
 
@@ -98,7 +99,9 @@ function compileLazyCall(
 function compileStaticCall(definition: FunctionDefinition, argumentEvaluators: readonly Evaluator[]): Evaluator {
   const lazy = compileLazyCall(definition, argumentEvaluators);
   if (lazy !== undefined) return lazy;
-  const { implementation, localName } = definition;
+  const { localName } = definition;
+  // This call's own implementation, with any state the function keeps where it is called from.
+  const implementation = definition.implementationForCall();
   const types = definitionSignature(definition, argumentEvaluators.length).parameterTypes;
   const descriptions = argumentEvaluators.map((_, index) => () => `Argument ${index + 1} of ${localName}()`);
   const call: PausableEvaluator = (dynamicContext) => {

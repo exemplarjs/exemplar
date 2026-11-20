@@ -85,16 +85,10 @@ describe('translateRegex', () => {
     expect(failure('(', '', 'xpath').kind).toBe('invalid-pattern');
   });
 
-  it('reuses a translation for the same pattern, flags and dialect', () => {
-    const first = translateRegex('cache-a', 'i', 'xpath');
-    expect(translateRegex('cache-a', 'i', 'xpath')).toBe(first);
-    expect(translateRegex('cache-a', '', 'xpath')).not.toBe(first);
-    expect(translateRegex('cache-a', '', 'xsd')).not.toBe(translateRegex('cache-a', '', 'xpath'));
-  });
-
-  it('keeps a bounded number of translations, dropping the oldest', () => {
-    const oldest = translateRegex('evicted', '', 'xpath');
-    for (let i = 0; i < 600; i++) translateRegex(`filler${i}`, '', 'xpath');
-    expect(translateRegex('evicted', '', 'xpath')).not.toBe(oldest);
+  it('translates a pattern each time it is asked, keeping nothing', () => {
+    const first = translateRegex('given-twice', 'i', 'xpath');
+    const second = translateRegex('given-twice', 'i', 'xpath');
+    expect(second).not.toBe(first);
+    expect(second.regex.source).toBe(first.regex.source);
   });
 });

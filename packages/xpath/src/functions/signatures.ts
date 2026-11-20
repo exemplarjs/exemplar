@@ -43,17 +43,12 @@ function readParameters(
   return { types, variadic };
 }
 
-/** The sequence types made in code, by their text, each compiled once. */
-const SEQUENCE_TYPES = new Map<string, SequenceTypeMatcher>();
-
-/** A sequence type written as signatures write it, such as `map(*)`, for the types of functions made in code. */
+/**
+ * A sequence type written as signatures write it, such as `map(*)`, for the types of functions and
+ * options made in code. It is compiled each time, so code that needs one often keeps it as a constant.
+ */
 export function sequenceTypeOf(text: string): SequenceTypeMatcher {
-  let type = SEQUENCE_TYPES.get(text);
-  if (type === undefined) {
-    type = sequenceTypeFromText(text, signaturePrefix);
-    SEQUENCE_TYPES.set(text, type);
-  }
-  return type;
+  return sequenceTypeFromText(text, signaturePrefix);
 }
 
 /** A signature with one more parameter after the others, such as `$collation as xs:string`. */
@@ -76,6 +71,17 @@ function readReturnType(tokens: TokenStream, context: NamespaceContext): Sequenc
  * defineFunction('fn:abs($arg as xs:numeric?) as xs:numeric?', ([arg]) => ...);
  */
 export function defineFunction(signature: string, implementation: FunctionImplementation): FunctionDefinition {
+  return defineStatefulFunction(signature, () => implementation);
+}
+
+/**
+ * A function that keeps state at each place it is called from, such as a cache of the pictures it
+ * has parsed: `makeImplementation` is called once for each place, and its closure holds the state.
+ */
+export function defineStatefulFunction(
+  signature: string,
+  makeImplementation: () => FunctionImplementation
+): FunctionDefinition {
   const tokens = new TokenStream(signature);
   const context = signatureContext(signature);
   const name = resolveFunctionName(tokens.expectName(), context);
@@ -87,7 +93,7 @@ export function defineFunction(signature: string, implementation: FunctionImplem
     parameterTypes: types,
     returnType,
     variadic,
-    implementation,
+    implementationForCall: makeImplementation,
   };
 }
 
@@ -106,16 +112,36 @@ export function defineLazyFunction(
   return { ...defineFunction(signature, implementation), lazyFirst };
 }
 
+/** What a function defined with and without a last parameter does: its other arguments, the last one or undefined, and the dynamic context to its result. */
+export type LastImplementation = (
+  args: readonly XdmValue[],
+  last: XdmValue | undefined,
+  context: DynamicContext
+) => Pausable<XdmValue>;
+
 /** A function defined twice: by its signature, and with one more parameter after the others, its argument given or undefined. */
 export function defineWithLast(
   signature: string,
   parameter: string,
-  implementation: (args: readonly XdmValue[], last: XdmValue | undefined, context: DynamicContext) => Pausable<XdmValue>
+  implementation: LastImplementation
+): FunctionDefinition[] {
+  return defineStatefulWithLast(signature, parameter, () => implementation);
+}
+
+/** `defineWithLast` for a function that keeps state at each place it is called from, as `defineStatefulFunction` does. */
+export function defineStatefulWithLast(
+  signature: string,
+  parameter: string,
+  makeImplementation: () => LastImplementation
 ): FunctionDefinition[] {
   return [
-    defineFunction(signature, (args, context) => implementation(args, undefined, context)),
-    defineFunction(withLastParameter(signature, parameter), (args, context) =>
-      implementation(args.slice(0, -1), args.at(-1), context)
-    ),
+    defineStatefulFunction(signature, () => {
+      const implementation = makeImplementation();
+      return (args, context) => implementation(args, undefined, context);
+    }),
+    defineStatefulFunction(withLastParameter(signature, parameter), () => {
+      const implementation = makeImplementation();
+      return (args, context) => implementation(args.slice(0, -1), args.at(-1), context);
+    }),
   ];
 }

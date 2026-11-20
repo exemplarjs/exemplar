@@ -2,25 +2,30 @@ import { XdmAtomicValue, XdmMap, type XdmValue } from '@exemplarjs/xdm';
 import { dynamicError, XPathErrorCode } from '@/api/xpath-exception';
 import type { DynamicContext } from '@/runtime/dynamic-context';
 import type { Pausable } from '@/runtime/pausing';
+import type { SequenceTypeMatcher } from '@/static/matchers';
 import { isTrue, onlyItem, stringArgument } from './core/values.ts';
 import { convertArgument } from './function-conversion.ts';
 import type { FunctionDefinition } from './function-library.ts';
 import { defineWithLast, sequenceTypeOf } from './signatures.ts';
+
+/** The types of the options most functions take. */
+const BOOLEAN = sequenceTypeOf('xs:boolean');
+const STRING = sequenceTypeOf('xs:string');
 
 /**
  * The value of an option in an options map, converted to the option's sequence type, such as
  * `xs:boolean`, by the function conversion rules, or undefined when the map does not have it;
  * XPTY0004 when it cannot be.
  */
-export function optionValue(options: XdmMap, name: string, type: string): XdmValue | undefined {
+export function optionValue(options: XdmMap, name: string, type: SequenceTypeMatcher): XdmValue | undefined {
   const value = options.get(XdmAtomicValue.string(name));
   if (value === undefined) return undefined;
-  return convertArgument(value, sequenceTypeOf(type), () => `The option ${name}`);
+  return convertArgument(value, type, () => `The option ${name}`);
 }
 
 /** A boolean option, or its default when it is not given. */
 export function booleanOption(options: XdmMap, name: string, fallback: boolean): boolean {
-  const value = optionValue(options, name, 'xs:boolean');
+  const value = optionValue(options, name, BOOLEAN);
   return value === undefined ? fallback : isTrue(value);
 }
 
@@ -31,7 +36,7 @@ export function choiceOption<const Choice extends string>(
   choices: readonly Choice[],
   fallback: Choice
 ): Choice {
-  const value = optionValue(options, name, 'xs:string');
+  const value = optionValue(options, name, STRING);
   if (value === undefined) return fallback;
   const text = stringArgument(value);
   if (!(choices as readonly string[]).includes(text))

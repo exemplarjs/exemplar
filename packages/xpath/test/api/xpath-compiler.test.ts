@@ -83,6 +83,35 @@ describe('XPathCompiler', () => {
     );
   });
 
+  it('keeps the executables it makes, unless it is told to compile afresh each time', () => {
+    const compiler = new XPathCompiler({ cache: false });
+    expect(compiler.compile('1 + 1')).not.toBe(compiler.compile('1 + 1'));
+    const keeping = new XPathCompiler();
+    const sum = keeping.compile('1 + $n', { variables: ['n'] });
+    expect(keeping.compile('1 + $n', { variables: ['n'] })).toBe(sum);
+    expect(sum.evaluateNumber(null, { variables: { n: 2 } })).toBe(3);
+    // The same text with other variables, or with their types, is another expression.
+    expect(keeping.compile('1 + $n', { variables: { n: 'xs:integer' } })).not.toBe(sum);
+    expect(keeping.compile('1 + $n', { variables: ['m', 'n'] })).not.toBe(sum);
+    // A variable declared with no type, as untyped callers can, is still a variable declared.
+    const untyped = { n: undefined } as unknown as Record<string, string>;
+    expect(keeping.compile('1', { variables: untyped })).not.toBe(keeping.compile('1', { variables: {} }));
+    expect(new XPathCompiler().compile('1 + $n', { variables: ['n'] })).not.toBe(sum);
+  });
+
+  it('keeps no expression that does not compile, and past its capacity of 256 drops the one used longest ago', () => {
+    const keeping = new XPathCompiler();
+    expect(compileError(() => keeping.compile('1 +'))).toBe('XPST0003');
+    expect(compileError(() => keeping.compile('1 +'))).toBe('XPST0003');
+    const first = keeping.compile('0');
+    const second = keeping.compile('1');
+    for (let number = 2; number < 256; number++) keeping.compile(String(number));
+    expect(keeping.compile('0')).toBe(first);
+    keeping.compile('256');
+    expect(keeping.compile('0')).toBe(first);
+    expect(keeping.compile('1')).not.toBe(second);
+  });
+
   it('applies its default element namespace and base URI', () => {
     const compiler = new XPathCompiler({ defaultElementNamespace: 'urn:d', baseURI: 'http://e.com/' });
     expect(compiler.compile('namespace-uri-from-QName(xs:QName("a")), static-base-uri()').evaluateStrings()).toEqual([

@@ -14,7 +14,12 @@ export interface FunctionDefinition {
   readonly returnType: SequenceTypeMatcher;
   /** Whether the last parameter repeats, as `fn:concat`'s does, for any number of arguments from the count of parameters. */
   readonly variadic: boolean;
-  readonly implementation: FunctionImplementation;
+  /**
+   * What the function does at one place it is called from. Most functions give the same
+   * implementation everywhere; one that keeps state, such as the patterns it has translated, makes
+   * a new one for each place, so that the state belongs to that call and goes with its expression.
+   */
+  readonly implementationForCall: () => FunctionImplementation;
   /** Whether the first argument is the URI of a resource it reads, which asynchronous evaluation fetches first when it is a literal. */
   readonly readsResource?: boolean;
   /** Whether it may give a promise for a resource it reads by other means; a function that reads by URI or takes a function argument may. */
@@ -22,6 +27,12 @@ export interface FunctionDefinition {
   /** How much of its first argument it needs, when not all: so many first items, as `exists` needs one, or only their count. */
   readonly lazyFirst?: number | 'count';
 }
+
+/**
+ * How many patterns or pictures a function caches at one place it is called from. One written in
+ * the expression needs a single entry; one computed for each item needs more.
+ */
+export const CALL_CACHE_CAPACITY = 16;
 
 /** Whether a function may give a promise: it reads resources, or calls the function items it is given. */
 export function mayPause(definition: FunctionDefinition): boolean {

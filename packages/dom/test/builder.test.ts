@@ -418,10 +418,13 @@ describe('DocumentBuilder.parse: attribute declarations', () => {
     ]);
   });
 
-  it('shares one TypeInfo for each type', () => {
-    const a = build('<!DOCTYPE r [<!ATTLIST r a CDATA #IMPLIED>]><r a="1"/>').documentElement?.getAttributeNode('a');
-    const b = build('<!DOCTYPE s [<!ATTLIST s b CDATA #IMPLIED>]><s b="1"/>').documentElement?.getAttributeNode('b');
-    expect(a?.schemaTypeInfo).toBe(b?.schemaTypeInfo);
+  it('shares one TypeInfo for each type in a document', () => {
+    const root = build(
+      '<!DOCTYPE r [<!ATTLIST r a CDATA #IMPLIED b CDATA #IMPLIED c NMTOKEN #IMPLIED>]><r a="1" b="2" c="3"/>'
+    ).documentElement;
+    const [a, b, c] = ['a', 'b', 'c'].map((name) => root?.getAttributeNode(name)?.schemaTypeInfo);
+    expect(a).toBe(b);
+    expect([a?.typeName, c?.typeName]).toEqual(['CDATA', 'NMTOKEN']);
   });
 
   it('lets the first declaration of an attribute count (§3.3)', () => {

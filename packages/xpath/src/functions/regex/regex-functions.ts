@@ -1,10 +1,10 @@
 import { EMPTY_SEQUENCE, XdmAtomicValue, type XdmValue } from '@exemplarjs/xdm';
-import { isAsciiDigit, Radix, splitWhitespace } from '@exemplarjs/xml/internal';
+import { isAsciiDigit, Radix, splitWhitespace, type TranslatedRegex } from '@exemplarjs/xml/internal';
 import { dynamicError, XPathErrorCode } from '@/api/xpath-exception';
 import { booleanResult, stringArgument, stringResult } from '@/functions/core/values';
 import type { FunctionDefinition } from '@/functions/function-library';
 import { defineFunction } from '@/functions/signatures';
-import { compiledRegex, defineWithFlags, nonEmptyRegex, segments } from './compiled-regex.ts';
+import { defineWithFlags, segments } from './compiled-regex.ts';
 
 /** A piece of a replacement string: literal text, or the text a group matched, 0 being the whole match. */
 type ReplacementPart = string | { readonly group: number };
@@ -65,9 +65,8 @@ function replacementParts(replacement: string, groupCount: number, literal: bool
 }
 
 /** `fn:replace`: each match replaced by the replacement, its group references filled in; a group that matched nothing gives `''`. */
-function replace(input: string, pattern: string, replacement: string, flags: string): string {
-  const translated = nonEmptyRegex(pattern, flags);
-  const parts = replacementParts(replacement, translated.groupCount, flags.includes('q'));
+function replace(input: string, translated: TranslatedRegex, replacement: string, isLiteral: boolean): string {
+  const parts = replacementParts(replacement, translated.groupCount, isLiteral);
   let result = '';
   for (const { from, match } of segments(translated, input)) {
     result += input.slice(from, match?.index);
@@ -81,8 +80,7 @@ function replace(input: string, pattern: string, replacement: string, flags: str
 }
 
 /** `fn:tokenize`: the text between the separators the pattern matches, empty for empty input; a separator at the start gives a leading `''`. */
-function tokenize(input: string, pattern: string, flags: string): XdmValue {
-  const translated = nonEmptyRegex(pattern, flags);
+function tokenize(input: string, translated: TranslatedRegex): XdmValue {
   if (input === '') return EMPTY_SEQUENCE;
   return [...segments(translated, input)].flatMap(({ from, match }) => stringResult(input.slice(from, match?.index)));
 }
@@ -91,17 +89,20 @@ function tokenize(input: string, pattern: string, flags: string): XdmValue {
 export const REGEX_FUNCTIONS: readonly FunctionDefinition[] = [
   ...defineWithFlags(
     'fn:matches($input as xs:string?, $pattern as xs:string) as xs:boolean',
-    ([input, pattern], flags) => booleanResult(compiledRegex(pattern, flags).regex.test(input))
+    'allowed',
+    ([input], regex) => booleanResult(regex.regex.test(input))
   ),
   ...defineWithFlags(
     'fn:replace($input as xs:string?, $pattern as xs:string, $replacement as xs:string) as xs:string',
-    ([input, pattern, replacement = ''], flags) => stringResult(replace(input, pattern, replacement, flags))
+    'refused',
+    ([input, , replacement = ''], regex, flags) => stringResult(replace(input, regex, replacement, flags.includes('q')))
   ),
   defineFunction('fn:tokenize($input as xs:string?) as xs:string*', ([input]) =>
     splitWhitespace(stringArgument(input)).map((token) => XdmAtomicValue.string(token))
   ),
   ...defineWithFlags(
     'fn:tokenize($input as xs:string?, $pattern as xs:string) as xs:string*',
-    ([input, pattern], flags) => tokenize(input, pattern, flags)
+    'refused',
+    ([input], regex) => tokenize(input, regex)
   ),
 ];

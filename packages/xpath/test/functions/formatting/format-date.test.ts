@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { parseDatePicture } from '@/functions/formatting/date-picture';
+import { parsePrimaryToken } from '@/functions/formatting/integer-format';
 import { errorCode, evaluate, strings } from '../../helpers/evaluate.ts';
+
+// The parsers as they are, watched, to count how often a call has a picture or a token parsed.
+vi.mock('@/functions/formatting/date-picture', async (original) => {
+  const actual = await original<typeof import('@/functions/formatting/date-picture')>();
+  return { ...actual, parseDatePicture: vi.fn(actual.parseDatePicture) };
+});
+vi.mock('@/functions/formatting/integer-format', async (original) => {
+  const actual = await original<typeof import('@/functions/formatting/integer-format')>();
+  return { ...actual, parsePrimaryToken: vi.fn(actual.parsePrimaryToken) };
+});
 
 /** 2003-09-07 formatted by a picture in a language and a calendar. */
 function formatted(picture: string, language: string, calendar: string): string {
@@ -70,5 +82,18 @@ describe('format-date, found in review', () => {
 
   it('raises FOFD1340 for a calendar name that is empty', () => {
     expect(errorCode("format-date(xs:date('2024-11-06'), '[D]', (), '', ())")).toBe('FOFD1340');
+  });
+
+  it('parses a picture and its number tokens once at each place it is called from', () => {
+    vi.mocked(parseDatePicture).mockClear();
+    vi.mocked(parsePrimaryToken).mockClear();
+    const dates = "(xs:date('2003-09-07'), xs:date('2004-10-08'), xs:date('2005-11-09'))";
+    expect(strings(`for $d in ${dates} return format-date($d, '[Y0001]-[M01]')`)).toEqual([
+      '2003-09',
+      '2004-10',
+      '2005-11',
+    ]);
+    expect(vi.mocked(parseDatePicture).mock.calls.map(([picture]) => picture)).toEqual(['[Y0001]-[M01]']);
+    expect(vi.mocked(parsePrimaryToken).mock.calls.map(([token]) => token)).toEqual(['0001', '01']);
   });
 });

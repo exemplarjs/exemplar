@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { XdmAtomicValue } from '@exemplarjs/xdm';
+import { XPathCompilerBase } from '@/api/xpath-compiler-base';
+import { coreLibrary } from '@/functions/core/index';
+import { defineStatefulFunction } from '@/functions/signatures';
 import { errorCode, evaluate, strings } from '../helpers/evaluate.ts';
 
 describe('named functions as items', () => {
@@ -27,5 +31,25 @@ describe('named functions as items', () => {
       'xs:integer 2',
     ]);
     expect(errorCode('function-lookup(xs:QName("fn:abs"), 1)("a")')).toBe('XPTY0004');
+  });
+
+  it('give a function referred to by name one implementation, however often the reference is evaluated', () => {
+    let made = 0;
+    // Counts its own calls, as a function that keeps state where it is called from.
+    const counter = defineStatefulFunction('fn:counter() as xs:integer', () => {
+      made++;
+      let calls = 0;
+      return () => [XdmAtomicValue.integer(++calls)];
+    });
+    const compiler = new XPathCompilerBase({}, coreLibrary().add(counter));
+    const byName = compiler.compile('counter#0()');
+    expect([byName.evaluateNumber(), byName.evaluateNumber()]).toEqual([1, 2]);
+    // Two calls written in one expression are two places, each with its own.
+    const called = compiler.compile('counter(), counter()');
+    expect([called.evaluateNumbers(), called.evaluateNumbers()]).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
+    expect(made).toBe(3);
   });
 });

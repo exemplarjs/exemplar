@@ -22,7 +22,7 @@ export type MatchAnchor = 'anywhere' | 'start' | 'end';
  * and may give the keys `collation-key` returns.
  *
  * ```ts
- * const collation = resolveCollation(HTML_ASCII_CASE_INSENSITIVE_COLLATION, undefined);
+ * const collation = new Collations().resolve(HTML_ASCII_CASE_INSENSITIVE_COLLATION, undefined);
  * collation.compare('ABC', 'abc'); // 0
  * collation.find('Hello', 'LL', 'anywhere'); // { index: 2, length: 2 }
  * ```
