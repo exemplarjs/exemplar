@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isKnownNcName, namesElement, qualifiedName } from '@/names';
+import { CheckedNames, namesElement, qualifiedName } from '@/names';
 
 describe('qualifiedName', () => {
   it('puts a prefix and a colon before the local name, when there is a prefix', () => {
@@ -7,15 +7,28 @@ describe('qualifiedName', () => {
   });
 });
 
-describe('isKnownNcName', () => {
+describe('CheckedNames', () => {
   it('accepts XML names without colons, again once remembered, and nothing else', () => {
-    expect(['a', 'a', '_b.c-d', 'a:b', '1a', ''].map((name) => isKnownNcName(name))).toEqual([
+    const names = new CheckedNames();
+    expect(['a', 'a', '_b.c-d', 'a:b', '1a', ''].map((name) => names.isNcName(name))).toEqual([
       true,
       true,
       true,
       false,
       false,
       false,
+    ]);
+  });
+
+  it('tells apart names that share a length and their first, middle and last characters', () => {
+    const names = new CheckedNames();
+    expect(['abcd', 'aecd', 'abcd', 'a:cd', 'a cd', 'aecd'].map((name) => names.isNcName(name))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
     ]);
   });
 });
