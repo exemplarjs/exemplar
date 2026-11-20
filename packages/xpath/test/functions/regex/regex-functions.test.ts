@@ -14,6 +14,13 @@ describe('matches', () => {
     expect(errorCode('matches("a", "a", "g")')).toBe('FORX0001');
     expect(errorCode('matches("a", "[")')).toBe('FORX0002');
   });
+
+  it('refuses unknown flags at a call that has just translated the same text as flags and a pattern', () => {
+    // Flags i with pattern x/y, then flags i/x with pattern y: the same characters, divided another way.
+    const twice =
+      "for $i in (1, 2) return matches('X/Y', if ($i = 1) then 'x/y' else 'y', if ($i = 1) then 'i' else 'i/x')";
+    expect(errorCode(twice)).toBe('FORX0001');
+  });
 });
 
 describe('replace', () => {

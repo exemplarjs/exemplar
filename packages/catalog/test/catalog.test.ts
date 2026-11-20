@@ -591,7 +591,7 @@ describe('CatalogResolver as a resolver itself', () => {
     expect(c.resolve('http://x/none.xml', undefined)).toBeUndefined();
   });
 
-  it('remembers its answers, and starts again once it has remembered many', () => {
+  it('caches its answers, dropping the one used longest ago once it holds many', () => {
     const c = entries('<rewriteURI uriStartString="http://x/" rewritePrefix="r/"/>');
     for (let i = 0; i < 10_001; i++) expect(c.matchURI(`http://x/${i}`)).toBe(`file:///c/r/${i}`);
     expect(c.matchURI('http://x/0')).toBe('file:///c/r/0');

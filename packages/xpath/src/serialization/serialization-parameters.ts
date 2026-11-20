@@ -16,6 +16,8 @@ import { splitWhitespace, trimWhitespace } from '@exemplarjs/xml/internal';
 import { dynamicError, XPathErrorCode } from '@/api/xpath-exception';
 import { characterCount, isTrue } from '@/functions/core/values';
 import { optionValue } from '@/functions/options';
+import { sequenceTypeOf } from '@/functions/signatures';
+import type { SequenceTypeMatcher } from '@/static/matchers';
 import { splitEQName } from '@/static/name-resolution';
 import { expandedKey } from '@/static/static-context';
 
@@ -136,14 +138,14 @@ function characterMapOf(value: XdmMap): ReadonlyMap<string, string> {
 }
 
 /** The type a parameter's value must have in a parameters map. */
-const MAP_TYPES: Readonly<Record<ParameterKind, string>> = {
-  boolean: 'xs:boolean?',
-  string: 'xs:string?',
-  names: 'xs:QName*',
-  decimal: 'xs:decimal?',
-  method: 'item()?',
-  standalone: 'xs:boolean?',
-  'character-map': 'map(xs:string, xs:string)?',
+const MAP_TYPES: Readonly<Record<ParameterKind, SequenceTypeMatcher>> = {
+  boolean: sequenceTypeOf('xs:boolean?'),
+  string: sequenceTypeOf('xs:string?'),
+  names: sequenceTypeOf('xs:QName*'),
+  decimal: sequenceTypeOf('xs:decimal?'),
+  method: sequenceTypeOf('item()?'),
+  standalone: sequenceTypeOf('xs:boolean?'),
+  'character-map': sequenceTypeOf('map(xs:string, xs:string)?'),
 };
 
 /** A parameter's value from a parameters map, converted to its type; XPTY0004 when it cannot be. */

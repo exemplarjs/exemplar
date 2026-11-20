@@ -1,34 +1,62 @@
 import { describe, expect, it } from 'vitest';
-import { compiledRegex, nonEmptyRegex, segments } from '@/functions/regex/compiled-regex';
-import { XPathException } from '@/index';
+import { EMPTY_SEQUENCE, XdmAtomicValue, type XdmValue } from '@exemplarjs/xdm';
+import { type TranslatedRegex, translateRegex } from '@exemplarjs/xml/internal';
+import { defineWithFlags, segments } from '@/functions/regex/compiled-regex';
+import type { DynamicContext } from '@/runtime/dynamic-context';
 
-/** The code of the XPathException a call raises. */
-function codeOf(call: () => unknown): string | undefined {
-  try {
-    call();
-    return undefined;
-  } catch (error) {
-    return error instanceof XPathException ? error.code : 'not an XPathException';
-  }
+/** Strings as the arguments of a call. */
+function strings(...values: string[]): XdmValue[] {
+  return values.map((value) => [XdmAtomicValue.string(value)]);
 }
 
-describe('compiled regular expressions', () => {
-  it('translates a pattern with its flags', () => {
-    expect(compiledRegex('a.c', 's').regex.test('a\nc')).toBe(true);
+/** A dynamic context for functions that read none. */
+const NO_CONTEXT = undefined as unknown as DynamicContext;
+
+describe('defineWithFlags', () => {
+  it('translates a pattern once at each place the function is called from, for each set of flags', () => {
+    const seen: TranslatedRegex[] = [];
+    const [withoutFlags, withFlags] = defineWithFlags(
+      'fn:seen($input as xs:string?, $pattern as xs:string)',
+      'allowed',
+      (_strings, regex) => {
+        seen.push(regex);
+        return EMPTY_SEQUENCE;
+      }
+    );
+    const here = withoutFlags!.implementationForCall();
+    const there = withoutFlags!.implementationForCall();
+    void here(strings('x', 'a+'), NO_CONTEXT);
+    void here(strings('y', 'a+'), NO_CONTEXT);
+    void there(strings('x', 'a+'), NO_CONTEXT);
+    expect(seen[1]).toBe(seen[0]);
+    expect(seen[2]).not.toBe(seen[0]);
+    const flagged = withFlags!.implementationForCall();
+    void flagged(strings('x', 'a+', 'i'), NO_CONTEXT);
+    void flagged(strings('x', 'a+', ''), NO_CONTEXT);
+    expect([seen[3]!.regex.test('A'), seen[4]!.regex.test('A')]).toEqual([true, false]);
   });
 
-  it('turns translation errors into FORX0001 and FORX0002', () => {
-    expect(codeOf(() => compiledRegex('a', 'z'))).toBe('FORX0001');
-    expect(codeOf(() => compiledRegex('a{2,1}', ''))).toBe('FORX0002');
+  it('gives the implementation its strings and flags, and caches no pattern that fails', () => {
+    const calls: unknown[] = [];
+    const [, withFlags] = defineWithFlags(
+      'fn:seen($input as xs:string?, $pattern as xs:string)',
+      'refused',
+      (given, _regex, flags) => {
+        calls.push([...given], flags);
+        return EMPTY_SEQUENCE;
+      }
+    );
+    const call = withFlags!.implementationForCall();
+    void call(strings('in', 'a', 'q'), NO_CONTEXT);
+    expect(calls).toEqual([['in', 'a'], 'q']);
+    expect(() => call(strings('in', '^', ''), NO_CONTEXT)).toThrow(/FORX0003/);
+    expect(() => call(strings('in', '^', ''), NO_CONTEXT)).toThrow(/FORX0003/);
   });
+});
 
-  it('raises FORX0003 for a pattern that matches the empty string where one must not', () => {
-    expect(codeOf(() => nonEmptyRegex('^', ''))).toBe('FORX0003');
-    expect(nonEmptyRegex('a', '').groupCount).toBe(0);
-  });
-
+describe('segments', () => {
   it('divides a text into segments, each match with its groups, leaving the shared expressions untouched', () => {
-    const translated = compiledRegex('(a)(b)?', '');
+    const translated = translateRegex('(a)(b)?', '', 'xpath');
     const parts = [...segments(translated, 'abxa'), ...segments(translated, 'xx')];
     expect(parts.map(({ from, match }) => [from, match?.index, match?.[0], match?.indices?.[2]])).toEqual([
       [0, 0, 'ab', [1, 2]],

@@ -4,7 +4,9 @@ import {
   declarationName,
   ErrorFactory,
   isAllWhitespace,
+  isNcName,
   isXmlName,
+  NameCache,
   reservedBindingProblem,
   XMLNS_NAMESPACE,
 } from '@exemplarjs/xml/internal';
@@ -21,7 +23,7 @@ import {
   escaper,
   quotedLiteral,
 } from './escape.ts';
-import { CheckedNames, qualifiedName } from './names.ts';
+import { qualifiedName } from './names.ts';
 import { NamespaceBindings } from './namespaces.ts';
 import { type WritableNode, writeNode } from './node.ts';
 import type { ResolvedOutputOptions } from './options.ts';
@@ -94,8 +96,8 @@ export class StreamWriter {
   /** The namespace bindings in scope, and the element whose start tag is being written. */
   readonly #bindings = new NamespaceBindings();
   readonly #contextNode = new ContextNode();
-  /** The names already checked. */
-  readonly #checkedNames = new CheckedNames();
+  /** The names found to be XML names without colons, as a document repeats its names. */
+  readonly #ncNameCache = new NameCache();
 
   constructor(sink: Sink | ByteSink, options: ResolvedOutputOptions, encoder: Encoder) {
     this.#output = new Output(sink, encoder);
@@ -338,9 +340,18 @@ export class StreamWriter {
     if (!this.#isTagOpen) this.#fail(ErrorCode.WRITE_STATE, `${what} go directly after a start tag`);
   }
 
+  /** Whether a name is an XML name without colons, checked once for a name the document repeats. */
+  #isNcName(name: string): boolean {
+    const cache = this.#ncNameCache;
+    if (cache.has(name)) return true;
+    if (!isNcName(name)) return false;
+    cache.add(name);
+    return true;
+  }
+
   /** Whether a name is an XML name without colons, or with them when the writer is not namespace-aware (Namespaces §7). */
   #isName(name: string): boolean {
-    return this.#checkedNames.isNcName(name) || (!this.#namespaceAware && isXmlName(name));
+    return this.#isNcName(name) || (!this.#namespaceAware && isXmlName(name));
   }
 
   /** Throws unless a name's parts are names and it gives the reserved prefixes and namespaces only to each other (Namespaces §3). */
@@ -348,8 +359,7 @@ export class StreamWriter {
     if (!this.#isName(localName)) {
       this.#fail(ErrorCode.WRITE_NAME, `${localName} is not a ${this.#namespaceAware ? 'local name' : 'name'}`);
     }
-    if (prefix !== '' && !this.#checkedNames.isNcName(prefix))
-      this.#fail(ErrorCode.WRITE_NAME, `${prefix} is not a prefix`);
+    if (prefix !== '' && !this.#isNcName(prefix)) this.#fail(ErrorCode.WRITE_NAME, `${prefix} is not a prefix`);
     this.#checkBinding(prefix, uri);
   }
 
@@ -394,8 +404,7 @@ export class StreamWriter {
 
   /** Throws unless a prefix may be declared for a URI: it is a prefix, binds nothing reserved, and is undeclared only in XML 1.1. */
   #checkDeclaration(prefix: string, uri: string): void {
-    if (prefix !== '' && !this.#checkedNames.isNcName(prefix))
-      this.#fail(ErrorCode.WRITE_NAME, `${prefix} is not a prefix`);
+    if (prefix !== '' && !this.#isNcName(prefix)) this.#fail(ErrorCode.WRITE_NAME, `${prefix} is not a prefix`);
     this.#checkBinding(prefix, uri);
     if (prefix !== '' && uri === '' && !this.#escaper.options.version11) {
       this.#fail(ErrorCode.WRITE_NAME, 'A prefix can be undeclared only in XML 1.1');

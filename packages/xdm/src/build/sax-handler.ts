@@ -1,12 +1,12 @@
 import { IllegalStateError, InvalidArgumentError } from '@exemplarjs/xml';
 import type { Location } from '@exemplarjs/xml';
 import {
-  checkQName,
   copyString,
   declaredPrefixOf,
   ErrorFactory,
   isAllWhitespace,
   locationOf,
+  NameCheck,
   prefixOf,
   type SAXAttributes,
   type SAXLocator,
@@ -41,6 +41,8 @@ export class XdmBuildingHandler {
   /** Where the events are, for the errors the checks throw. */
   readonly #where = (): Location => locationOf(this.#locator);
   #structure = new StructureCheck(this.#where);
+  /** Checks names, cached in a set: the tree's name table hashes each name anyway, so a set costs nothing more. */
+  #nameCheck = new NameCheck(this.#where, () => new Set());
   #locator: SAXLocator | undefined;
   #document: XdmNode | undefined;
   /** The prefix mappings for the next start tag. */
@@ -87,6 +89,8 @@ export class XdmBuildingHandler {
 
   endDocument(): void {
     this.#structure.endDocument();
+    // A new check, as this one holds names sliced from the document just read.
+    this.#nameCheck = new NameCheck(this.#where, () => new Set());
     const tree = this.#started();
     tree.endDocument();
     this.#document = XdmNode.of(tree.finish(), ROOT_NODE);
@@ -104,7 +108,7 @@ export class XdmBuildingHandler {
     }
     this.#structure.startElement(qName);
     const prefix = prefixOf(qName);
-    checkQName('element', qName, localName, prefix, uri, this.#where);
+    this.#nameCheck.checkQName('element', qName, localName, prefix, uri);
     const names = tree.names;
     const parent = tree.current;
     const element = tree.startElement(names.code(qName, names.namespace(uri)));
@@ -116,7 +120,7 @@ export class XdmBuildingHandler {
       if (declaredPrefixOf(name) !== undefined) continue;
       const attributeURI = attributes.uri(i);
       const attributePrefix = prefixOf(name);
-      checkQName('attribute', name, attributes.localName(i), attributePrefix, attributeURI, this.#where);
+      this.#nameCheck.checkQName('attribute', name, attributes.localName(i), attributePrefix, attributeURI);
       if (attributePrefix !== '') this.#declareIfUnbound(tree, attributePrefix, attributeURI);
       const value = copyString(attributes.value(i));
       tree.attribute(names.code(name, names.namespace(attributeURI)), value, flagsOf(attributes.type(i)));

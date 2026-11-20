@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { parsePrimaryToken } from '@/functions/formatting/integer-format';
 import { errorCode, evaluate, strings } from '../../helpers/evaluate.ts';
+
+// The token parser as it is, watched, to count how often a call has a picture parsed.
+vi.mock('@/functions/formatting/integer-format', async (original) => {
+  const actual = await original<typeof import('@/functions/formatting/integer-format')>();
+  return { ...actual, parsePrimaryToken: vi.fn(actual.parsePrimaryToken) };
+});
 
 describe('fn:format-integer', () => {
   it('writes decimal digit patterns with padding and grouping', () => {
@@ -37,5 +44,11 @@ describe('fn:format-integer', () => {
         errorCode(`format-integer(1, ${picture})`)
       )
     ).toEqual(['FODF1310', 'FODF1310', 'FODF1310', 'FODF1310', 'FODF1310', 'FODF1310']);
+  });
+
+  it('parses a picture once at each place it is called from', () => {
+    vi.mocked(parsePrimaryToken).mockClear();
+    expect(strings("for $i in (7, 8, 9) return format-integer($i, '001')")).toEqual(['007', '008', '009']);
+    expect(vi.mocked(parsePrimaryToken).mock.calls.map(([token]) => token)).toEqual(['001']);
   });
 });

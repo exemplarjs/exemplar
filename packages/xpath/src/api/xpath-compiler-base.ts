@@ -1,7 +1,9 @@
+import { LruCache } from '@exemplarjs/xml/internal';
 import { compile, type CompileState } from '@/compile/compiler';
 import { codepointCollation, type Collation } from '@/functions/collations/collation';
-import { resolveCollation } from '@/functions/collations/resolve-collation';
+import { COLLATIONS } from '@/functions/collations/resolve-collation';
 import type { FunctionLibrary } from '@/functions/function-library';
+import { CompilerState } from '@/static/compiler-state';
 import { resolvePlainName } from '@/static/name-resolution';
 import { type DeclaredVariable, DEFAULT_NAMESPACES, expandedKey, StaticContext } from '@/static/static-context';
 import { sequenceTypeFromText } from '@/static/type-resolution';
@@ -28,6 +30,12 @@ export interface XPathCompilerOptions {
   readonly defaultCollation?: string;
   /** How atomic values cross to and from JavaScript, by type name. */
   readonly converters?: Converters;
+  /**
+   * Keep what `compile` makes: an expression compiled again with the same variables, declared in
+   * the same order, gives the executable made the first time, the same object. `compileAsync`
+   * shares the cache. On by default; the compiler holds 256, dropping the least recently used.
+   */
+  readonly cache?: boolean;
 }
 
 /** How one expression is compiled. */
@@ -35,6 +43,9 @@ export interface CompileOptions<Declared extends VariableDeclarations> {
   /** The variables the expression uses: names alone, or names with sequence types such as `'xs:integer'` or `'node()*'`. */
   readonly variables?: Declared;
 }
+
+/** How many executables a compiler holds, unless `cache` is off. */
+const EXECUTABLE_CAPACITY = 256;
 
 /**
  * What the full and the lean `XPathCompiler` share: compiling an expression, once, into an
@@ -45,6 +56,10 @@ export class XPathCompilerBase<Custom = never> {
   readonly #options: XPathCompilerOptions;
   readonly #namespaces: ReadonlyMap<string, string>;
   readonly #defaultCollation: Collation;
+  /** What every expression the compiler compiles shares, such as the collations their URIs name. */
+  readonly #state = new CompilerState();
+  /** The executables made, by expression and variables, unless `cache` is off. */
+  readonly #executables: LruCache<string, XPathExecutable<unknown>> | undefined;
   /** The functions expressions can call. */
   protected readonly library: FunctionLibrary;
 
@@ -54,7 +69,8 @@ export class XPathCompilerBase<Custom = never> {
     this.library = library;
     const collation = options.defaultCollation;
     this.#defaultCollation =
-      collation === undefined ? codepointCollation : resolveCollation(collation, options.baseURI);
+      collation === undefined ? codepointCollation : this.#state.get(COLLATIONS).resolve(collation, options.baseURI);
+    this.#executables = options.cache === false ? undefined : new LruCache(EXECUTABLE_CAPACITY);
   }
 
   /** The static context an expression is compiled in, with the compiler's namespaces, base URI and functions. */
@@ -67,13 +83,30 @@ export class XPathCompilerBase<Custom = never> {
       defaultCollation: this.#defaultCollation,
       functions: this.library,
       variables,
+      compilerState: this.#state,
     });
   }
 
-  /** Compiles an expression; raises an XPathException for a static error, such as XPST0003 for bad syntax. */
+  /**
+   * Compiles an expression; raises an XPathException for a static error, such as XPST0003 for bad
+   * syntax. Unless `cache` is off, an expression given again with the same variables is not compiled again.
+   */
   compile<const Declared extends VariableDeclarations = readonly []>(
     expression: string,
     options: CompileOptions<Declared> = {}
+  ): XPathExecutable<VariableValues<Declared, Custom>> {
+    const executables = this.#executables;
+    if (executables === undefined) return this.#compile(expression, options);
+    // The variables as they are declared, in the order given, as each takes the next slot.
+    const variables = options.variables ?? [];
+    const key = JSON.stringify([expression, Array.isArray(variables) ? variables : Object.entries(variables)]);
+    return executables.computeIfAbsent(key, () => this.#compile(expression, options));
+  }
+
+  /** Compiles an expression into a new executable. */
+  #compile<const Declared extends VariableDeclarations>(
+    expression: string,
+    options: CompileOptions<Declared>
   ): XPathExecutable<VariableValues<Declared, Custom>> {
     const syntax = parseXPath(expression);
     const variables = this.#declare(options.variables ?? []);

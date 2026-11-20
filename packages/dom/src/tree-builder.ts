@@ -61,19 +61,6 @@ function entry<K, V>(maps: Map<string, Map<K, V>>, key: string): Map<K, V> {
   }
   return map;
 }
-/** One TypeInfo for each attribute type, as they never change. */
-const TYPES = new Map<string, TypeInfo>();
-
-/** The shared TypeInfo for an attribute type. */
-function typeInfo(type: string): TypeInfo {
-  let info = TYPES.get(type);
-  if (info === undefined) {
-    info = new TypeInfo(type);
-    TYPES.set(type, info);
-  }
-  return info;
-}
-
 /** What the builder's own options and the reader's `coalescing` decide of any tree it builds. */
 export interface ContentOptions {
   readonly ignoringComments: boolean;
@@ -107,6 +94,8 @@ export class TreeBuilder implements EntityListener {
   readonly #elementOnly = new Set<string>();
   /** The declared attributes, by element name and attribute name. */
   readonly #declared = new Map<string, Map<string, AttributeDeclaration>>();
+  /** One TypeInfo for each attribute type the tree's attributes have. */
+  readonly #types = new Map<string, TypeInfo>();
   /** The DTD's entity declarations by name. */
   readonly #entities = new Map<string, EntityDeclaration>();
   #doctype: DocumentType | null = null;
@@ -305,11 +294,21 @@ export class TreeBuilder implements EntityListener {
       : new Attr(this.document, name, null, null);
     attr._setParsed(reader.attributeValue(index), reader.isAttributeSpecified(index));
     const type = reader.attributeType(index);
-    if (declared?.has(name) === true) attr._type = typeInfo(type);
+    if (declared?.has(name) === true) attr._type = this.#typeInfo(type);
     // Declared IDs and xml:id attributes alike.
     attr._isId = type === 'ID';
     attr._ownerElement = element;
     return attr;
+  }
+
+  /** The tree's TypeInfo for an attribute type. */
+  #typeInfo(type: string): TypeInfo {
+    let info = this.#types.get(type);
+    if (info === undefined) {
+      info = new TypeInfo(type);
+      this.#types.set(type, info);
+    }
+    return info;
   }
 
   /** The `xmlns` attribute for the cursor's namespace declaration at an index, owned by its element. */

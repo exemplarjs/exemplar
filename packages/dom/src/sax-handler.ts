@@ -1,11 +1,10 @@
 import { IllegalStateError } from '@exemplarjs/xml';
 import type { Location } from '@exemplarjs/xml';
 import {
-  checkName,
-  checkQName,
   declaredPrefixOf,
   ErrorFactory,
   isAllWhitespace,
+  NameCheck,
   locationOf,
   prefixOf,
   type SAXAttributes,
@@ -65,6 +64,7 @@ export class DOMBuildingHandler {
   /** Where the events are, for the errors the checks throw. */
   readonly #where = (): Location => locationOf(this.#locator);
   #structure = new StructureCheck(this.#where);
+  #nameCheck = new NameCheck(this.#where);
   #locator: SAXLocator | undefined;
   #building: Document | undefined;
   #finished: Document | undefined;
@@ -118,6 +118,8 @@ export class DOMBuildingHandler {
 
   endDocument(): void {
     this.#structure.endDocument();
+    // A new check, as this one holds names sliced from the document just read.
+    this.#nameCheck = new NameCheck(this.#where);
     const document = this.#started();
     document._changed();
     this.#finished = document;
@@ -133,8 +135,8 @@ export class DOMBuildingHandler {
     this.#structure.startElement(qName);
     // Events without namespaces have neither a local name nor a URI.
     const namespaceAware = localName !== '' || uri !== '';
-    if (namespaceAware) checkQName('element', qName, localName, prefixOf(qName), uri, this.#where);
-    else checkName('element', qName, this.#where);
+    if (namespaceAware) this.#nameCheck.checkQName('element', qName, localName, prefixOf(qName), uri);
+    else this.#nameCheck.checkName('element', qName);
     const prefixes = this.#pendingPrefixes;
     const attributeNodes: Attr[] = prefixes.length + attributes.length === 0 ? NO_ATTRIBUTES : [];
     const namespace = uri === '' ? null : uri;
@@ -251,7 +253,7 @@ export class DOMBuildingHandler {
   #attribute(document: Document, attributes: SAXAttributes, index: number, namespaceAware: boolean): Attr | undefined {
     const name = attributes.qName(index);
     if (!namespaceAware) {
-      checkName('attribute', name, this.#where);
+      this.#nameCheck.checkName('attribute', name);
       return parsed(new Attr(document, name, null, null), attributes, index);
     }
     const declared = declaredPrefixOf(name);
@@ -261,7 +263,7 @@ export class DOMBuildingHandler {
     }
     const uri = attributes.uri(index);
     const localName = attributes.localName(index);
-    checkQName('attribute', name, localName, prefixOf(name), uri, this.#where);
+    this.#nameCheck.checkQName('attribute', name, localName, prefixOf(name), uri);
     return parsed(new Attr(document, name, uri === '' ? null : uri, localName), attributes, index);
   }
 

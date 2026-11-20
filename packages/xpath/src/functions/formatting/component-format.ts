@@ -1,19 +1,25 @@
 import type { Decimal, XMLGregorianCalendar } from '@exemplarjs/xdm';
 import { type CivilDate, HOURS_PER_HALF_DAY, powerOfTen } from '@exemplarjs/xdm/internal';
-import { remembered } from '@exemplarjs/xml/internal';
+import type { LruCache } from '@exemplarjs/xml/internal';
 import { dynamicError, XPathErrorCode } from '@/api/xpath-exception';
 import { characters } from '@/functions/core/values';
 import { dayOfYear, isoWeekday, weekOfMonth, weekOfYear } from './date-components.ts';
-import { type NameCase, type NamedValue, writeName } from './date-names.ts';
+import { type NameCase, type NamedValue, type NameLanguage, writeName } from './date-names.ts';
 import type { Component, VariableMarker, WidthModifier } from './date-picture.ts';
-import { decimalDigits, formatDigits, hasDecimalDigit, parseDigitPattern } from './digit-pattern.ts';
+import { decimalDigits, type DigitPattern, formatDigits, hasDecimalDigit, parseDigitPattern } from './digit-pattern.ts';
 import { formatInteger, isPrimaryToken, parsePrimaryToken, type PrimaryToken } from './integer-format.ts';
 import { formatTimezone } from './timezone-format.ts';
 
-/** What a marker is written with besides the value: the `Intl` locale for names, or undefined for English, and the calendar. */
+/**
+ * What a marker is written with besides the value: the language for names, the calendar, and the
+ * caches of the call the markers are written for, which hold the number tokens and the fraction
+ * patterns its markers have had parsed, by presentation.
+ */
 export interface RenderContext {
-  readonly locale: string | undefined;
+  readonly language: NameLanguage;
   readonly calendar: string;
+  readonly numberTokens: LruCache<string, PrimaryToken>;
+  readonly fractionPatterns: LruCache<string, DigitPattern>;
 }
 
 /** What a component needs of a value: its date, its time of day, or neither. */
@@ -72,14 +78,14 @@ function yearMaximum(token: PrimaryToken, width: WidthModifier | undefined): num
   return undefined;
 }
 
-/** A marker's number token, parsed once for a presentation given again. */
-const numberToken = remembered((presentation: string) =>
-  parsePrimaryToken(presentation, XPathErrorCode.INVALID_DATE_TIME_PICTURE)
-);
+/** A marker's number token, read from its presentation. */
+function numberToken(presentation: string): PrimaryToken {
+  return parsePrimaryToken(presentation, XPathErrorCode.INVALID_DATE_TIME_PICTURE);
+}
 
 /** A non-negative number as a marker writes it: by its token, padded to the width's minimum, a year cut to its maximum. */
-function writeNumber(value: bigint, marker: VariableMarker): string {
-  const token = numberToken(numberPresentation(marker));
+function writeNumber(value: bigint, marker: VariableMarker, context: RenderContext): string {
+  const token = context.numberTokens.computeIfAbsent(numberPresentation(marker), numberToken);
   const minimum = marker.width?.minimum ?? 0;
   const maximum = marker.component === 'Y' ? yearMaximum(token, marker.width) : undefined;
   const kept = maximum === undefined ? value : value % powerOfTen(maximum);
@@ -95,20 +101,20 @@ function reversed(text: string): string {
   return characters(text).toReversed().join('');
 }
 
-/** A fraction's digit pattern, read from the right, parsed once for a presentation given again. */
-const fractionPattern = remembered((presentation: string) =>
-  parseDigitPattern(reversed(presentation), XPathErrorCode.INVALID_DATE_TIME_PICTURE, presentation)
-);
+/** A fraction's digit pattern, read from the right of its presentation. */
+function fractionPattern(presentation: string): DigitPattern {
+  return parseDigitPattern(reversed(presentation), XPathErrorCode.INVALID_DATE_TIME_PICTURE, presentation);
+}
 
 /**
  * The fraction of a second as `f` writes it: a digit pattern is read from the left, so `001`
  * gives three digits and `1##` one to three. Digits beyond the maximum are cut, not rounded.
  */
-function writeFraction(fraction: Decimal, marker: VariableMarker): string {
+function writeFraction(fraction: Decimal, marker: VariableMarker, context: RenderContext): string {
   const presentation = numberPresentation(marker);
   const digits = decimalDigits(fraction).fraction;
-  if (!hasDecimalDigit(presentation)) return writeNumber(BigInt(digits === '' ? '0' : digits), marker);
-  const pattern = fractionPattern(presentation);
+  if (!hasDecimalDigit(presentation)) return writeNumber(BigInt(digits === '' ? '0' : digits), marker, context);
+  const pattern = context.fractionPatterns.computeIfAbsent(presentation, fractionPattern);
   const minimum = Math.max(pattern.mandatoryDigits, marker.width?.minimum ?? 0);
   const widthMaximum = marker.width?.maximum;
   const fromPattern = pattern.digitSigns > 1 ? pattern.digitSigns : undefined;
@@ -123,7 +129,7 @@ function writeNamed(value: NamedValue, marker: VariableMarker, context: RenderCo
   const nameCase = isNameCase(marker.presentation)
     ? marker.presentation
     : (COMPONENT_RULES[marker.component].presentation as NameCase);
-  return writeName(value, nameCase, context.locale, marker.width);
+  return writeName(value, nameCase, marker.width, context.language);
 }
 
 /** A component that is a name when the marker asks for one, and else a number. */
@@ -133,7 +139,7 @@ function writeNameOrNumber(
   context: RenderContext
 ): string {
   const asName = isNameCase(marker.presentation) || (marker.presentation === undefined && marker.component === 'F');
-  return asName ? writeNamed(value, marker, context) : writeNumber(BigInt(value.index), marker);
+  return asName ? writeNamed(value, marker, context) : writeNumber(BigInt(value.index), marker, context);
 }
 
 /** The year, month and day of a value that has a date. */
@@ -174,7 +180,7 @@ export function writeMarker(asWritten: VariableMarker, value: XMLGregorianCalend
   const marker = supported(asWritten);
   switch (marker.component) {
     case 'f': {
-      return writeFraction(value.fractionalSecond as Decimal, marker);
+      return writeFraction(value.fractionalSecond as Decimal, marker, context);
     }
     case 'P': {
       const half = (value.hour as number) < HOURS_PER_HALF_DAY ? AM : PM;
@@ -194,7 +200,7 @@ export function writeMarker(asWritten: VariableMarker, value: XMLGregorianCalend
     }
     default: {
       const number = COMPONENT_NUMBERS[marker.component] as (value: XMLGregorianCalendar) => number;
-      return writeNumber(BigInt(number(value)), marker);
+      return writeNumber(BigInt(number(value)), marker, context);
     }
   }
 }

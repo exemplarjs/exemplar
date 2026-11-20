@@ -2,6 +2,7 @@ import { XS_NAMESPACE } from '@exemplarjs/xdm';
 import { XML_NAMESPACE } from '@exemplarjs/xml/internal';
 import type { Collation } from '@/functions/collations/collation';
 import type { FunctionLibrary } from '@/functions/function-library';
+import type { CompilerState } from './compiler-state.ts';
 import type { SequenceTypeMatcher } from './matchers.ts';
 
 /** The namespace of the standard functions. */
@@ -69,6 +70,8 @@ export class StaticContext implements NamespaceContext {
   readonly functions: FunctionLibrary;
   /** The declared variables, by expanded key. */
   readonly variables: ReadonlyMap<string, DeclaredVariable>;
+  /** What the compiler keeps for every expression it compiles, such as the collations their URIs name. */
+  readonly compilerState: CompilerState;
   readonly #namespaces: ReadonlyMap<string, string>;
 
   constructor(options: {
@@ -79,6 +82,7 @@ export class StaticContext implements NamespaceContext {
     defaultCollation: Collation;
     functions: FunctionLibrary;
     variables: ReadonlyMap<string, DeclaredVariable>;
+    compilerState: CompilerState;
   }) {
     this.text = options.text;
     this.#namespaces = options.namespaces;
@@ -87,6 +91,7 @@ export class StaticContext implements NamespaceContext {
     this.defaultCollation = options.defaultCollation;
     this.functions = options.functions;
     this.variables = options.variables;
+    this.compilerState = options.compilerState;
   }
 
   resolvePrefix(prefix: string): string | undefined {

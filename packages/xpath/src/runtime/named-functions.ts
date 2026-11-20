@@ -49,12 +49,16 @@ function constructorItem(localName: string, context: StaticContext): FunctionIte
   );
 }
 
-/** A function of the library as an item, such as `fn:abs#1`, run in the dynamic context it was referred to in. */
-function definitionItem(definition: FunctionDefinition, arity: number, context: DynamicContext): FunctionItem {
+/**
+ * What makes a function of the library as an item, such as `fn:abs#1`, run in the dynamic context
+ * it is referred to in. Every item made shares one implementation, so the state the function
+ * keeps where it is called from lasts as long as the reference does.
+ */
+function definitionItemMaker(definition: FunctionDefinition, arity: number): FunctionMaker {
   const name = functionName(definition.namespaceURI, definition.localName);
-  return new FunctionItem(name, definitionSignature(definition, arity), (args) =>
-    definition.implementation(args, context)
-  );
+  const signature = definitionSignature(definition, arity);
+  const implementation = definition.implementationForCall();
+  return (context) => new FunctionItem(name, signature, (args) => implementation(args, context));
 }
 
 /** The most arguments a function item can take, 2^20, as its signature lists a type for each. */
@@ -80,5 +84,5 @@ export function namedFunction(
     return item === undefined ? undefined : () => item;
   }
   const definition = context.functions.find(namespaceURI, localName, arity);
-  return definition === undefined ? undefined : (dynamic) => definitionItem(definition, arity, dynamic);
+  return definition === undefined ? undefined : definitionItemMaker(definition, arity);
 }

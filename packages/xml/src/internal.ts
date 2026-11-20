@@ -27,8 +27,6 @@ export {
   type SAXLocator,
   StructureCheck,
   attributeIndex,
-  checkName,
-  checkQName,
   locationOf,
 } from './util/structure.ts';
 export { EventDispatcher, declareEntity } from './events/event-dispatch.ts';
@@ -79,8 +77,10 @@ export {
 } from './util/chars.ts';
 export { Radix, upperHex } from './util/numbers.ts';
 export { abandon } from './util/promises.ts';
-export { remembered } from './util/remembered.ts';
 export { GROWTH_FACTOR } from './util/arrays.ts';
+export { LruCache } from './util/lru-cache.ts';
+export { NameCache } from './util/name-cache.ts';
+export { NameCheck } from './util/name-check.ts';
 export { startsWithDeclaration } from './tokenizer/declaration.ts';
 export {
   isNameChar,
@@ -103,7 +103,7 @@ export {
   namespacesInScope,
 } from './util/namespaces.ts';
 export { type NodeLike, NodeType, attributesOf, prefixDeclaredBy } from './util/nodes.ts';
-export { type TranslatedRegex, translateRegex } from './util/regex.ts';
+export { checkRegexFlags, type TranslatedRegex, translateRegex } from './util/regex.ts';
 export { RegexError } from './util/regex-error.ts';
 export {
   escapeAndResolveURI,

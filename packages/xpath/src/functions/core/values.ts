@@ -7,7 +7,7 @@ import {
   XS,
 } from '@exemplarjs/xdm';
 import type { Collation } from '@/functions/collations/collation';
-import { resolveCollation } from '@/functions/collations/resolve-collation';
+import { COLLATIONS } from '@/functions/collations/resolve-collation';
 import type { FunctionDefinition } from '@/functions/function-library';
 import { defineWithLast } from '@/functions/signatures';
 import type { DynamicContext } from '@/runtime/dynamic-context';
@@ -105,7 +105,8 @@ export function defineWithCollation(signature: string, implementation: CollatedI
 /** The collation a URI names, resolved against the static base URI; the default collation when there is no URI. */
 export function collationOf(uri: string | undefined, context: DynamicContext): Collation {
   const staticContext = context.environment.staticContext;
-  return uri === undefined ? staticContext.defaultCollation : resolveCollation(uri, staticContext.baseURI);
+  if (uri === undefined) return staticContext.defaultCollation;
+  return staticContext.compilerState.get(COLLATIONS).resolve(uri, staticContext.baseURI);
 }
 
 /** The comparison options of a context, with strings compared by a collation. */

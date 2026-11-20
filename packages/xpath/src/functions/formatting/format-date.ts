@@ -1,15 +1,21 @@
 import { EMPTY_SEQUENCE } from '@exemplarjs/xdm';
-import type { XdmValue, XMLGregorianCalendar } from '@exemplarjs/xdm';
-import { remembered, trimWhitespace } from '@exemplarjs/xml/internal';
+import type { XMLGregorianCalendar } from '@exemplarjs/xdm';
+import { LruCache, trimWhitespace } from '@exemplarjs/xml/internal';
 import { dynamicError, XPathErrorCode } from '@/api/xpath-exception';
 import { optionalAtomic, optionalString, stringArgument, stringResult } from '@/functions/core/values';
-import type { FunctionDefinition } from '@/functions/function-library';
-import { defineFunction } from '@/functions/signatures';
+import {
+  CALL_CACHE_CAPACITY,
+  type FunctionDefinition,
+  type FunctionImplementation,
+} from '@/functions/function-library';
+import { defineStatefulFunction } from '@/functions/signatures';
 import { splitEQName } from '@/static/name-resolution';
 import { DEFAULT_LANGUAGE, intlSupports } from '@/static/static-context';
 import { type RenderContext, writeMarker } from './component-format.ts';
+import { ENGLISH, INTL_NAMES, type NameLanguage } from './date-names.ts';
 import { parseDatePicture, type PicturePart } from './date-picture.ts';
-import { isWordsToken } from './integer-format.ts';
+import type { DigitPattern } from './digit-pattern.ts';
+import { isWordsToken, type PrimaryToken } from './integer-format.ts';
 
 /** The calendars written as they are; any other known calendar is written as `AD` after a `[Calendar: AD]` marker. */
 const SUPPORTED_CALENDARS: ReadonlySet<string> = new Set(['AD', 'ISO']);
@@ -75,32 +81,42 @@ function languageFor(language: string | undefined, parts: readonly PicturePart[]
   return { chosen: undefined, marker: `[Language: ${DEFAULT_LANGUAGE}]` };
 }
 
-/** A picture's parts, parsed once for a picture given again. */
-const datePicture = remembered(parseDatePicture);
-
 /**
  * `fn:format-dateTime`, `fn:format-date` and `fn:format-time`: a value as a picture writes it,
- * in a language and calendar; empty for an empty value. The place argument is not used.
+ * in a language and calendar; empty for an empty value. The place argument is not used. Each place
+ * one is called from keeps the pictures it has parsed and their markers' tokens.
  */
-function formatDateTime(args: readonly XdmValue[]): XdmValue {
-  const parts = datePicture(stringArgument(args[1]));
-  const value = optionalAtomic(args[0])?.value as XMLGregorianCalendar | undefined;
-  if (value === undefined) return EMPTY_SEQUENCE;
-  const calendar = calendarNamed(optionalString(args[3]));
-  const language = languageFor(optionalString(args[2]), parts);
-  const context: RenderContext = { locale: language.chosen, calendar: calendar.chosen };
-  const written = parts.map((part) => (typeof part === 'string' ? part : writeMarker(part, value, context)));
-  return stringResult(`${calendar.marker}${language.marker}${written.join('')}`);
+function dateFormatter(): FunctionImplementation {
+  const pictures = new LruCache<string, readonly PicturePart[]>(CALL_CACHE_CAPACITY);
+  const numberTokens = new LruCache<string, PrimaryToken>(CALL_CACHE_CAPACITY);
+  const fractionPatterns = new LruCache<string, DigitPattern>(CALL_CACHE_CAPACITY);
+  return (args, { environment }) => {
+    const parts = pictures.computeIfAbsent(stringArgument(args[1]), parseDatePicture);
+    const value = optionalAtomic(args[0])?.value as XMLGregorianCalendar | undefined;
+    if (value === undefined) return EMPTY_SEQUENCE;
+    const calendar = calendarNamed(optionalString(args[3]));
+    const language = languageFor(optionalString(args[2]), parts);
+    const locale = language.chosen;
+    // The compiler's `Intl` names are fetched only for a language that needs them.
+    const names: NameLanguage =
+      locale === undefined ? ENGLISH : { locale, intlNames: environment.staticContext.compilerState.get(INTL_NAMES) };
+    const context: RenderContext = { language: names, calendar: calendar.chosen, numberTokens, fractionPatterns };
+    const written = parts.map((part) => (typeof part === 'string' ? part : writeMarker(part, value, context)));
+    return stringResult(`${calendar.marker}${language.marker}${written.join('')}`);
+  };
 }
 
 /** The three functions, each with two and with five arguments (F&O §9.8). */
 export const FORMAT_DATE_FUNCTIONS: readonly FunctionDefinition[] = (['dateTime', 'date', 'time'] as const).flatMap(
   (type) => [
-    defineFunction(`fn:format-${type}($value as xs:${type}?, $picture as xs:string) as xs:string?`, formatDateTime),
-    defineFunction(
+    defineStatefulFunction(
+      `fn:format-${type}($value as xs:${type}?, $picture as xs:string) as xs:string?`,
+      dateFormatter
+    ),
+    defineStatefulFunction(
       `fn:format-${type}($value as xs:${type}?, $picture as xs:string, $language as xs:string?, ` +
         `$calendar as xs:string?, $place as xs:string?) as xs:string?`,
-      formatDateTime
+      dateFormatter
     ),
   ]
 );

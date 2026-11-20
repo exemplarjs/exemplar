@@ -1,6 +1,7 @@
-import { remembered } from '@exemplarjs/xml/internal';
+import { LruCache } from '@exemplarjs/xml/internal';
 import { characters } from '@/functions/core/values';
 import { ABBREVIATION_LENGTH, ENGLISH_MONTHS, ENGLISH_WEEKDAYS } from '@/functions/date-time/english-names';
+import type { CompilerStateKey } from '@/static/compiler-state';
 import type { WidthModifier } from './date-picture.ts';
 
 /**
@@ -34,23 +35,47 @@ const ENGLISH_NAMES: Readonly<Record<NameKind, readonly string[]>> = {
 /** The year of the dates `Intl` names are read from: it began on a Monday, so its first seven days are Monday to Sunday. */
 const NAME_YEAR = 2001;
 
-/** The `Intl` formats month and weekday names are read with, by locale. */
-const NAME_FORMATS = {
-  month: remembered((locale) => new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' })),
-  weekday: remembered((locale) => new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' })),
-};
+/** How many locales' formats of one kind a compiler caches. */
+const LOCALE_CAPACITY = 100;
 
-/** A month or weekday name in a language `Intl` supports, read from the parts of a formatted date. */
-function intlName(kind: 'month' | 'weekday', index: number, locale: string): string {
-  const format = NAME_FORMATS[kind](locale);
-  const date = kind === 'month' ? Date.UTC(NAME_YEAR, index - 1, 1) : Date.UTC(NAME_YEAR, 0, index);
-  return (format.formatToParts(date).find((part) => part.type === kind) as Intl.DateTimeFormatPart).value;
+/**
+ * The month and weekday names of the languages `Intl` supports, read from the parts of a formatted
+ * date. An `Intl` format is made once for each locale, as making one is slow, and held for as long
+ * as the compiler is.
+ */
+export class IntlNames {
+  /** The formats for each kind of name, by locale. */
+  readonly #formats = {
+    month: new LruCache<string, Intl.DateTimeFormat>(LOCALE_CAPACITY),
+    weekday: new LruCache<string, Intl.DateTimeFormat>(LOCALE_CAPACITY),
+  };
+
+  /** The name of a month, from 1, or of a weekday, from 1 for Monday, in a locale. */
+  name(kind: 'month' | 'weekday', index: number, locale: string): string {
+    const format = this.#formats[kind].computeIfAbsent(
+      locale,
+      () => new Intl.DateTimeFormat(locale, { [kind]: 'long', timeZone: 'UTC' })
+    );
+    const date = kind === 'month' ? Date.UTC(NAME_YEAR, index - 1, 1) : Date.UTC(NAME_YEAR, 0, index);
+    return (format.formatToParts(date).find((part) => part.type === kind) as Intl.DateTimeFormatPart).value;
+  }
 }
 
+/** A compiler's names of months and weekdays in other languages. */
+export const INTL_NAMES: CompilerStateKey<IntlNames> = { make: () => new IntlNames() };
+
+/** The language names are written in: English, or an `Intl` locale with the names `Intl` gives for it. */
+export type NameLanguage = { readonly locale: undefined } | { readonly locale: string; readonly intlNames: IntlNames };
+
+/** English, which needs no names from `Intl`. */
+export const ENGLISH: NameLanguage = { locale: undefined };
+
 /** A name in full: from `Intl` for a month or weekday in another language, else English. */
-function fullName(value: NamedValue, locale: string | undefined): string {
+function fullName(value: NamedValue, language: NameLanguage): string {
   if (value.kind === 'text') return value.text;
-  if (locale !== undefined && value.kind !== 'dayPeriod') return intlName(value.kind, value.index, locale);
+  if (language.locale !== undefined && value.kind !== 'dayPeriod') {
+    return language.intlNames.name(value.kind, value.index, language.locale);
+  }
   return ENGLISH_NAMES[value.kind][value.index - 1] as string;
 }
 
@@ -80,10 +105,11 @@ function shortened(name: string, value: NamedValue, locale: string | undefined, 
 export function writeName(
   value: NamedValue,
   nameCase: NameCase,
-  locale: string | undefined,
-  width: WidthModifier | undefined
+  width: WidthModifier | undefined,
+  language: NameLanguage
 ): string {
-  const name = inNameCase(fullName(value, locale), nameCase, locale);
+  const locale = language.locale;
+  const name = inNameCase(fullName(value, language), nameCase, locale);
   const maximum = width?.maximum;
   const fitted = maximum === undefined ? name : shortened(name, value, locale, maximum);
   return fitted.padEnd(width?.minimum ?? 0, ' ');

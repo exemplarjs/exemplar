@@ -7,14 +7,11 @@
  * translateRegex('[a-z-[aeiou]]+', 'i', 'xpath').regex.test('XYZ'); // true
  * translateRegex('\\d{3}', '', 'xsd').regex.test('1234'); // false: XSD anchors the pattern
  * ```
- *
- * Translations are cached, since a pattern is usually translated many times and matched more.
  */
 
 import { ErrorFactory } from './errors.ts';
 import { RegexError } from './regex-error.ts';
 import { type PatternOptions, type RegexDialect, translatePattern } from './regex-parser.ts';
-import { RememberedResults } from './remembered.ts';
 
 export type { RegexDialect } from './regex-parser.ts';
 
@@ -33,25 +30,16 @@ export interface TranslatedRegex {
 /** The flags XPath allows (F&O 3.1 §5.6.2). */
 const XPATH_FLAGS = new Set(['s', 'm', 'i', 'x', 'q']);
 
-/** How many translations are kept before the oldest is dropped. */
-const CACHE_LIMIT = 500;
-
-/** Translations by dialect, flags and pattern. */
-const translations = new RememberedResults<TranslatedRegex>(CACHE_LIMIT);
-
 /**
  * Translates an XPath or XSD regular expression with its flags into a JavaScript one. Throws a
  * `RegexError` of kind `invalid-flags` for flags the dialect does not allow, and of kind
  * `invalid-pattern` for a pattern it does not.
  */
 export function translateRegex(pattern: string, flags: string, dialect: RegexDialect): TranslatedRegex {
-  checkFlags(flags, dialect);
-  // Valid flags hold only letters, so the separators cannot be confused.
-  return translations.get(`${dialect}/${flags}/${pattern}`, () => {
-    const { source, groupCount, groupParents } = translatePattern(pattern, optionsFor(flags, dialect));
-    const regex = engineRegex(source, 'v', pattern);
-    return { regex, global: engineRegex(source, 'dgv', pattern), groupCount, groupParents };
-  });
+  checkRegexFlags(flags, dialect);
+  const { source, groupCount, groupParents } = translatePattern(pattern, optionsFor(flags, dialect));
+  const regex = engineRegex(source, 'v', pattern);
+  return { regex, global: engineRegex(source, 'dgv', pattern), groupCount, groupParents };
 }
 
 /** A translated pattern as a `RegExp`; one the engine refuses, such as a quantifier above its limit, is an invalid pattern. */
@@ -65,8 +53,8 @@ function engineRegex(source: string, flags: string, pattern: string): RegExp {
   }
 }
 
-/** Throws unless every flag is one XPath allows; XSD allows none. */
-function checkFlags(flags: string, dialect: RegexDialect): void {
+/** Throws a `RegexError` of kind `invalid-flags` unless every flag is one XPath allows; XSD allows none. */
+export function checkRegexFlags(flags: string, dialect: RegexDialect): void {
   if (dialect === 'xsd') {
     if (flags !== '') throw flagError('XML Schema patterns take no flags', flags);
     return;

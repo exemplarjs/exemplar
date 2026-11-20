@@ -2,7 +2,8 @@ import type { ResolvedOptions } from '@/config/options';
 import type { Location } from '@/errors/xml-error';
 import { cursorOf, StreamReaderDelegate } from '@/filters/delegate';
 import { ErrorFactory, IllegalStateError, InvalidArgumentError } from '@/util/errors';
-import { checkName, checkQName, StructureCheck } from '@/util/structure';
+import { NameCheck } from '@/util/name-check';
+import { StructureCheck } from '@/util/structure';
 import { EventType } from './event-type.ts';
 import { LISTEN_ENTITIES, NAMESPACES_IN_SCOPE, READER_OPTIONS } from './internal.ts';
 import { NO_BINDINGS, type StreamReader } from './stream-reader.ts';
@@ -66,8 +67,8 @@ export interface ReaderConsumer {
 export class ReaderInput {
   readonly reader: StreamReader;
   readonly #options: ReaderInputOptions;
-  /** Whether names are checked: only a delegate can change them. */
-  readonly #checksNames: boolean;
+  /** Checks names, for a delegate: only it can change them. */
+  readonly #nameCheck: NameCheck | undefined;
   readonly #namespaceAware: boolean;
   /** Where the reader is, for the errors the checks throw. */
   readonly #where: () => Location;
@@ -92,9 +93,9 @@ export class ReaderInput {
         );
       }
     }
-    this.#checksNames = reader instanceof StreamReaderDelegate;
     this.#namespaceAware = readerOptions.namespaceAware;
     this.#where = () => reader.location();
+    this.#nameCheck = reader instanceof StreamReaderDelegate ? new NameCheck(this.#where) : undefined;
     this.#structure = new StructureCheck(this.#where);
   }
 
@@ -238,7 +239,7 @@ export class ReaderInput {
   #startElement(): void {
     const reader = this.reader;
     this.#structure.startElement(reader.name());
-    if (this.#checksNames) this.#checkNames();
+    if (this.#nameCheck !== undefined) this.#checkNames(this.#nameCheck);
   }
 
   /** Closes an element; at the end of an element read on its own, the document's end follows. */
@@ -248,24 +249,21 @@ export class ReaderInput {
   }
 
   /** Checks the names of the reader's start tag, which a delegate may have changed. */
-  #checkNames(): void {
+  #checkNames(nameCheck: NameCheck): void {
     const reader = this.reader;
-    const where = this.#where;
     if (!this.#namespaceAware) {
-      checkName('element', reader.name(), where);
-      for (let i = 0; i < reader.attributeCount(); i++) checkName('attribute', reader.attributeName(i), where);
+      nameCheck.checkName('element', reader.name());
+      for (let i = 0; i < reader.attributeCount(); i++) nameCheck.checkName('attribute', reader.attributeName(i));
       return;
     }
-    checkQName('element', reader.name(), reader.localName(), reader.prefix(), reader.namespaceURI(), where);
+    nameCheck.checkQName('element', reader.name(), reader.localName(), reader.prefix(), reader.namespaceURI());
     for (let i = 0; i < reader.attributeCount(); i++) {
-      const name = reader.attributeName(i);
-      checkQName(
+      nameCheck.checkQName(
         'attribute',
-        name,
+        reader.attributeName(i),
         reader.attributeLocalName(i),
         reader.attributePrefix(i),
-        reader.attributeNamespace(i),
-        where
+        reader.attributeNamespace(i)
       );
     }
   }

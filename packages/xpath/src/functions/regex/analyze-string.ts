@@ -1,8 +1,9 @@
 import { AttributeFlag, NameTable, TreeBuilder, XdmNode, type XdmValue } from '@exemplarjs/xdm';
 import { ROOT_NODE } from '@exemplarjs/xdm/internal';
+import type { TranslatedRegex } from '@exemplarjs/xml/internal';
 import type { FunctionDefinition } from '@/functions/function-library';
 import { FN_NAMESPACE } from '@/static/static-context';
-import { defineWithFlags, nonEmptyRegex, segments } from './compiled-regex.ts';
+import { defineWithFlags, segments } from './compiled-regex.ts';
 
 /** A group that took part in a match: its number and the span it matched. */
 interface MatchedGroup {
@@ -72,8 +73,7 @@ class ResultWriter {
  * the groups of each match as nested `fn:group` elements numbered by `nr`, all under one
  * `fn:analyze-string-result` element with no parent.
  */
-function analyzeString(input: string, pattern: string, flags: string): XdmValue {
-  const translated = nonEmptyRegex(pattern, flags);
+function analyzeString(input: string, translated: TranslatedRegex): XdmValue {
   const writer = new ResultWriter();
   writer.start('analyze-string-result');
   writer.builder.namespace('fn', FN_NAMESPACE);
@@ -91,5 +91,6 @@ function analyzeString(input: string, pattern: string, flags: string): XdmValue 
 /** `fn:analyze-string`, with and without flags. */
 export const ANALYZE_STRING_FUNCTIONS: readonly FunctionDefinition[] = defineWithFlags(
   'fn:analyze-string($input as xs:string?, $pattern as xs:string) as element(fn:analyze-string-result)',
-  ([input, pattern], flags) => analyzeString(input, pattern, flags)
+  'refused',
+  ([input], regex) => analyzeString(input, regex)
 );

@@ -322,9 +322,18 @@ through a function passed to itself cannot overwrite a caller's parameters.
 
 The functions beyond the core are in groups, each a module the lean compiler takes; `compileAsync` finds the functions
 an expression names in an index that loads no group, and imports the groups it lacks together. Regular expressions are
-translated to JavaScript ones with the `v` flag, through the translator in `@exemplarjs/xml`'s utilities, and cached by
-pattern and flags. The XML serialization method writes through `@exemplarjs/writer`; HTML and XHTML share a writer of
-their own, as HTML's syntax is not XML's.
+translated to JavaScript ones with the `v` flag, through the translator in `@exemplarjs/xml`'s utilities.
+
+A function that works something out from an argument, as `matches` translates its pattern and `format-date` parses its
+picture, keeps it where it is called from. `defineStatefulFunction` makes a new implementation, with its cache in the
+closure, for each call written in an expression and for each reference to the function by name, such as `matches#2`;
+`function-lookup` finds its function when it runs, so it makes one each time it is called. What a compiler's expressions
+share is the compiler's (`CompilerState`): collations, the `Intl` names of months and weekdays, and the document builder
+`fn:doc` reads with when an evaluation names none. The compiler also holds the executables it makes, by expression and
+declared variables, unless its `cache` option is off.
+
+The XML serialization method writes through `@exemplarjs/writer`; HTML and XHTML share a writer of their own, as HTML's
+syntax is not XML's.
 
 ## Writing
 
@@ -338,6 +347,20 @@ through a stream writer, `reader-copy.ts` writes what a reader reads, and `node.
 
 Canonicalization writes from a cursor of its own with each method's escaping, ordering and namespace rules, reading the
 whole DTD and its entities.
+
+## Caches
+
+No cache that input can grow lives in a module, where nothing could collect it: each belongs to an object and goes when
+that object does. The tables a module builds once on first use, such as the case variants of the regular expression `i`
+flag, have a fixed size and stay.
+
+- **`LruCache`** (`@exemplarjs/xml`'s utilities) holds up to a capacity and drops the least recently used entry. The
+  catalog resolver keeps its answers in one, an XPath compiler its collations and its executables, and each XPath call
+  that translates a pattern or parses a picture its results.
+- **`NameCache`** holds names a check has passed. It finds a name by its length and three of its characters, as hashing
+  every name a parser hands over costs more than the check it saves. A stream writer has one, and so does the check of
+  the names a filter, a delegate or a SAX caller gives (`NameCheck`), which serves one document. The XDM handler has
+  that check use a `Set` instead, as its name table hashes each name anyway.
 
 ## Errors
 

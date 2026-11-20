@@ -66,6 +66,17 @@ describe('the lean XPathCompiler', () => {
     expect(again.evaluateString()).toBe('b');
   });
 
+  it('keeps what it compiles asynchronously, in the cache compile uses', async () => {
+    const compiler = new XPathCompiler();
+    const first = await compiler.compileAsync('replace("a", "a", "b")');
+    expect(await compiler.compileAsync('replace("a", "a", "b")')).toBe(first);
+    expect(compiler.compile('replace("a", "a", "b")')).toBe(first);
+    // An expression that fails for a missing group is not kept, so it compiles once the group is loaded.
+    expect(() => compiler.compile('format-integer(1, "w")')).toThrow(expect.objectContaining({ code: 'XPST0017' }));
+    const loaded = await compiler.compileAsync('format-integer(1, "w")');
+    expect(loaded.evaluateString()).toBe('one');
+  });
+
   it('leaves alone names in no group, and raises the static errors compile raises', async () => {
     const compiler = new XPathCompiler();
     const always = await compiler.compileAsync('true()');

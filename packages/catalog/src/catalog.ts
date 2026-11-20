@@ -8,7 +8,14 @@ import {
   type ResolveRequest,
   type URIResolver,
 } from '@exemplarjs/xml';
-import { ErrorFactory, hasScheme, resolveTargetURI, resolveURI, unmatchedByCatalog } from '@exemplarjs/xml/internal';
+import {
+  ErrorFactory,
+  hasScheme,
+  LruCache,
+  resolveTargetURI,
+  resolveURI,
+  unmatchedByCatalog,
+} from '@exemplarjs/xml/internal';
 import { type CatalogFile, type Delegate, readCatalogFile, type Rewrite, type Suffix } from './file.ts';
 import { normalizePublicId, normalizeURI, unwrapURN } from './normalize.ts';
 
@@ -35,8 +42,8 @@ interface CatalogLink {
 /** What searching one catalog file gives: a match, a delegation to resolve instead, or nothing. */
 type FileSearchResult = string | (() => string | undefined) | undefined;
 
-/** How many answers a resolver remembers before it starts again. */
-const CACHE_LIMIT = 10_000;
+/** How many answers a resolver caches. */
+const ANSWER_CAPACITY = 10_000;
 
 /** A relative identifier made absolute against the base URI; undefined for one that is absolute or cannot be. */
 function resolvedIfRelative(id: string | undefined, baseURI: string | undefined): string | undefined {
@@ -104,7 +111,7 @@ function leadsBackToItself(link: CatalogLink): boolean {
  * Each catalog file lists entries such as `<system systemId="http://…/a.dtd" uri="local/a.dtd"/>`.
  * A lookup searches the files in order, each one's nextCatalog files straight after it; the first
  * match wins, and a delegate entry hands the lookup over to other catalog files. Files are read once,
- * when first needed unless `defer` is off, and answers are remembered.
+ * when first needed unless `defer` is off, and answers are cached.
  */
 export class CatalogResolver implements CatalogProcessor, EntityResolver, URIResolver {
   /** What happens when nothing matches: `strict` fails, `continue` and `ignore` leave it to other resolvers. */
@@ -112,8 +119,8 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
   readonly #settings: CatalogSettings;
   /** The catalog files read so far, null for one that could not be read or is no catalog. */
   readonly #files = new Map<string, CatalogFile | null>();
-  /** The answers worked out so far, by lookup. */
-  readonly #answers = new Map<string, string | undefined>();
+  /** The answers cached, by lookup. */
+  readonly #answers = new LruCache<string, string | undefined>(ANSWER_CAPACITY);
 
   /** @internal */
   constructor(settings: CatalogSettings) {
@@ -127,7 +134,7 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
 
   /** The URI an external identifier maps to (§7.1); failing that, as the JDK does, the uri entries' match for its system id. */
   matchEntity(publicId: string | undefined, systemId: string | undefined, baseURI?: string): string | undefined {
-    return this.#remembered(JSON.stringify(['entity', publicId, systemId, baseURI]), () => {
+    return this.#answers.computeIfAbsent(JSON.stringify(['entity', publicId, systemId, baseURI]), () => {
       // A relative system identifier is tried as written against system entries alone, so that none loses to a public one.
       const absolute = resolvedIfRelative(systemId, baseURI);
       const found =
@@ -143,7 +150,7 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
 
   /** The URI a URI reference maps to (§7.2); failing that, as the JDK does, the system entries' match for it. */
   matchURI(uri: string, baseURI?: string): string | undefined {
-    return this.#remembered(JSON.stringify(['uri', uri, baseURI]), () => {
+    return this.#answers.computeIfAbsent(JSON.stringify(['uri', uri, baseURI]), () => {
       const found = lookUpAsWrittenThenAbsolute(uri, baseURI, (id) => this.#resolveURIReference(id as string));
       if (found !== undefined) return found;
       return lookUpAsWrittenThenAbsolute(uri, baseURI, (id) =>
@@ -316,14 +323,5 @@ export class CatalogResolver implements CatalogProcessor, EntityResolver, URIRes
     );
     for (const uri of [...file.nextCatalogs, ...delegated]) this.#readAllFiles({ uri, reachedFrom: link }, expanded);
     expanded.add(link.uri);
-  }
-
-  /** An answer worked out once and remembered, as catalog files do not change. */
-  #remembered(key: string, work: () => string | undefined): string | undefined {
-    if (this.#answers.has(key)) return this.#answers.get(key);
-    const answer = work();
-    if (this.#answers.size >= CACHE_LIMIT) this.#answers.clear();
-    this.#answers.set(key, answer);
-    return answer;
   }
 }
