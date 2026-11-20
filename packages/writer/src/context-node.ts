@@ -16,16 +16,14 @@ export class ContextNode {
   /** Each prefixed attribute's prefix and URI, whose bindings are checked when the tag closes. */
   readonly #attributePrefixes: string[] = [];
   readonly #attributePrefixURIs: string[] = [];
+  #prefixedCount = 0;
 
   /** Starts the tag of an element with a prefix and URI. */
   open(prefix: string, uri: string | undefined): void {
     this.#prefix = prefix;
     this.#uri = uri;
     this.#attributeCount = 0;
-    if (this.#attributePrefixes.length > 0) {
-      this.#attributePrefixes.length = 0;
-      this.#attributePrefixURIs.length = 0;
-    }
+    this.#prefixedCount = 0;
   }
 
   /** Whether the tag already has an attribute of this expanded name; notes it when it does not. */
@@ -42,8 +40,10 @@ export class ContextNode {
 
   /** Notes a prefixed attribute, whose prefix the output must bind to its URI by the time the tag closes. */
   notePrefixedAttribute(prefix: string, uri: string): void {
-    this.#attributePrefixes.push(prefix);
-    this.#attributePrefixURIs.push(uri);
+    const count = this.#prefixedCount;
+    this.#attributePrefixes[count] = prefix;
+    this.#attributePrefixURIs[count] = uri;
+    this.#prefixedCount = count + 1;
   }
 
   /** Why the output does not bind a prefix the tag uses to its URI, or undefined when it binds them all. */
@@ -54,7 +54,7 @@ export class ContextNode {
       if (uri !== '') return `The default namespace is not bound to ${uri}`;
       return 'An element in no namespace needs xmlns="" here: call writeDefaultNamespace(\'\') or turn on repairNamespaces';
     }
-    for (let i = 0; i < this.#attributePrefixes.length; i++) {
+    for (let i = 0; i < this.#prefixedCount; i++) {
       const prefix = this.#attributePrefixes[i] as string;
       if (prefix !== 'xml' && bindings.declaredURIOf(prefix) !== this.#attributePrefixURIs[i]) {
         return `The prefix ${prefix} is not bound to ${this.#attributePrefixURIs[i]}`;

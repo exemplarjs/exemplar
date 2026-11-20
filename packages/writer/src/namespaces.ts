@@ -63,8 +63,11 @@ export class NamespaceBindings {
 
   /** The URI a prefix is bound to, declared or set, or undefined. */
   uriOf(prefix: string): string | undefined {
-    const index = this.#prefixes.lastIndexOf(prefix);
-    return index === -1 ? undefined : this.#uris[index];
+    const prefixes = this.#prefixes;
+    for (let index = prefixes.length - 1; index >= 0; index--) {
+      if (prefixes[index] === prefix) return this.#uris[index];
+    }
+    return undefined;
   }
 
   /** Where the innermost declared binding of a prefix is, at `from` or after; -1 for none. */
