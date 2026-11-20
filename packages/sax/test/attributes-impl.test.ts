@@ -74,6 +74,22 @@ describe('AttributesImpl (SAX AttributesImpl, Attributes2Impl)', () => {
     expect(() => attributes.setAttribute(1, '', 'a', 'a', 'CDATA', '')).toThrow(RangeError);
   });
 
+  it('forgets the attributes it held when it is cleared or given fewer', () => {
+    const attributes = new AttributesImpl(rootAttributes('<r a="1" b="2" c="3"/>'));
+    attributes.setAttributes(rootAttributes('<r x="9"/>'));
+    expect(lines(attributes)).toEqual([' x x CDATA 9 true']);
+    expect([attributes.index('b'), attributes.value('b'), attributes.value('', 'c')]).toEqual([
+      -1,
+      undefined,
+      undefined,
+    ]);
+    expect(() => attributes.qName(1)).toThrow(RangeError);
+    attributes.clear();
+    expect(() => attributes.setValue(0, 'v')).toThrow(RangeError);
+    attributes.addAttribute('', 'd', 'd', 'CDATA', '4');
+    expect(lines(attributes)).toEqual([' d d CDATA 4 true']);
+  });
+
   it('carries changed attributes through a filter to the handler', () => {
     const seen: string[][] = [];
     new SAXParser().parse('<a x="1"/>', {

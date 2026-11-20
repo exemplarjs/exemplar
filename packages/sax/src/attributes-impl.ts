@@ -27,7 +27,9 @@ interface Held {
  * ```
  */
 export class AttributesImpl implements Attributes {
+  /** The attributes held, in the first `#count` places; the array keeps its size when attributes go. */
   readonly #held: Held[] = [];
+  #count = 0;
 
   /** A list holding a copy of the attributes given, or an empty one. */
   constructor(attributes?: Attributes) {
@@ -35,7 +37,7 @@ export class AttributesImpl implements Attributes {
   }
 
   get length(): number {
-    return this.#held.length;
+    return this.#count;
   }
 
   localName(index: number): string {
@@ -74,7 +76,7 @@ export class AttributesImpl implements Attributes {
 
   /** Adds an attribute at the end, as specified in the start tag. */
   addAttribute(uri: string, localName: string, qName: string, type: string, value: string): void {
-    this.#held.push({ uri, localName, qName, type, value, specified: true });
+    this.#held[this.#count++] = { uri, localName, qName, type, value, specified: true };
   }
 
   /** Replaces the attribute at an index. */
@@ -86,27 +88,30 @@ export class AttributesImpl implements Attributes {
   /** Replaces every attribute with a copy of those given. */
   setAttributes(attributes: Attributes): void {
     this.clear();
-    for (let i = 0; i < attributes.length; i++) {
-      this.#held.push({
+    const length = attributes.length;
+    for (let i = 0; i < length; i++) {
+      this.#held[i] = {
         uri: attributes.uri(i),
         localName: attributes.localName(i),
         qName: attributes.qName(i),
         type: attributes.type(i),
         value: attributes.value(i),
         specified: attributes.isSpecified(i),
-      });
+      };
     }
+    this.#count = length;
   }
 
   /** Removes the attribute at an index; those after it move down one. */
   removeAttribute(index: number): void {
     this.#at(index);
     this.#held.splice(index, 1);
+    this.#count--;
   }
 
   /** Removes every attribute. */
   clear(): void {
-    this.#held.length = 0;
+    this.#count = 0;
   }
 
   setURI(index: number, uri: string): void {
@@ -137,7 +142,8 @@ export class AttributesImpl implements Attributes {
   /** The attribute at an index; a RangeError when there is none. */
   #at(index: number): Held {
     const held = this.#held[index];
-    if (held === undefined) throw ErrorFactory.create(RangeError, `Attribute index ${index} is out of range`);
+    if (held === undefined || index >= this.#count)
+      throw ErrorFactory.create(RangeError, `Attribute index ${index} is out of range`);
     return held;
   }
 }
