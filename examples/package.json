@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/examples",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Worked examples of exemplar, each tested against its expected result",
   "license": "Apache-2.0",

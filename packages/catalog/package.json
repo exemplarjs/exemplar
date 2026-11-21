@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/catalog",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "OASIS XML Catalogs 1.1 for @exemplarjs/xml",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",

@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/xpath",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "An XPath 3.1 processor over @exemplarjs/xdm trees",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",

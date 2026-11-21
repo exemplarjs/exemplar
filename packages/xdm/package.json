@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/xdm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "An XDM 3.1 tree built by @exemplarjs/xml, the data model for XPath, XQuery and XSLT",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",

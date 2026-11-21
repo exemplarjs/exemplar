@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/test-support",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "The test fixtures and helpers the @exemplarjs packages' tests share",
   "license": "Apache-2.0",
