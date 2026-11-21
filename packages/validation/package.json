@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/validation",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A DTD validator for @exemplarjs/xml",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",

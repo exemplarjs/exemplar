@@ -1,6 +1,6 @@
 {
   "name": "@exemplarjs/xml",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A fast, W3C-conformant XML reader for TypeScript",
   "license": "Apache-2.0",
   "homepage": "https://exemplar.l47.net",
