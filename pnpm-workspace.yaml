@@ -6,17 +6,17 @@ packages:
 # Every external dependency's version; packages refer to it with `catalog:`.
 catalog:
   '@fast-check/vitest': 0.5.0
-  '@types/node': 24.19.2
+  '@types/node': 26.6.6
   '@vitest/browser-playwright': 5.1.0
   '@vitest/coverage-v8': 5.1.0
   eslint-plugin-sonarjs: 4.2.2
   eslint-plugin-turbo: 2.11.11
   knip: 6.45.1
   lefthook: 2.2.1
-  oxfmt: 0.78.0
-  oxlint: 1.93.0
+  oxfmt: 0.79.0
+  oxlint: 1.94.0
   oxlint-tsgolint: 7.0.2007
-  playwright: 1.65.0
+  playwright: 1.65.1
   rimraf: 6.1.4
   rolldown: 1.3.2
   tsdown: 0.23.7
